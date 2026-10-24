@@ -40,10 +40,13 @@ import ResidentsPage from './ResidentsPage.vue';
 import IslandPage from './IslandPage.vue';
 import ProgressPage from './ProgressPage.vue';
 import HousingPage from './HousingPage.vue';
+import DesignPage from './DesignPage.vue';
 import {
   listenState,
   native,
   request,
+  type DesignData,
+  type DesignKind,
   type HousingData,
   type HousingTarget,
   type HousingKind,
@@ -60,7 +63,16 @@ function stepText(number: number, suffix: 'Title' | 'Body') {
   return t(('step' + number + suffix) as Parameters<typeof t>[0]);
 }
 
-type Page = 'overview' | 'player' | 'inventory' | 'villagers' | 'island' | 'tools' | 'progress' | 'housing';
+type Page =
+  | 'overview'
+  | 'player'
+  | 'inventory'
+  | 'villagers'
+  | 'island'
+  | 'tools'
+  | 'progress'
+  | 'housing'
+  | 'designs';
 const state = ref<State>({ language: 'en', recent: '', session: null, fullScreen: false });
 const page = ref<Page>('overview');
 const playerIndex = ref(0);
@@ -124,6 +136,8 @@ const fields = ref({
 });
 const playerForm = ref<HTMLFormElement | null>(null);
 const residentsPage = ref<InstanceType<typeof ResidentsPage> | null>(null);
+const designData = ref<DesignData | null>(null);
+const designTarget = ref<{ kind: DesignKind; index: number }>({ kind: 'patterns', index: 0 });
 const housingPage = ref<InstanceType<typeof HousingPage> | null>(null);
 const housingData = ref<HousingData | null>(null);
 const housingTarget = ref<HousingTarget>({ kind: 'playerHouses', index: 0, room: 0, layer: 0 });
@@ -148,6 +162,7 @@ const nav = [
   { id: 'inventory', icon: Package },
   { id: 'progress', icon: Check },
   { id: 'housing', icon: Map },
+  { id: 'designs', icon: Palette },
   { id: 'villagers', icon: Users },
   { id: 'island', icon: Leaf },
   { id: 'tools', icon: Map },
@@ -214,6 +229,17 @@ async function run(action: () => Promise<void>) {
   } finally {
     busy.value = false;
   }
+}
+async function loadDesigns() {
+  if (state.value.session) designData.value = await request<DesignData>('designs', { ...designTarget.value });
+}
+async function navigateDesigns(kind: DesignKind, index: number) {
+  if (busy.value) return;
+  await run(async () => {
+    const data = await request<DesignData>('designs', { kind, index });
+    designData.value = data;
+    designTarget.value = { kind: data.kind, index: data.index };
+  });
 }
 async function loadHousing() {
   if (!state.value.session) return;
@@ -284,9 +310,13 @@ async function command(
   }
   return await run(async () => {
     accept(await request<State>(name, payload));
+    // Reopening a save may change the library capacity (50 vs 100 slots).
+    if (['open', 'openRecent', 'closeSave'].includes(name))
+      designTarget.value = { ...designTarget.value, index: 0 };
     if (page.value === 'inventory') await loadInventory();
     if (page.value === 'progress') await loadProgress();
     if (page.value === 'housing') await loadHousing();
+    if (page.value === 'designs') await loadDesigns();
     if (success) toast(success);
   });
 }
@@ -302,6 +332,7 @@ async function go(destination: Page) {
   if (destination === 'inventory') await run(() => loadInventory(0));
   if (destination === 'progress') await run(loadProgress);
   if (destination === 'housing') await run(loadHousing);
+  if (destination === 'designs') await run(loadDesigns);
 }
 async function applyProfile() {
   if (!playerForm.value?.reportValidity()) return false;
@@ -330,6 +361,15 @@ async function applyWorldDrafts() {
 }
 async function worldCommand(name: string, payload: Record<string, unknown> = {}) {
   if (
+    (name === 'tool' && ['patterns', 'proDesigns', 'flag', 'tailor'].includes(String(payload.tool))) ||
+    (name === 'legacy' && payload.section === 'designs')
+  ) {
+    if (busy.value || !(await applyWorldDrafts())) return false;
+    designTarget.value = { kind: (payload.tool as DesignKind) ?? 'patterns', index: 0 };
+    page.value = 'designs';
+    return await run(loadDesigns);
+  }
+  if (
     name === 'tool' &&
     ['playerHouses', 'residentHouses', 'campsite', 'fruitFlowers'].includes(String(payload.tool))
   ) {
@@ -353,7 +393,7 @@ async function worldCommand(name: string, payload: Record<string, unknown> = {})
   return await command(
     name,
     { player: playerIndex.value, ...payload },
-    name === 'legacy' || name === 'tool' ? undefined : 'applied',
+    ['legacy', 'tool', 'designImport', 'designExport', 'designPng'].includes(name) ? undefined : 'applied',
   );
 }
 function chooseSlot(item: ItemView) {
@@ -480,6 +520,7 @@ watch(playerIndex, () => {
   if (page.value === 'inventory') void run(() => loadInventory(0));
   if (page.value === 'progress') void run(loadProgress);
   if (page.value === 'housing') void run(loadHousing);
+  if (page.value === 'designs') void run(loadDesigns);
 });
 watch(container, () => {
   selected.value = null;
@@ -727,7 +768,8 @@ onUnmounted(() => {
             page === 'player' ||
             page === 'inventory' ||
             page === 'progress' ||
-            page === 'housing'
+            page === 'housing' ||
+            page === 'designs'
           "
           class="player-switcher"
           role="group"
@@ -1037,6 +1079,13 @@ onUnmounted(() => {
             </aside>
           </div>
         </section>
+        <DesignPage
+          v-else-if="page === 'designs'"
+          :data="designData"
+          :busy="busy"
+          :execute="worldCommand"
+          :navigate="navigateDesigns"
+        />
         <HousingPage
           v-else-if="page === 'housing'"
           ref="housingPage"

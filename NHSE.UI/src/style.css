@@ -528,6 +528,7 @@ h3 {
   overflow: hidden;
 }
 .sidebar {
+  overflow-y: auto;
   width: 212px;
   flex: 0 0 212px;
   position: sticky;

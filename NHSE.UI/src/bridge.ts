@@ -221,3 +221,11 @@ export interface HousingData {
   locked: boolean;
 }
 export interface HousingTarget { kind: HousingKind; index: number; room: number; layer: number; resident?: number }
+
+export type DesignKind = 'patterns' | 'proDesigns' | 'flag' | 'tailor';
+export interface DesignData {
+  kind: DesignKind;
+  index: number;
+  entries: { index: number; name: string; preview: string }[];
+  selected: { name: string; player: string; town: string; compatibility: number; sheets: string[]; palette: string[] };
+}

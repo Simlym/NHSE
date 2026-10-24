@@ -456,8 +456,113 @@ var oldRoomBefore = originalSave.Main.Data.ToArray();
 oldHousing.SetRoomItem(0, 0, 0, 2, 3, furniture, true, true, false);
 Check(originalSave.Main.GetPlayerHouse(0).GetRoom(0).GetItemLayers()[0].GetTile(3, 3).IsExtension, "original room format supports the same multi-tile placement rules");
 oldHousing.Undo(); Check(originalSave.Main.Data.SequenceEqual(oldRoomBefore), "original room placement undo preserves every byte");
+// Batch 4: preview and file exchange preserve complete design bytes and ownership.
+var designs = new WorkspaceSession(save);
+var designsBefore = save.Main.Data.ToArray();
+var designsPersonalBefore = personal.Data.ToArray();
+var designsOtherBefore = other.Data.ToArray();
+Check(designs.DesignCount("patterns") == save.Main.Offsets.PatternCount && designs.DesignCount("flag") == 1 && designs.DesignCount("tailor") == 8, "design libraries use format-specific capacities and the fixed flag/tailor slots");
+var ordinaryFile = DesignFixture(false, "Pattern A");
+var proFile = DesignFixture(true, "PRO A");
+ExpectInvalid(() => designs.ImportDesigns("patterns", 0, 0, [ordinaryFile, new byte[1]], false));
+ExpectInvalid(() => designs.ImportDesigns("patterns", designs.DesignCount("patterns") - 1, 0, [ordinaryFile, ordinaryFile], false));
+ExpectInvalid(() => designs.ImportDesigns("flag", 1, 0, [ordinaryFile], false));
+ExpectInvalid(() => designs.ImportDesigns("tailor", 8, 0, [proFile], false));
+ExpectInvalid(() => designs.ImportDesigns("proDesigns", 0, 0, [ordinaryFile], false));
+ExpectInvalid(() => designs.ImportDesigns("patterns", 0, -1, [ordinaryFile], false));
+ExpectInvalid(() => designs.GetDesignWorkspace("bad", 0));
+Check(save.Main.Data.SequenceEqual(designsBefore) && !designs.IsDirty, "invalid design batches, kinds and player indexes leave every byte and history unchanged");
+foreach (var kind in new[] { "patterns", "proDesigns", "flag", "tailor" })
+{
+    var file = WorkspaceSession.IsProDesign(kind) ? proFile : ordinaryFile;
+    designs.ImportDesigns(kind, 0, 0, [file], false);
+    Check(designs.DesignBytes(kind, 0).SequenceEqual(file), "valid design import/export roundtrip preserves all bytes: " + kind);
+    designs.Undo(); Check(save.Main.Data.SequenceEqual(designsBefore), "design undo restores all main bytes: " + kind);
+    designs.Redo(); Check(designs.DesignBytes(kind, 0).SequenceEqual(file), "design redo restores the imported file: " + kind);
+    designs.Undo();
+}
+var firstFile = DesignFixture(false, "First"); var secondFile = DesignFixture(false, "Second");
+new DesignPattern(firstFile).GetTownIdentity().CopyTo(firstFile.AsSpan(0xA5 + 64));
+new DesignPattern(firstFile).GetPlayerIdentity().CopyTo(firstFile.AsSpan(0xA5 + 128));
+
+designs.ImportDesigns("patterns", 0, 1, [firstFile, secondFile], true);
+var importedBatch = save.Main.Data.ToArray();
+Check(save.Main.GetDesign(0).IsOriginatedFrom(other) && save.Main.GetDesign(1).IsOriginatedFrom(other), "batch ownership uses the selected player rather than the slot number");
+Check(save.Main.GetDesign(0).Data[0xA5..].SequenceEqual(firstFile.AsSpan(0xA5)) && save.Main.GetDesign(1).Data[0xA5..].SequenceEqual(secondFile.AsSpan(0xA5)), "ownership updates never replace matching identity-like bytes in the palette, pixels or padding");
+firstFile.AsSpan().Fill(255); secondFile.AsSpan().Fill(255);
+designs.Undo(); Check(save.Main.Data.SequenceEqual(designsBefore), "one undo restores an entire multi-file design batch");
+designs.Redo(); Check(save.Main.Data.SequenceEqual(importedBatch), "design history owns copies independent of imported byte arrays");
+designs.Save();
+var savedDesignBatch = save.Main.Data.ToArray();
+var noOpFiles = new[] { designs.DesignBytes("patterns", 0), designs.DesignBytes("patterns", 1) };
+designs.ImportDesigns("patterns", 0, 1, noOpFiles, false);
+Check(!designs.IsDirty, "importing identical valid files adds no revision");
+var detachedExport = designs.DesignBytes("patterns", 0); detachedExport[0] ^= 255;
+Check(save.Main.Data.SequenceEqual(savedDesignBatch), "exported design buffers cannot mutate the save");
+var transparent = DesignFixture(false, "Transparent");
+new DesignPattern(transparent).UsageCompatibility = 0xDEADBEEF;
+new DesignPattern(transparent)[1023] = 15;
+designs.ImportDesigns("flag", 0, 0, [transparent], false);
+Check(save.Main.FlagMyDesign.UsageCompatibility == 0xEE02 && save.Main.FlagMyDesign[1023] == 15, "ordinary compatibility repair detects transparent pixels without changing the pixels");
+var opaque = DesignFixture(false, "Opaque"); new DesignPattern(opaque).UsageCompatibility = 0;
+designs.ImportDesigns("patterns", designs.DesignCount("patterns") - 1, 0, [opaque], false);
+Check(save.Main.GetDesign(designs.DesignCount("patterns") - 1).UsageCompatibility == 0xEE00, "opaque compatibility repair uses the regular design flag");
+var proInvalid = DesignFixture(true, "PRO repaired"); new DesignPatternPRO(proInvalid).UsageCompatibility = 0;
+designs.ImportDesigns("proDesigns", 0, 0, [proInvalid], false);
+Check(save.Main.GetDesignPRO(0).UsageCompatibility == 0xEE01, "PRO compatibility repair uses the PRO flag");
+var proUnused = DesignFixture(true, "Unused PRO"); new DesignPatternPRO(proUnused).UsageCompatibility = 0xEE05;
+designs.ImportDesigns("tailor", 7, 0, [proUnused], false);
+Check(designs.DesignBytes("tailor", 7).SequenceEqual(proUnused), "known unused PRO compatibility is retained in the last tailor slot");
+var preview = designs.GetDesignWorkspace("proDesigns", 0);
+Check(preview.Entries.Length == designs.DesignCount("proDesigns") && preview.Selected.Sheets.Length == 4 && preview.Selected.Palette.Length == 15 && preview.Selected.Palette[0] == "#112233", "design previews expose every slot, four PRO sheets and the correct RGB palette");
+for (var sheet = 0; sheet < 4; sheet++)
+{
+    var bitmap = Convert.FromBase64String(preview.Selected.Sheets[sheet]);
+    Check(bitmap.Length == 4096 && bitmap[0] == 0x33 + sheet && bitmap[1] == 0x22 + sheet && bitmap[2] == 0x11 + sheet && bitmap[3] == 255
+        && bitmap[4092] == 0x33 + sheet, "PRO preview keeps sheet offsets independent: " + sheet);
+}
+var transparentPreview = designs.GetDesignWorkspace("flag", 0);
+Check(Convert.FromBase64String(transparentPreview.Selected.Sheets[0])[4095] == 0, "transparent design pixels keep zero alpha in previews");
+Check(personal.Data.SequenceEqual(designsPersonalBefore) && other.Data.SequenceEqual(designsOtherBefore), "design operations never alter player files");
+designs.Save();
+var designsReload = new HorizonSave(provider);
+Check(designsReload.Main.GetDesign(0).IsOriginatedFrom(designsReload.Players[1].Personal) && designsReload.Main.FlagMyDesign.UsageCompatibility == 0xEE02
+    && designsReload.Main.GetDesignPRO(0).DesignName == "PRO repaired" && designsReload.Main.GetDesignsTailor()[7].Data.SequenceEqual(proUnused)
+    && !designsReload.GetInvalidHashes().Any(), "all four design libraries survive encrypted save/reload with valid hashes");
+var oldDesigns = new WorkspaceSession(originalSave);
+var oldDesignBefore = originalSave.Main.Data.ToArray();
+Check(oldDesigns.DesignCount("patterns") == 50, "original saves retain their 50-slot design capacity");
+oldDesigns.ImportDesigns("patterns", 49, 0, [ordinaryFile], false);
+Check(oldDesigns.DesignBytes("patterns", 49).SequenceEqual(ordinaryFile), "original save imports the last available design slot");
+oldDesigns.Undo(); Check(originalSave.Main.Data.SequenceEqual(oldDesignBefore), "original save design undo restores every byte");
 Console.WriteLine("All workspace integration checks passed.");
 if (args.Length == 2 && args[0] == "--fixture") provider.Export(args[1]);
+
+static byte[] DesignFixture(bool pro, string name)
+{
+    var bytes = new byte[pro ? DesignPatternPRO.SIZE : DesignPattern.SIZE];
+    bytes[^1] = 0xCD;
+    if (pro)
+    {
+        var p = new DesignPatternPRO(bytes) { DesignName = name, PlayerName = "Author", TownName = "Origin", PlayerID = 55, TownID = 66, UsageCompatibility = 0xEE01, Version = 123, Hash = 456 };
+        for (var i = 0; i < 15; i++)
+        {
+            var offset = DesignPatternPRO.GetColorOffset(i);
+            bytes[offset] = (byte)(0x11 + i); bytes[offset + 1] = (byte)(0x22 + i); bytes[offset + 2] = (byte)(0x33 + i);
+        }
+        for (var sheet = 0; sheet < 4; sheet++) for (var i = 0; i < 1024; i++) p.SetPixelAtIndex(sheet, i, sheet);
+    }
+    else
+    {
+        var p = new DesignPattern(bytes) { DesignName = name, PlayerName = "Author", TownName = "Origin", PlayerID = 55, TownID = 66, UsageCompatibility = 0xEE00, Version = 123, Hash = 456 };
+        for (var i = 0; i < 15; i++)
+        {
+            var offset = DesignPattern.GetColorOffset(i);
+            bytes[offset] = (byte)(0x11 + i); bytes[offset + 1] = (byte)(0x22 + i); bytes[offset + 2] = (byte)(0x33 + i);
+        }
+    }
+    return bytes;
+}
 
 static Dictionary<string, System.Text.Json.JsonElement> HousingValues(params (string Key, object Value)[] fields) => fields.ToDictionary(f => f.Key, f => System.Text.Json.JsonSerializer.SerializeToElement(f.Value));
 

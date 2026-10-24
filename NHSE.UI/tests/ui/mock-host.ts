@@ -236,7 +236,37 @@ export async function mockHost(page: Page, picker = false) {
             : null,
       };
     };
+    function designBitmap(sheet: number) {
+      const bytes = new Uint8Array(4096);
+      for (let i = 0; i < bytes.length; i += 4) {
+        bytes[i] = 51 + sheet;
+        bytes[i + 1] = 34 + sheet;
+        bytes[i + 2] = 17 + sheet;
+        bytes[i + 3] = 255;
+      }
+      if (sheet === 3) bytes[4095] = 0;
+      return btoa(String.fromCharCode(...bytes));
+    }
+    let designRecords = Object.fromEntries(
+      ['patterns', 'proDesigns', 'flag', 'tailor'].map((kind) => [
+        kind,
+        Array.from({ length: kind === 'flag' ? 1 : kind === 'tailor' ? 8 : 100 }, (_, index) => ({
+          name: `${kind} ${index + 1}`,
+          player: 'Author',
+          town: 'Origin',
+          compatibility: kind === 'patterns' || kind === 'flag' ? 0xee00 : 0xee01,
+          sheets: Array.from({ length: kind === 'proDesigns' || kind === 'tailor' ? 4 : 1 }, (_, i) =>
+            designBitmap(i),
+          ),
+          palette: Array.from(
+            { length: 15 },
+            (_, i) => '#' + [17 + i, 34 + i, 51 + i].map((v) => v.toString(16).padStart(2, '0')).join(''),
+          ),
+        })),
+      ]),
+    );
     type Snapshot = {
+      designRecords: typeof designRecords;
       housingRecords: typeof housingRecords;
       progressRecords: typeof progressRecords;
       turnips: typeof turnips;
@@ -260,12 +290,14 @@ export async function mockHost(page: Page, picker = false) {
         recycleItem,
         progressRecords,
         housingRecords,
+        designRecords,
       });
     const restore = (value: Snapshot) => {
       turnips = value.turnips;
       recycleItem = value.recycleItem;
       progressRecords = value.progressRecords;
       housingRecords = value.housingRecords;
+      designRecords = value.designRecords;
       players = value.players;
       item = value.item;
       revision = value.revision;
@@ -404,6 +436,35 @@ export async function mockHost(page: Page, picker = false) {
                 freeParam: p.delete ? 0 : Number(p.freeParam),
               };
             }
+            if (message.command === 'designImport') {
+              const controls = window as unknown as {
+                nhseDesignCancelNext?: boolean;
+                nhseDesignErrorNext?: string;
+              };
+              if (controls.nhseDesignErrorNext) {
+                const error = controls.nhseDesignErrorNext;
+                controls.nhseDesignErrorNext = undefined;
+                queueMicrotask(() =>
+                  listeners.forEach((fn) => fn({ data: { id: message.id, ok: false, error } })),
+                );
+                return;
+              }
+              if (controls.nhseDesignCancelNext) controls.nhseDesignCancelNext = false;
+              else {
+                remember();
+                const entries = designRecords[String(p.kind)]!;
+                const start = p.all ? 0 : Number(p.index);
+                const count = p.all ? Math.min(2, entries.length) : 1;
+                for (let i = 0; i < count; i++) {
+                  const entry = entries[start + i]!;
+                  entry.name = `Imported ${i + 1}`;
+                  if (p.useCurrentPlayer) {
+                    entry.player = players[Number(p.player)]!.name;
+                    entry.town = players[Number(p.player)]!.island;
+                  }
+                }
+              }
+            }
             if (message.command === 'setPlayer') {
               remember();
               const player = players[Number(p.player)]!;
@@ -479,7 +540,19 @@ export async function mockHost(page: Page, picker = false) {
             }
             if (message.command === 'save') savedRevision = revision;
             if (message.command === 'closeSave') opened = false;
-            if (message.command === 'housing') {
+            if (message.command === 'designs') {
+              const entries = designRecords[String(p.kind)]!;
+              data = {
+                kind: p.kind,
+                index: p.index,
+                entries: entries.map((entry, index) => ({
+                  index,
+                  name: entry.name,
+                  preview: entry.sheets[0],
+                })),
+                selected: entries[Number(p.index)],
+              };
+            } else if (message.command === 'housing') {
               data = housing(p);
             } else if (message.command === 'progress') {
               data = {

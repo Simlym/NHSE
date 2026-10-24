@@ -15,10 +15,9 @@ The shared 40-slot recycle box uses the workspace inventory grid and item catalo
 it is accessible from both inventory and the island shortcut. Both editors join
 the same undo/redo history and only write to disk on Save.
 
-Terrain and all four design
-editors open directly from the workspace's labeled shortcuts. These specialized
-C# editors share the current save; changed byte ranges across main and player
-files join the workspace's undo history. Unchanged dialogs add no history; an
+The terrain editor opens directly from the workspace's labeled shortcut. This
+specialized C# editor shares the current save; changed byte ranges across main
+and player files join the workspace's undo history. Unchanged dialogs add no history; an
 exception restores the pre-dialog bytes. Detailed properties, import/export and
 console tools remain available in the full original editor.
 
@@ -70,6 +69,30 @@ profile from island fruit. Changing native island fruit updates its five flags;
 flower-only changes preserve unrelated fruit data. All pages share save/undo/redo
 and retain drafts through language changes. House and room import/export remains
 available in the original editor as part of the later import/export migration.
+
+## Custom designs
+
+The design workspace previews ordinary patterns, PRO patterns, the island flag
+and tailor designs with their real save-format slot counts. A searchable thumbnail
+library renders 32×32 images from BGRA bitmap data without filtering; PRO designs
+show all four independent sheets, and index 15 remains transparent. Creator, island
+and the 15-color palette are displayed alongside the previews.
+
+The bounded native bridge offers single and folder import/export using the original
+`.nhd` / `.nhpd` formats, plus PNG export for a selected sheet or palette. Native
+file/folder dialogs select local paths. The import ownership selector explicitly
+keeps the file's creator or assigns the currently selected player. Assigning a
+player copies only the two identity fields, preserving matching bytes in pixels.
+Known compatibility flags and all unknown/padding bytes are retained; invalid
+compatibility uses the original regular-transparent / PRO repair rules.
+
+Folder imports sort files by filename and replace from slot 1. All files are
+validated against the design type and capacity before a single batch commit;
+malformed or oversized batches change nothing. A single undo restores the whole
+batch. Cancelling dialogs and importing identical valid files add no history.
+Exports preserve file bytes and never dirty the session. Batch exports include
+slot numbers to distinguish identical names. Imports change memory; workspace
+Save performs the normal encryption and hash updates.
 
 ## Build and run
 

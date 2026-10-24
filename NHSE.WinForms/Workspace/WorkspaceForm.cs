@@ -125,7 +125,7 @@ public sealed partial class WorkspaceForm : Form
         catch (Exception ex)
         {
             if (id is not null)
-                Reply(new { id, ok = false, error = ex.Message is "villagerHouseMissing" or "roomPlacementBlocked" ? ex.Message : ex is ArgumentException ? "invalidRequest" : "operationFailed", detail = ex.Message });
+                Reply(new { id, ok = false, error = ex.Message is "villagerHouseMissing" or "roomPlacementBlocked" or "designFileSize" or "designCapacity" or "designNoFiles" ? ex.Message : ex is ArgumentException ? "invalidRequest" : "operationFailed", detail = ex.Message });
         }
         finally { if (claimed) HandlingMessage = false; }
     }
@@ -265,6 +265,16 @@ public sealed partial class WorkspaceForm : Form
             case "setPlayer":
                 RequireSession().SetPlayer(Int(p, "player"), p.GetProperty("wallet").GetUInt32(), p.GetProperty("bank").GetUInt32(), p.GetProperty("miles").GetUInt32(), p.GetProperty("earnedMiles").GetUInt32(),
                     Str(p, "name"), Str(p, "island"), OptionalUInt(p, "pocketCapacity"), OptionalUInt(p, "storageCapacity"), OptionalUInt(p, "hotelTickets"), OptionalUInt(p, "poki"));
+                return State();
+            case "designs": return RequireSession().GetDesignWorkspace(Str(p, "kind"), Int(p, "index"));
+            case "designImport":
+                ImportDesignFiles(Str(p, "kind"), Int(p, "index"), Int(p, "player"), p.GetProperty("all").GetBoolean(), p.GetProperty("useCurrentPlayer").GetBoolean());
+                return State();
+            case "designExport":
+                ExportDesignFiles(Str(p, "kind"), Int(p, "index"), p.GetProperty("all").GetBoolean());
+                return State();
+            case "designPng":
+                ExportDesignPng(Str(p, "kind"), Int(p, "index"), Int(p, "sheet"), p.GetProperty("palette").GetBoolean());
                 return State();
             case "housing": return RequireSession().GetHousing(Str(p, "kind"), Int(p, "player"), p.TryGetProperty("resident", out var houseResident) ? RequireSession().FindResidentHouse(houseResident.GetInt32()) : Int(p, "index"), Int(p, "room"), Int(p, "layer"), Sprite);
             case "setHousing":

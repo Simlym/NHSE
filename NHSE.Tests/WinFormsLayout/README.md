@@ -80,6 +80,31 @@ Application compatibility override still require the manual checks below.
 
 ## Manual display checks
 
+### Map workspace
+
+The field map editor opens maximized, supports resizing, and offers a full-screen
+button or F11. Press F11 again or Escape to restore the previous window state.
+The left viewport fills the available square area, navigation remains in the
+middle column, and editing tabs remain in the right column. Save/Cancel are in a
+separate bottom row. The navigation column scrolls if the window is short.
+
+The viewport uses integer pixels per tile and regenerates its cached render layers
+after a short resize debounce. Mouse positions are mapped through the displayed
+image dimensions for both the viewport and overview, including while resizing.
+
+```powershell
+pwsh -NoProfile -STA -File NHSE.Tests/WinFormsLayout/Smoke-MapEditor.ps1 -BuildDirectory .\NHSE.WinForms\bin\Release\net10.0-windows
+```
+
+This smoke test constructs the real map editor from synthetic in-memory save data,
+checks all 1024 tile positions at maximum/minimum/full-screen/restored sizes, checks
+overview navigation, verifies both render layers and display dimensions agree,
+and verifies that the underlying save bytes are unchanged. It does not read or
+write user saves. `Verify-Layout.ps1` also checks the map's four editing tabs,
+footer, full-screen button, and Escape restoration.
+
+### Display settings
+
 1. Build `NHSE.WinForms/NHSE.WinForms.csproj` with the .NET 10 SDK.
 2. Set Windows scaling to 100%, 125%, 150%, then 200%, restarting NHSE each time.
 3. Repeat with the Windows high-DPI compatibility override set to Application.

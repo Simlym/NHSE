@@ -24,6 +24,12 @@ foreach ($file in $files) {
     $sources.Add("namespace $namespace { public partial class $name : $baseType { public $simpleName() { InitializeComponent(); } $extra } }")
 }
 $sources.Add((Get-Content "$repo\NHSE.WinForms\Controls\ItemGrid.cs" -Raw).Replace('namespace NHSE.WinForms;', 'namespace NHSE.WinForms {') + "`n}")
+if ($Source -ne 'original') {
+    foreach ($layoutSource in 'Subforms\Map\FieldItemEditor.Layout.cs') {
+        $sources.Add((Get-Content "$repo\NHSE.WinForms\$layoutSource" -Raw).Replace('namespace NHSE.WinForms;', 'namespace NHSE.WinForms {') + "`n}")
+    }
+}
+$sources.Add((Get-Content "$repo\NHSE.WinForms\Util\MapViewportGeometry.cs" -Raw).Replace('namespace NHSE.WinForms;', 'namespace NHSE.WinForms {') + "`n}")
 $sources.Add(@'
 namespace NHSE.Core { public interface IGridItem { int Width { get; } int Height { get; } } }
 namespace NHSE.WinForms { public class InterpolatingPictureBox : System.Windows.Forms.PictureBox {} }
@@ -70,7 +76,8 @@ public static class LayoutAudit
             form.PerformLayout();
             Application.DoEvents();
             CheckChildren(form, failures, form.Name);
-            if (form.FormBorderStyle == FormBorderStyle.Sizable) {
+            if (form.Name == "FieldItemEditor" && form.Controls.Find("TLP_Workspace", true).Length != 0) CheckMapWorkspace(form, failures);
+            if (form.FormBorderStyle == FormBorderStyle.Sizable && form.Name != "FieldItemEditor") {
                 var initial = form.ClientSize;
                 form.Size = new Size(1, 1);
                 if (form.ClientSize.Width < initial.Width || form.ClientSize.Height < initial.Height)
@@ -83,7 +90,7 @@ public static class LayoutAudit
                 if (!form.ClientRectangle.Contains(button.Bounds)) failures.Add($"OUTSIDE {form.Name}.{button.Name}: {button.Bounds} / {form.ClientSize}");
                 if (button.Height < TextRenderer.MeasureText(button.Text, button.Font).Height + 4) failures.Add($"TEXT HEIGHT {form.Name}.{button.Name}");
             }
-            if (type.Name == "SingleItemEditor" || type.Name == "PlayerItemEditor" || type.Name == "Editor")
+            if (type.Name == "SingleItemEditor" || type.Name == "PlayerItemEditor" || type.Name == "Editor" || type.Name == "FieldItemEditor")
             {
                 foreach (var controlName in new[] { "ItemEditor", "FLP_Controls", "FLP_Count", "FLP_Uses", "L_Count", "L_Uses", "NUD_Count" })
                     foreach (var child in form.Controls.Find(controlName, true))
@@ -105,6 +112,69 @@ public static class LayoutAudit
         if (translations.TryGetValue(control is Form ? formName : formName + "." + control.Name, out var value)) control.Text = value;
         foreach (Control child in control.Controls) Translate(child, formName, translations);
     }
+    private static void CheckMapWorkspace(Form form, List<string> failures)
+    {
+        if (form.WindowState != FormWindowState.Maximized || !form.MaximizeBox)
+            failures.Add("MAP MUST OPEN MAXIMIZED");
+        var viewport = form.Controls.Find("PB_Viewport", true).Single();
+        int maximizedWidth = viewport.Width;
+        CheckMapBounds(form, failures);
+        var tabs = (TabControl)form.Controls.Find("TC_Editor", true).Single();
+        foreach (TabPage page in tabs.TabPages)
+        {
+            tabs.SelectedTab = page;
+            Application.DoEvents();
+            CheckChildren(form, failures, form.Name);
+        }
+        tabs.SelectedIndex = 0;
+        form.WindowState = FormWindowState.Normal;
+        form.Size = form.MinimumSize;
+        Application.DoEvents();
+        CheckMapBounds(form, failures);
+        if (viewport.Width >= maximizedWidth) failures.Add("MAP VIEW DOES NOT GROW WITH WINDOW");
+        form.WindowState = FormWindowState.Maximized;
+        Application.DoEvents();
+        var fullScreen = (Button)form.Controls.Find("B_FullScreen", true).Single();
+        fullScreen.PerformClick();
+        Application.DoEvents();
+        if (form.FormBorderStyle != FormBorderStyle.None || form.Bounds != Screen.FromControl(form).Bounds)
+            failures.Add("MAP FULL SCREEN DOES NOT FILL MONITOR");
+        CheckMapBounds(form, failures);
+        var command = form.GetType().GetMethod("ProcessCmdKey", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        command.Invoke(form, new object[] { new Message(), Keys.Escape });
+        Application.DoEvents();
+        if (form.FormBorderStyle != FormBorderStyle.Sizable || form.WindowState != FormWindowState.Maximized)
+            failures.Add("MAP ESC DOES NOT RESTORE MAXIMIZED WINDOW");
+        CheckMapBounds(form, failures);
+
+        foreach (int side in new[] { 512, 788, 1000, 1920, 2160 })
+        {
+            for (int y = 0; y < 32; y++)
+                for (int x = 0; x < 32; x++)
+                {
+                    var position = new Point((2 * x + 1) * side / 64, (2 * y + 1) * side / 64);
+                    var mapped = NHSE.WinForms.MapViewportGeometry.ToImage(position, new Size(side, side), new Size(512, 512));
+                    if (mapped.X / 16 != x || mapped.Y / 16 != y) failures.Add("MAP TILE COORDINATE DRIFT");
+                }
+            var edge = NHSE.WinForms.MapViewportGeometry.ToImage(new Point(side, side), new Size(side, side), new Size(512, 512));
+            if (edge != new Point(511, 511)) failures.Add("MAP EDGE WRAPS TO OPPOSITE CORNER");
+        }
+        var overview = NHSE.WinForms.MapViewportGeometry.ToImage(new Point(300, 264), new Size(600, 528), new Size(288, 256));
+        if (overview != new Point(144, 128)) failures.Add("MINIMAP COORDINATE DRIFT");
+    }
+    private static void CheckMapBounds(Form form, List<string> failures)
+    {
+        var viewport = form.Controls.Find("PB_Viewport", true).Single();
+        if (!viewport.Parent.ClientRectangle.Contains(viewport.Bounds) || viewport.Width != viewport.Height)
+            failures.Add("MAP VIEWPORT MUST FIT AS SQUARE");
+        if (viewport.Width < 256) failures.Add("MAP VIEWPORT TOO SMALL TO EDIT AT MINIMUM SIZE");
+        foreach (var name in new[] { "B_Save", "B_Cancel", "B_FullScreen", "TC_Editor" })
+        {
+            var control = form.Controls.Find(name, true).Single();
+            var bounds = form.RectangleToClient(control.Parent.RectangleToScreen(control.Bounds));
+            if (!form.ClientRectangle.Contains(bounds)) failures.Add("MAP CONTROL OUTSIDE WINDOW: " + name);
+        }
+    }
     private static void CheckChildren(Control parent, List<string> failures, string path)
     {
         foreach (Control child in parent.Controls)
@@ -112,8 +182,9 @@ public static class LayoutAudit
             if (!child.Visible || child is ToolStrip) continue;
             if (child is Button && !(parent is ScrollableControl sc && sc.AutoScroll) && !parent.ClientRectangle.Contains(child.Bounds))
                 failures.Add($"CLIPPED {path}.{child.Name}: {child.Bounds} / {parent.ClientSize}");
-            if (child is Button b && TextRenderer.MeasureText(b.Text, b.Font).Width + 4 > b.ClientSize.Width)
-                failures.Add($"BUTTON TEXT WIDTH {path}.{child.Name}");
+            if (child is Button b && TextRenderer.MeasureText(b.Text, b.Font,
+                new Size(Math.Max(1, b.ClientSize.Width - 8), int.MaxValue), TextFormatFlags.WordBreak).Height + 4 > b.ClientSize.Height)
+                failures.Add($"BUTTON TEXT CLIPPED {path}.{child.Name}");
             if (child is NumericUpDown && parent is FlowLayoutPanel && !parent.ClientRectangle.Contains(child.Bounds))
                 failures.Add($"NUMBER CLIPPED {path}.{child.Name}");
             if ((path.Contains(".ItemEditor") || path.Contains(".VillagerEditor")) && child is Label label && !label.AutoSize && !string.IsNullOrEmpty(label.Text))

@@ -20,7 +20,7 @@ public sealed partial class FieldItemEditor : Form, IItemLayerEditor
 {
     private readonly MainSave SAV;
     private readonly MapEditor Editor;
-    private readonly MapRenderer Renderer;
+    private MapRenderer Renderer;
 
     private MapViewState View => Editor.Mutator.View;
     private MapTileManager Map => Editor.Mutator.Manager;
@@ -79,6 +79,23 @@ public sealed partial class FieldItemEditor : Form, IItemLayerEditor
         LB_Items.SelectedIndex = 0; // triggers a draw
 
         Loading = false;
+        ViewportResized = UpdateViewportResolution;
+        UpdateViewportResolution();
+    }
+
+    private void UpdateViewportResolution()
+    {
+        int scale = Math.Max(1, (PB_Viewport.Width - 2) / LayerFieldItem.TilesPerAcreDim);
+        if (Loading || Editor.ViewScale == scale)
+            return;
+
+        var previous = Renderer;
+        Editor.ViewScale = scale;
+        Renderer = new MapRenderer(Editor);
+        ResetDrag();
+        ReloadMapBackground();
+        LoadItemGridAcre();
+        previous.Dispose();
     }
 
     private void LoadComboBoxes()
@@ -340,8 +357,10 @@ public sealed partial class FieldItemEditor : Form, IItemLayerEditor
 
     private (int X, int Y) GetViewCoordinates(MouseEventArgs e)
     {
-        var x = e.X / Editor.ViewScale;
-        var y = e.Y / Editor.ViewScale;
+        var image = PB_Viewport.Image?.Size ?? new Size(Editor.ViewScale * LayerFieldItem.TilesPerAcreDim, Editor.ViewScale * LayerFieldItem.TilesPerAcreDim);
+        var location = MapViewportGeometry.ToImage(e.Location, PB_Viewport.ClientSize, image);
+        var x = location.X / Editor.ViewScale;
+        var y = location.Y / Editor.ViewScale;
         return (x, y);
     }
 
@@ -958,7 +977,8 @@ public sealed partial class FieldItemEditor : Form, IItemLayerEditor
 
     private void ClickMapAt(MouseEventArgs e)
     {
-        var (absX, absY) = Editor.GetMapCoordinates(e.X, e.Y, CHK_SnapToAcre.Checked ? MapViewCoordinateRequest.SnapAcre : MapViewCoordinateRequest.Centered);
+        var location = GetMapImageCoordinates(e.Location);
+        var (absX, absY) = Editor.GetMapCoordinates(location.X, location.Y, CHK_SnapToAcre.Checked ? MapViewCoordinateRequest.SnapAcre : MapViewCoordinateRequest.Centered);
 
         // Truncate to root-node coordinates. The map is only 1px per tile, and nobody is wanting to click on extension-tiles.
         absX &= 0xFFFE;
@@ -976,10 +996,14 @@ public sealed partial class FieldItemEditor : Form, IItemLayerEditor
         }
         else if (e.Button == MouseButtons.None)
         {
-            var (absX, absY) = Editor.GetCursorCoordinates(e.X, e.Y);
+            var location = GetMapImageCoordinates(e.Location);
+            var (absX, absY) = Editor.GetCursorCoordinates(location.X, location.Y);
             SetCoordinateText(absX, absY);
         }
     }
+
+    private Point GetMapImageCoordinates(Point location)
+        => MapViewportGeometry.ToImage(location, PB_Map.ClientSize, PB_Map.Image?.Size ?? PB_Map.BackgroundImage?.Size ?? PB_Map.ClientSize);
 
     private void SetCoordinateText(int absX, int absY) => L_Coordinates.Text = $"({absX:000},{absY:000}) = (0x{absX:X2},0x{absY:X2})";
 
@@ -1276,7 +1300,13 @@ public sealed partial class FieldItemEditor : Form, IItemLayerEditor
         tbeForm.BringToFront();
     }
 
-    private void FieldItemEditor_FormClosed(object sender, FormClosedEventArgs e) => tbeForm?.Close();
+    private void FieldItemEditor_FormClosed(object sender, FormClosedEventArgs e)
+    {
+        ViewportResized = null;
+        ViewportResizeTimer.Stop();
+        tbeForm?.Close();
+        Renderer.Dispose();
+    }
 }
 
 public interface IItemLayerEditor

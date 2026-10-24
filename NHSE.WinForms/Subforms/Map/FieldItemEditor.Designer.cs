@@ -158,6 +158,10 @@
             PAN_Arrows = new System.Windows.Forms.Panel();
             tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             tableLayoutPanel2 = new System.Windows.Forms.TableLayoutPanel();
+            TLP_Workspace = new System.Windows.Forms.TableLayoutPanel();
+            PAN_Viewport = new System.Windows.Forms.Panel();
+            FLP_Actions = new System.Windows.Forms.FlowLayoutPanel();
+            B_FullScreen = new System.Windows.Forms.Button();
             CM_Click.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)PB_Map).BeginInit();
             CM_Picture.SuspendLayout();
@@ -195,11 +199,16 @@
             PAN_Arrows.SuspendLayout();
             tableLayoutPanel1.SuspendLayout();
             tableLayoutPanel2.SuspendLayout();
+            TLP_Workspace.SuspendLayout();
+            PAN_Viewport.SuspendLayout();
+            FLP_Actions.SuspendLayout();
             SuspendLayout();
             // 
             // B_Cancel
             // 
             B_Cancel.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
+            B_Cancel.AutoSize = true;
+            B_Cancel.MinimumSize = new System.Drawing.Size(84, 30);
             B_Cancel.Location = new System.Drawing.Point(976, 595);
             B_Cancel.Margin = new System.Windows.Forms.Padding(4);
             B_Cancel.Name = "B_Cancel";
@@ -212,6 +221,8 @@
             // B_Save
             // 
             B_Save.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
+            B_Save.AutoSize = true;
+            B_Save.MinimumSize = new System.Drawing.Size(84, 30);
             B_Save.Location = new System.Drawing.Point(1067, 595);
             B_Save.Margin = new System.Windows.Forms.Padding(4);
             B_Save.Name = "B_Save";
@@ -303,12 +314,13 @@
             // PB_Map
             // 
             PB_Map.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            PB_Map.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
             PB_Map.ContextMenuStrip = CM_Picture;
             PB_Map.Location = new System.Drawing.Point(0, 27);
             PB_Map.Margin = new System.Windows.Forms.Padding(0);
             PB_Map.Name = "PB_Map";
             PB_Map.Size = new System.Drawing.Size(288, 256);
-            PB_Map.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
+            PB_Map.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
             PB_Map.TabIndex = 23;
             PB_Map.TabStop = false;
             PB_Map.MouseDown += PB_Map_MouseDown;
@@ -402,12 +414,13 @@
             // PB_Viewport
             // 
             PB_Viewport.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            PB_Viewport.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
             PB_Viewport.ContextMenuStrip = CM_Click;
             PB_Viewport.Location = new System.Drawing.Point(17, 17);
             PB_Viewport.Margin = new System.Windows.Forms.Padding(8);
             PB_Viewport.Name = "PB_Viewport";
             PB_Viewport.Size = new System.Drawing.Size(514, 514);
-            PB_Viewport.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
+            PB_Viewport.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
             PB_Viewport.TabIndex = 28;
             PB_Viewport.TabStop = false;
             PB_Viewport.MouseClick += ViewportMouseClick;
@@ -607,7 +620,7 @@
             // 
             // TC_Editor
             // 
-            TC_Editor.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            TC_Editor.Dock = System.Windows.Forms.DockStyle.Fill;
             TC_Editor.Controls.Add(Tab_Item);
             TC_Editor.Controls.Add(Tab_Building);
             TC_Editor.Controls.Add(Tab_Terrain);
@@ -636,7 +649,7 @@
             // 
             // ItemEdit
             // 
-            ItemEdit.Dock = System.Windows.Forms.DockStyle.Top;
+            ItemEdit.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
             ItemEdit.Location = new System.Drawing.Point(4, 4);
             ItemEdit.Margin = new System.Windows.Forms.Padding(5);
             ItemEdit.Name = "ItemEdit";
@@ -1539,8 +1552,8 @@
             // 
             // tableLayoutPanel2
             // 
-            tableLayoutPanel2.AutoSize = true;
-            tableLayoutPanel2.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            tableLayoutPanel2.AutoScroll = true;
+            tableLayoutPanel2.Dock = System.Windows.Forms.DockStyle.Fill;
             tableLayoutPanel2.ColumnCount = 1;
             tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             tableLayoutPanel2.Controls.Add(FLP_GridOptions, 0, 4);
@@ -1558,25 +1571,71 @@
             tableLayoutPanel2.RowStyles.Add(new System.Windows.Forms.RowStyle());
             tableLayoutPanel2.Size = new System.Drawing.Size(288, 534);
             tableLayoutPanel2.TabIndex = 103;
+            //
+            // TLP_Workspace
+            //
+            TLP_Workspace.ColumnCount = 3;
+            TLP_Workspace.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            TLP_Workspace.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 312F));
+            TLP_Workspace.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 300F));
+            TLP_Workspace.Controls.Add(PAN_Viewport, 0, 0);
+            TLP_Workspace.Controls.Add(tableLayoutPanel2, 1, 0);
+            TLP_Workspace.Controls.Add(TC_Editor, 2, 0);
+            TLP_Workspace.Controls.Add(FLP_Actions, 0, 1);
+            TLP_Workspace.SetColumnSpan(FLP_Actions, 3);
+            TLP_Workspace.Dock = System.Windows.Forms.DockStyle.Fill;
+            TLP_Workspace.Name = "TLP_Workspace";
+            TLP_Workspace.Padding = new System.Windows.Forms.Padding(8);
+            TLP_Workspace.RowCount = 2;
+            TLP_Workspace.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            TLP_Workspace.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            TLP_Workspace.Size = new System.Drawing.Size(1164, 641);
+            //
+            // PAN_Viewport
+            //
+            PAN_Viewport.Controls.Add(PB_Viewport);
+            PAN_Viewport.Dock = System.Windows.Forms.DockStyle.Fill;
+            PAN_Viewport.Margin = new System.Windows.Forms.Padding(8);
+            PAN_Viewport.Name = "PAN_Viewport";
+            //
+            // FLP_Actions
+            //
+            FLP_Actions.AutoSize = true;
+            FLP_Actions.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            FLP_Actions.Controls.Add(B_Save);
+            FLP_Actions.Controls.Add(B_Cancel);
+            FLP_Actions.Controls.Add(B_FullScreen);
+            FLP_Actions.Dock = System.Windows.Forms.DockStyle.Fill;
+            FLP_Actions.FlowDirection = System.Windows.Forms.FlowDirection.RightToLeft;
+            FLP_Actions.Margin = new System.Windows.Forms.Padding(0, 8, 0, 0);
+            FLP_Actions.Name = "FLP_Actions";
+            FLP_Actions.WrapContents = false;
+            //
+            // B_FullScreen
+            //
+            B_FullScreen.AutoSize = true;
+            B_FullScreen.Margin = new System.Windows.Forms.Padding(4);
+            B_FullScreen.MinimumSize = new System.Drawing.Size(140, 30);
+            B_FullScreen.Name = "B_FullScreen";
+            B_FullScreen.TabIndex = 8;
+            B_FullScreen.Text = "Full screen (F11)";
+            B_FullScreen.UseVisualStyleBackColor = true;
             // 
             // FieldItemEditor
             // 
             AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             ClientSize = new System.Drawing.Size(1164, 641);
-            Controls.Add(tableLayoutPanel2);
-            Controls.Add(TC_Editor);
-            Controls.Add(PB_Viewport);
-            Controls.Add(B_Cancel);
-            Controls.Add(B_Save);
-            FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
+            Controls.Add(TLP_Workspace);
+            FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
             Icon = Properties.Resources.icon;
             Margin = new System.Windows.Forms.Padding(4);
-            MaximizeBox = false;
-            MinimizeBox = false;
+            MaximizeBox = true;
+            MinimizeBox = true;
             Name = "FieldItemEditor";
             StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             Text = "Field Item Editor";
+            WindowState = System.Windows.Forms.FormWindowState.Maximized;
             FormClosed += FieldItemEditor_FormClosed;
             CM_Click.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)PB_Map).EndInit();
@@ -1621,8 +1680,14 @@
             tableLayoutPanel1.PerformLayout();
             tableLayoutPanel2.ResumeLayout(false);
             tableLayoutPanel2.PerformLayout();
+            PAN_Viewport.ResumeLayout(false);
+            FLP_Actions.ResumeLayout(false);
+            FLP_Actions.PerformLayout();
+            TLP_Workspace.ResumeLayout(false);
+            TLP_Workspace.PerformLayout();
             ResumeLayout(false);
             PerformLayout();
+            InitializeWorkspaceLayout();
 
         }
 
@@ -1630,6 +1695,10 @@
 
         private System.Windows.Forms.Button B_Cancel;
         private System.Windows.Forms.Button B_Save;
+        private System.Windows.Forms.TableLayoutPanel TLP_Workspace;
+        private System.Windows.Forms.Panel PAN_Viewport;
+        private System.Windows.Forms.FlowLayoutPanel FLP_Actions;
+        private System.Windows.Forms.Button B_FullScreen;
         private System.Windows.Forms.ContextMenuStrip CM_Click;
         private System.Windows.Forms.ToolStripMenuItem Menu_View;
         private System.Windows.Forms.ToolStripMenuItem Menu_Set;

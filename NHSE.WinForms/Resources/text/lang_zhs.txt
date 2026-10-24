@@ -130,6 +130,7 @@ CampsiteEditor.L_Camper_Edit=编辑访客：
 CampsiteEditor.L_CampsiteUnlockStatus=此存档中露营地尚未解锁。
 CampsiteEditor.L_CampDate=确定营地参观日期：
 FieldItemEditor.B_Cancel=取消
+FieldItemEditor.B_FullScreen=全屏 (F11)
 FieldItemEditor.B_Down=↓
 FieldItemEditor.B_DumpAcre=导出耕地
 FieldItemEditor.B_DumpAllAcres=导出所有耕地

@@ -88,7 +88,53 @@ export async function mockHost(page: Page, picker = false) {
       feverStart: 0,
     };
     let recycleItem = { ...item, quantity: 5 };
+    type ProgressEntry = {
+      index: number;
+      name: string;
+      known?: boolean;
+      made?: boolean;
+      fresh?: boolean;
+      favorite?: boolean;
+      value?: number;
+      wheel?: boolean;
+      slot?: number;
+      count?: number;
+      flag?: number;
+      dates?: string[];
+      read?: boolean[];
+      milestones?: number;
+      thresholds?: number[];
+    };
+    let progressRecords: Record<string, ProgressEntry[]>[] = [0, 1].map(() => ({
+      recipes: Array.from({ length: 2048 }, (_, index) => ({
+        index,
+        name: `Recipe ${index}`,
+        known: false,
+        made: false,
+        fresh: false,
+        favorite: false,
+      })),
+      reactions: Array.from({ length: 264 }, (_, index) => ({
+        index,
+        name: 'None',
+        value: 0,
+        fresh: false,
+        wheel: index >= 256,
+        slot: index >= 256 ? index - 256 : index,
+      })),
+      achievements: Array.from({ length: 512 }, (_, index) => ({
+        index,
+        name: `Achievement ${index}`,
+        count: 0,
+        flag: 0,
+        dates: Array(6).fill(''),
+        read: Array(6).fill(false),
+        milestones: 5,
+        thresholds: [10, 100, 500, 2000, 5000, 0],
+      })),
+    }));
     type Snapshot = {
+      progressRecords: typeof progressRecords;
       turnips: typeof turnips;
       recycleItem: typeof recycleItem;
       players: typeof players;
@@ -100,10 +146,20 @@ export async function mockHost(page: Page, picker = false) {
     const history: Snapshot[] = [],
       redo: Snapshot[] = [];
     const capture = (): Snapshot =>
-      structuredClone({ players, item, revision, residents, islandSettings, turnips, recycleItem });
+      structuredClone({
+        players,
+        item,
+        revision,
+        residents,
+        islandSettings,
+        turnips,
+        recycleItem,
+        progressRecords,
+      });
     const restore = (value: Snapshot) => {
       turnips = value.turnips;
       recycleItem = value.recycleItem;
+      progressRecords = value.progressRecords;
       players = value.players;
       item = value.item;
       revision = value.revision;
@@ -156,6 +212,63 @@ export async function mockHost(page: Page, picker = false) {
             let data: unknown;
             if (message.command === 'language') locale = String(p.language);
             if (message.command === 'open' || message.command === 'openRecent') opened = true;
+            if (['setRecipe', 'setReaction', 'setAchievement'].includes(message.command)) {
+              remember();
+              const section = (
+                { setRecipe: 'recipes', setReaction: 'reactions', setAchievement: 'achievements' } as Record<
+                  string,
+                  string
+                >
+              )[message.command]!;
+              const entry = progressRecords[Number(p.player)]![section]![Number(p.index)]!;
+              for (const key of [
+                'known',
+                'made',
+                'fresh',
+                'favorite',
+                'value',
+                'count',
+                'flag',
+                'dates',
+                'read',
+              ]) {
+                if (key in entry && key in p) Object.assign(entry, { [key]: structuredClone(p[key]) });
+              }
+              if (section === 'reactions') entry.name = String(p.value);
+            }
+            if (message.command === 'progressBatch') {
+              remember();
+              const section = String(p.section);
+              const entries = progressRecords[Number(p.player)]![section]!;
+              for (const entry of entries) {
+                if (Number(p.index) !== -1 && entry.index !== Number(p.index)) continue;
+                if (section === 'recipes') {
+                  if (p.action === 'learnAll') {
+                    entry.known = true;
+                    entry.fresh = true;
+                  }
+                  if (p.action === 'clearAll') {
+                    entry.known = false;
+                    entry.made = false;
+                    entry.fresh = false;
+                    entry.favorite = false;
+                  }
+                  if (p.action === 'craftAll' && entry.known) {
+                    entry.made = true;
+                    entry.fresh = false;
+                  }
+                } else if (section === 'reactions') {
+                  entry.value = p.action === 'clearAll' ? 0 : entry.wheel ? entry.value : 3;
+                  entry.name = String(entry.value);
+                  if (p.action === 'clearAll') entry.fresh = false;
+                } else {
+                  entry.count = p.action === 'clear' ? 0 : 5000;
+                  entry.flag = p.action === 'clear' ? 0 : 1;
+                  entry.dates = Array(6).fill(p.action === 'clear' ? '' : '2026-10-24');
+                  entry.read = Array(6).fill(p.action !== 'clear');
+                }
+              }
+            }
             if (message.command === 'setPlayer') {
               remember();
               const player = players[Number(p.player)]!;
@@ -231,7 +344,13 @@ export async function mockHost(page: Page, picker = false) {
             }
             if (message.command === 'save') savedRevision = revision;
             if (message.command === 'closeSave') opened = false;
-            if (message.command === 'inventory') {
+            if (message.command === 'progress') {
+              data = {
+                section: p.section,
+                entries: progressRecords[Number(p.player)]![String(p.section)],
+                options: Array.from({ length: 256 }, (_, id) => ({ id, name: String(id) })),
+              };
+            } else if (message.command === 'inventory') {
               const items = Array.from({ length: 40 }, (_, index) =>
                 index === 0
                   ? { ...(p.container === 'recycle' ? recycleItem : item) }

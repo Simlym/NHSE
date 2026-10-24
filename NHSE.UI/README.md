@@ -30,6 +30,23 @@ resident villagers are marked to avoid duplicate replacements. Clipboard-based
 replacement remains on the original button's context menu. Replacement preparation
 uses independent copies and retains house assignment fields for both house formats.
 
+## Player progress
+
+The Player progress page edits DIY recipes, reactions and achievements directly in
+Vue. Recipe search/paging covers all 2,048 stored IDs, with known/crafted/new/favorite
+flags; learn-all retains the original construction-kit exclusions. Reactions expose
+the save format's learned slots, new flags and eight wheel slots without reordering.
+Raw reaction IDs and enum names remain available, including unused values.
+Achievements retain unsigned counts, raw byte flags and all six date/read fields;
+empty dates remain unset. Completion/clear actions use the existing C# model.
+
+Valid drafts apply when saving, navigating, selecting another entry, changing the
+progress section or switching players. Language changes preserve drafts. Bulk
+operations ask for confirmation and apply to the entire selected player's list,
+regardless of the current search, as one undo step. Data is fetched on demand;
+progress edits record only changed personal-file byte ranges. No files are written
+until the workspace Save command is used.
+
 ## Build and run
 
 Requires the .NET 10 SDK, Node.js 22.12+ (Node 24 also works), and npm.

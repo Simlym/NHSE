@@ -266,6 +266,22 @@ public sealed partial class WorkspaceForm : Form
                 RequireSession().SetPlayer(Int(p, "player"), p.GetProperty("wallet").GetUInt32(), p.GetProperty("bank").GetUInt32(), p.GetProperty("miles").GetUInt32(), p.GetProperty("earnedMiles").GetUInt32(),
                     Str(p, "name"), Str(p, "island"), OptionalUInt(p, "pocketCapacity"), OptionalUInt(p, "storageCapacity"), OptionalUInt(p, "hotelTickets"), OptionalUInt(p, "poki"));
                 return State();
+            case "progress": return RequireSession().GetProgress(Int(p, "player"), Str(p, "section"));
+            case "setRecipe":
+                RequireSession().SetRecipe(Int(p, "player"), Int(p, "index"), p.GetProperty("known").GetBoolean(),
+                    p.GetProperty("made").GetBoolean(), p.GetProperty("fresh").GetBoolean(), p.GetProperty("favorite").GetBoolean());
+                return State();
+            case "setReaction":
+                RequireSession().SetReaction(Int(p, "player"), Int(p, "index"), Int(p, "value"), p.GetProperty("fresh").GetBoolean());
+                return State();
+            case "setAchievement":
+                RequireSession().SetAchievement(Int(p, "player"), Int(p, "index"), p.GetProperty("count").GetUInt32(), Int(p, "flag"),
+                    p.GetProperty("dates").EnumerateArray().Select(x => x.GetString() ?? "").ToArray(),
+                    p.GetProperty("read").EnumerateArray().Select(x => x.GetBoolean()).ToArray());
+                return State();
+            case "progressBatch":
+                RequireSession().ProgressBatch(Int(p, "player"), Str(p, "section"), Str(p, "action"), Int(p, "index"));
+                return State();
             case "setTurnips":
                 RequireSession().SetTurnips(new WorkspaceSession.TurnipSettings(p.GetProperty("buyPrice").GetUInt32(),
                     p.GetProperty("sellPrices").EnumerateArray().Select(x => x.GetUInt32()).ToArray(),

@@ -38,10 +38,13 @@ import { languages, language, setLanguage, t, hasText } from './i18n';
 import VillagerPicker from './VillagerPicker.vue';
 import ResidentsPage from './ResidentsPage.vue';
 import IslandPage from './IslandPage.vue';
+import ProgressPage from './ProgressPage.vue';
 import {
   listenState,
   native,
   request,
+  type ProgressData,
+  type ProgressSection,
   type Inventory,
   type Catalog,
   type ItemView,
@@ -53,7 +56,7 @@ function stepText(number: number, suffix: 'Title' | 'Body') {
   return t(('step' + number + suffix) as Parameters<typeof t>[0]);
 }
 
-type Page = 'overview' | 'player' | 'inventory' | 'villagers' | 'island' | 'tools';
+type Page = 'overview' | 'player' | 'inventory' | 'villagers' | 'island' | 'tools' | 'progress';
 const state = ref<State>({ language: 'en', recent: '', session: null, fullScreen: false });
 const page = ref<Page>('overview');
 const playerIndex = ref(0);
@@ -117,6 +120,9 @@ const fields = ref({
 });
 const playerForm = ref<HTMLFormElement | null>(null);
 const residentsPage = ref<InstanceType<typeof ResidentsPage> | null>(null);
+const progressPage = ref<InstanceType<typeof ProgressPage> | null>(null);
+const progressData = ref<ProgressData | null>(null);
+const progressSection = ref<ProgressSection>('recipes');
 const islandPage = ref<InstanceType<typeof IslandPage> | null>(null);
 const currentPlayer = computed(() => state.value.session?.players.find((p) => p.index === playerIndex.value));
 const currentItem = computed(() => draftItem.value ?? selected.value);
@@ -132,6 +138,7 @@ const nav = [
   { id: 'overview', icon: LayoutDashboard },
   { id: 'player', icon: UserRound },
   { id: 'inventory', icon: Package },
+  { id: 'progress', icon: Check },
   { id: 'villagers', icon: Users },
   { id: 'island', icon: Leaf },
   { id: 'tools', icon: Map },
@@ -199,6 +206,21 @@ async function run(action: () => Promise<void>) {
     busy.value = false;
   }
 }
+async function loadProgress() {
+  if (!state.value.session) return;
+  progressData.value = await request<ProgressData>('progress', {
+    player: playerIndex.value,
+    section: progressSection.value,
+  });
+}
+async function changeProgressSection(section: ProgressSection) {
+  if (busy.value || !(await applyWorldDrafts())) return;
+  await run(async () => {
+    const next = await request<ProgressData>('progress', { player: playerIndex.value, section });
+    progressSection.value = section;
+    progressData.value = next;
+  });
+}
 async function loadInventory(pageNumber = inventory.value?.page ?? 0) {
   if (!state.value.session) return;
   const token = ++inventoryToken;
@@ -229,6 +251,7 @@ async function command(
   return await run(async () => {
     accept(await request<State>(name, payload));
     if (page.value === 'inventory') await loadInventory();
+    if (page.value === 'progress') await loadProgress();
     if (success) toast(success);
   });
 }
@@ -242,6 +265,7 @@ async function go(destination: Page) {
   if (!(await applyWorldDrafts())) return;
   page.value = destination;
   if (destination === 'inventory') await run(() => loadInventory(0));
+  if (destination === 'progress') await run(loadProgress);
 }
 async function applyProfile() {
   if (!playerForm.value?.reportValidity()) return false;
@@ -250,6 +274,7 @@ async function applyProfile() {
 async function selectPlayer(index: number) {
   if (busy.value || index === playerIndex.value) return;
   if (page.value === 'player' && profilePending.value && !(await applyProfile())) return;
+  if (!(await applyWorldDrafts())) return;
   playerIndex.value = index;
 }
 async function save() {
@@ -258,6 +283,8 @@ async function save() {
   await command('save', {}, 'saveSuccess');
 }
 async function applyWorldDrafts() {
+  if (page.value === 'progress' && progressPage.value && !(await progressPage.value.applyPending()))
+    return false;
   if (page.value === 'villagers' && residentsPage.value && !(await residentsPage.value.applyPending()))
     return false;
   if (page.value === 'island' && islandPage.value && !(await islandPage.value.applyPending())) return false;
@@ -392,6 +419,7 @@ watch(playerIndex, () => {
   selected.value = null;
   draftItem.value = null;
   if (page.value === 'inventory') void run(() => loadInventory(0));
+  if (page.value === 'progress') void run(loadProgress);
 });
 watch(container, () => {
   selected.value = null;
@@ -634,7 +662,7 @@ onUnmounted(() => {
           </div>
         </div>
         <div
-          v-if="page === 'overview' || page === 'player' || page === 'inventory'"
+          v-if="page === 'overview' || page === 'player' || page === 'inventory' || page === 'progress'"
           class="player-switcher"
           role="group"
           :aria-label="t('switchPlayer')"
@@ -943,6 +971,16 @@ onUnmounted(() => {
             </aside>
           </div>
         </section>
+        <ProgressPage
+          v-else-if="page === 'progress'"
+          ref="progressPage"
+          :data="progressData"
+          :section="progressSection"
+          :player="playerIndex"
+          :busy="busy"
+          :execute="worldCommand"
+          :change-section="changeProgressSection"
+        />
         <ResidentsPage
           v-else-if="page === 'villagers'"
           ref="residentsPage"

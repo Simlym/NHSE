@@ -169,3 +169,27 @@ export function request<T>(
     }
   });
 }
+
+export type ProgressSection = 'recipes' | 'reactions' | 'achievements';
+export interface ProgressEntry {
+  index: number;
+  name: string;
+  known?: boolean;
+  made?: boolean;
+  fresh?: boolean;
+  favorite?: boolean;
+  value?: number;
+  wheel?: boolean;
+  slot?: number;
+  count?: number;
+  flag?: number;
+  dates?: string[];
+  read?: boolean[];
+  milestones?: number;
+  thresholds?: number[];
+}
+export interface ProgressData {
+  section: ProgressSection;
+  entries: ProgressEntry[];
+  options: { id: number; name: string }[];
+}

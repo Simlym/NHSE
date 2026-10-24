@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { t } from './i18n';
-import type { HousingData, HousingTarget, HousingTile, ItemView, RoomItem } from './bridge';
+import type { HousingData, HousingTarget, HousingTile, ItemView, RoomItem, GridClipboardInfo, GridTarget } from './bridge';
 import HousingFields from './HousingFields.vue';
+import GridToolbar from './GridToolbar.vue';
+import { useGridSelection, pointKey } from './gridSelection';
 import { housingKinds, housingName, housingLabel } from './housingLabels';
 const props = defineProps<{
   data: HousingData | null;
   player: number;
   busy: boolean;
+  clipboard: GridClipboardInfo | null;
   execute: (command: string, payload?: Record<string, unknown>) => Promise<boolean>;
   navigate: (target: Partial<HousingTarget>) => Promise<void>;
   pickItem: () => void;
@@ -52,7 +55,22 @@ watch(
   () => {
     item.value = { ...(selectedTile.value?.item ?? emptyItem()) };
   },
+  { immediate: true },
 );
+const gridSelection = useGridSelection({
+  cells: () => props.data?.room?.tiles.map(t => ({ x: t.x, y: t.y })) ?? [],
+  scope: () => JSON.stringify([props.player, props.data?.kind, props.data?.index, props.data?.room?.room, props.data?.room?.layer]),
+  active: () => ({ ...selected.value }), busy: () => props.busy,
+  activate: async point => { const tile = props.data?.room?.tiles.find(t => t.x === point.x && t.y === point.y); if (tile) await selectTile(tile); }, action: gridAction,
+});
+async function gridAction(name: 'copyGrid' | 'pasteGrid' | 'delete' | 'rotate') {
+  if (!props.data?.room || props.busy || !gridSelection.selected.value.length) return;
+  const target: GridTarget = { kind: 'roomItems', house: props.data.index, room: props.data.room.room, layer: props.data.room.layer };
+  const selection = gridSelection.selected.value.map(p => ({ ...p }));
+  const anchor = selection.length > 1 ? { x: Math.min(...selection.map(p => p.x)), y: Math.min(...selection.map(p => p.y)) } : { ...selected.value };
+  if (await props.execute(name === 'delete' || name === 'rotate' ? 'editGrid' : name, { target, selection, anchor, noOverwrite: noOverwrite.value, operation: name }))
+    if (name !== 'copyGrid') item.value = { ...(selectedTile.value?.item ?? emptyItem()) };
+}
 const commonKeys = new Set([
   'HouseLevel',
   'HouseStatus',
@@ -98,6 +116,7 @@ async function applyTile(remove = false) {
   });
 }
 async function applyPending() {
+  if (gridSelection.dragging.value) return false;
   if (pending.value && !form.value?.reportValidity()) return false;
   if (pendingTile.value && !tileForm.value?.reportValidity()) return false;
   if (!(await applyFields())) return false;
@@ -187,23 +206,26 @@ defineExpose({ applyPending, chooseItem });
           >
         </div>
         <p class="field-help">{{ t('housingRoomHint') }}</p>
+        <GridToolbar :count="gridSelection.selected.value.length" :clipboard="clipboard" kind="items" :busy="busy || gridSelection.dragging.value" :action="gridAction" :clear="gridSelection.clear" />
         <div class="housing-room-layout">
           <div class="housing-grid-scroll">
-            <div class="housing-grid" :aria-label="t('housingRoomEditor')" role="group">
+            <div class="housing-grid" tabindex="0" data-columns="20" data-rows="20" @pointerdown="gridSelection.down" @pointermove="gridSelection.move" @pointerup="gridSelection.up" @pointercancel="gridSelection.cancel" @lostpointercapture="gridSelection.cancel" @keydown="gridSelection.keydown" :aria-label="t('housingRoomEditor')" role="group">
               <button
                 v-for="tile in data.room.tiles"
                 :key="`${tile.x},${tile.y}`"
                 class="housing-tile"
+                tabindex="-1"
                 :class="{
                   active: selected.x === tile.x && selected.y === tile.y,
                   empty: tile.empty,
                   extension: tile.extension,
+                  'multi-selected': gridSelection.keys.value.has(pointKey(tile)),
                 }"
                 :aria-label="`${tile.x},${tile.y}: ${tile.empty ? t('empty') : tile.extension ? t('housingExtension') : tile.name}`"
-                :aria-pressed="selected.x === tile.x && selected.y === tile.y"
+                :aria-pressed="gridSelection.keys.value.has(pointKey(tile))"
                 :title="`${tile.x},${tile.y} · ${tile.name}`"
                 :disabled="busy"
-                @click="selectTile(tile)"
+                @click="gridSelection.click($event, tile)"
               >
                 <img v-if="tile.image" :src="tile.image" alt="" /><span v-else>{{
                   tile.empty ? '·' : tile.extension ? '↖' : tile.item.itemId
@@ -297,6 +319,8 @@ defineExpose({ applyPending, chooseItem });
 }
 .housing-grid {
   display: grid;
+  touch-action: none;
+  user-select: none;
   grid-template-columns: repeat(20, minmax(28px, 1fr));
   min-width: 560px;
 }
@@ -314,6 +338,7 @@ defineExpose({ applyPending, chooseItem });
   outline-offset: -2px;
   background: var(--green-soft);
 }
+.housing-tile.multi-selected { box-shadow: inset 0 0 0 2px #2f8fe8; }
 .housing-tile.extension {
   background: var(--hover);
 }

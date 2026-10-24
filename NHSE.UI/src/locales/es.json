@@ -354,5 +354,22 @@
   "mapPresetFamilies": "Tierra|Agua",
   "mapPresetCorner": "Forma de esquina",
   "mapPresetCorners": "Redondeada|Diagonal|Interior",
-  "mapPresetTile": "Preajuste del terreno"
+  "mapPresetTile": "Preajuste del terreno",
+  "gridActions": "Acciones de selección",
+  "gridSelected": "{0} casillas seleccionadas",
+  "gridCopy": "Copiar",
+  "gridPaste": "Pegar",
+  "gridDelete": "Vaciar contenido seleccionado",
+  "gridRotate": "Girar selección",
+  "gridClearSelection": "Deseleccionar",
+  "gridClipboardInfo": "Portapapeles: {0} registros · {1}",
+  "gridHelp": "Ayuda de selección y atajos",
+  "gridSelectionHelp": "Arrastra para seleccionar un rectángulo. Ctrl/Cmd-clic añade o quita casillas; Mayús-clic amplía el rectángulo. Ctrl/Cmd+A selecciona la cuadrícula. Las flechas mueven y Mayús+flechas amplía. Ctrl/Cmd+C/V copia/pega, Supr vacía, R gira y Esc cancela. En modo pincel, mantén Mayús para seleccionar. Los campos de texto conservan sus atajos.",
+  "gridClipboardHelp": "El portapapeles del editor se comparte en la partida actual. Copia valores aplicados y objetos completos, omitiendo casillas vacías. Un objeto llena la selección según su tamaño; varios registros mantienen su disposición. Pegar y vaciar se deshacen en un paso cada uno; se comprueban límites y solapamientos.",
+  "gridEmptyCopy": "No hay objetos para copiar en la selección.",
+  "gridNoClipboard": "Copia primero una selección.",
+  "gridTypeMismatch": "No se pueden mezclar portapapeles de terreno y objetos.",
+  "gridRoomItem": "Los objetos exteriores no se pueden pegar en habitaciones.",
+  "gridCopied": "Selección copiada al portapapeles del editor.",
+  "gridArea": "Cuadrícula editable"
 }

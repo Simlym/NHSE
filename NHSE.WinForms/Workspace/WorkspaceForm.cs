@@ -274,6 +274,17 @@ public sealed partial class WorkspaceForm : Form
                 RequireSession().BatchMap(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), Str(p, "operation"),
                     p.GetProperty("whole").GetBoolean(), p.GetProperty("interiorOnly").GetBoolean(), p.GetProperty("values").Deserialize<Dictionary<string, JsonElement>>() ?? throw new ArgumentException("invalidRequest"));
                 return State();
+            case "copyGrid":
+            case "pasteGrid":
+            case "editGrid":
+            {
+                var gridTarget = p.GetProperty("target").Deserialize<WorkspaceSession.GridTarget>(Json) ?? throw new ArgumentException("invalidRequest");
+                var points = p.GetProperty("selection").Deserialize<WorkspaceSession.MapPoint[]>(Json) ?? throw new ArgumentException("invalidRequest");
+                if (command == "copyGrid") RequireSession().CopyGrid(gridTarget, points);
+                else if (command == "pasteGrid") RequireSession().PasteGrid(gridTarget, p.GetProperty("anchor").Deserialize<WorkspaceSession.MapPoint>(Json) ?? throw new ArgumentException("invalidRequest"), points, p.GetProperty("noOverwrite").GetBoolean());
+                else RequireSession().EditGrid(gridTarget, points, Str(p, "operation"));
+                return State();
+            }
             case "paintMapStroke":
                 RequireSession().PaintMapStroke(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), Int(p, "radius"), p.GetProperty("randomVariation").GetBoolean(),
                     p.GetProperty("values").Deserialize<Dictionary<string, JsonElement>>() ?? throw new ArgumentException("invalidRequest"), p.GetProperty("points").Deserialize<WorkspaceSession.MapPoint[]>() ?? throw new ArgumentException("invalidRequest"));

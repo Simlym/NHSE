@@ -354,5 +354,22 @@
   "mapPresetFamilies": "陸地|水域",
   "mapPresetCorner": "轉角形狀",
   "mapPresetCorners": "圓角|斜角|內角",
-  "mapPresetTile": "地形預設"
+  "mapPresetTile": "地形預設",
+  "gridActions": "選區操作",
+  "gridSelected": "已選 {0} 格",
+  "gridCopy": "複製",
+  "gridPaste": "貼上",
+  "gridDelete": "清空選區內容",
+  "gridRotate": "旋轉選區",
+  "gridClearSelection": "取消選擇",
+  "gridClipboardInfo": "剪貼簿：{0} 筆 · {1}",
+  "gridHelp": "選區與快捷鍵說明",
+  "gridSelectionHelp": "拖曳框選；Ctrl/Cmd 點選增減格子，Shift 點選擴展矩形。Ctrl/Cmd+A 全選目前網格，方向鍵移動，Shift+方向鍵擴展。Ctrl/Cmd+C/V 複製貼上，Delete 清空，R 旋轉，Esc 取消。筆刷模式下按住 Shift 可框選。文字框保留原有快捷鍵。",
+  "gridClipboardHelp": "編輯器剪貼簿在目前存檔內共用，複製已套用的資料，包含物品完整佔用範圍並略過空格。單個物品依佔用範圍填滿選區，多筆記錄保留相對配置；貼上和清空各可一步復原，仍會檢查邊界與重疊。",
+  "gridEmptyCopy": "選區中沒有可複製的物品。",
+  "gridNoClipboard": "請先複製選區。",
+  "gridTypeMismatch": "地形與物品剪貼簿不能混用。",
+  "gridRoomItem": "戶外物件不能貼到房間中。",
+  "gridCopied": "選區已複製到編輯器剪貼簿。",
+  "gridArea": "編輯網格"
 }

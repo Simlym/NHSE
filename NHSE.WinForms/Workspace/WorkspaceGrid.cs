@@ -1,0 +1,185 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using NHSE.Core;
+
+namespace NHSE.WinForms;
+
+internal sealed partial class WorkspaceSession
+{
+    internal sealed record GridTarget(string Kind, MapTarget? Map = null, int House = 0, int Room = 0, int Layer = 0);
+    internal sealed record GridClipboardInfo(string Kind, int Count, int Width, int Height);
+    private sealed record GridEntry(int X, int Y, byte[] Data);
+    private sealed record GridClipboard(GridClipboardInfo Info, GridEntry[] Entries);
+    private GridClipboard? GridBuffer;
+    private sealed record ItemGrid(LayerItem Layer, Action Save);
+    private ItemGrid ReadItemGrid(GridTarget target)
+    {
+        if (target.Kind == "mapItems")
+        {
+            if (target.Map is not { Mode: "items" } map) throw new ArgumentException("invalidRequest");
+            var layer = MapItemLayer(map);
+            return new(layer, () => CommitMapItems(map, layer));
+        }
+        if (target.Kind != "roomItems" || (uint)target.Room >= 6 || (uint)target.Layer >= 8) throw new ArgumentException("invalidRequest");
+        var before = HouseBytes(ReadHouse("playerHouses", target.House));
+        var house = (IPlayerHouse)CloneHouse("playerHouses", before);
+        var manager = new RoomManager(house.GetRoom(target.Room));
+        return new(manager.Layers[target.Layer], () => {
+            manager.Save(); house.SetRoom(target.Room, manager.Room);
+            CommitHouse("playerHouses", target.House, before, house.Write());
+        });
+    }
+    private LayerTerrain ReadTerrainGrid(GridTarget target)
+    {
+        if (target.Kind != "terrain" || target.Map is not { Mode: "terrain" } map) throw new ArgumentException("invalidRequest");
+        CheckMapTarget(map, MapMarkerCount);
+        return new(SaveFile.Main.GetTerrainTiles(), SaveFile.Main.GetAcreBytes());
+    }
+    private MapPoint GridCoordinate(GridTarget target, MapPoint p)
+    {
+        var size = target.Kind == "terrain" ? 16 : target.Kind == "mapItems" ? 32 : 20;
+        if ((uint)p.X >= size || (uint)p.Y >= size) throw new ArgumentException("invalidRequest");
+        if (target.Kind == "roomItems") return p;
+        if (target.Map is null) throw new ArgumentException("invalidRequest");
+        var (x, y) = MapCoordinates(target.Map, p.X, p.Y);
+        var config = target.Kind == "terrain" ? TerrainConfig : ItemConfig;
+        if (!config.IsCoordinateValidRelative(x, y)) throw new ArgumentException("mapInvalidAcre");
+        return new(x, y);
+    }
+    private MapPoint[] GridPoints(GridTarget target, MapPoint[] points)
+    {
+        if (points.Length is < 1 or > 1024) throw new ArgumentException("invalidRequest");
+        return points.Select(p => GridCoordinate(target, p)).Distinct().OrderBy(p => p.Y).ThenBy(p => p.X).ToArray();
+    }
+    private static MapPoint? GridRoot(LayerItem layer, MapPoint p)
+    {
+        if (!layer.Contains(p.X, p.Y)) throw new ArgumentException("roomPlacementBlocked");
+        var tile = layer.GetTile(p.X, p.Y);
+        if (tile.IsNone) return null;
+        if (!tile.IsExtension) return p;
+        var root = new MapPoint(p.X - tile.ExtensionX, p.Y - tile.ExtensionY);
+        if (!layer.Contains(root.X, root.Y)) throw new ArgumentException("mapInvalidItem");
+        var item = layer.GetTile(root.X, root.Y);
+        if (!item.IsRoot || item.ItemId != tile.ExtensionItemId) throw new ArgumentException("mapInvalidItem");
+        return root;
+    }
+    private static (int W, int H) GridItemSize(Item item)
+    {
+        var size = ItemInfo.GetItemSize(item);
+        return (item.Rotation & 1) == 0 ? (size.Width, size.Height) : (size.Height, size.Width);
+    }
+    private static void ClearGridRoot(LayerItem layer, MapPoint p)
+    {
+        var root = layer.GetTile(p.X, p.Y);
+        var (width, height) = GridItemSize(root);
+        for (var x = 0; x < width; x++) for (var y = 0; y < height; y++)
+        {
+            if (!layer.Contains(p.X + x, p.Y + y)) continue;
+            var tile = layer.GetTile(p.X + x, p.Y + y);
+            if (tile.IsExtension && tile.ExtensionItemId == root.ItemId && tile.ExtensionX == x && tile.ExtensionY == y) tile.Delete();
+        }
+        root.Delete();
+    }
+    public void CopyGrid(GridTarget target, MapPoint[] selection)
+    {
+        var terrain = target.Kind == "terrain" ? ReadTerrainGrid(target) : null;
+        var items = terrain is null ? ReadItemGrid(target).Layer : null;
+        var points = GridPoints(target, selection);
+        var entries = terrain is not null
+            ? points.Select(p => new GridEntry(p.X, p.Y, TerrainTile.SetArray([terrain.GetTile(p.X, p.Y)]))).ToArray()
+            : points.Select(p => GridRoot(items!, p)).Where(p => p is not null).Distinct().Select(p => new GridEntry(p!.X, p.Y, Item.SetArray([items!.GetTile(p.X, p.Y)]))).ToArray();
+        if (entries.Length == 0) throw new ArgumentException("gridEmptyCopy");
+        var minX = Math.Min(points.Min(p => p.X), entries.Min(e => e.X));
+        var minY = Math.Min(points.Min(p => p.Y), entries.Min(e => e.Y));
+        var maxX = points.Max(p => p.X) + 1; var maxY = points.Max(p => p.Y) + 1;
+        foreach (var entry in entries)
+        {
+            var (w, h) = terrain is null ? GridItemSize(new Item(BitConverter.ToUInt64(entry.Data))) : (1, 1);
+            maxX = Math.Max(maxX, entry.X + w); maxY = Math.Max(maxY, entry.Y + h);
+        }
+        GridBuffer = new(new(terrain is null ? "items" : "terrain", entries.Length, maxX - minX, maxY - minY),
+            entries.Select(e => new GridEntry(e.X - minX, e.Y - minY, e.Data.ToArray())).ToArray());
+    }
+    public void PasteGrid(GridTarget target, MapPoint anchor, MapPoint[] selection, bool noOverwrite)
+    {
+        var buffer = GridBuffer ?? throw new ArgumentException("gridNoClipboard");
+        if (buffer.Info.Kind != (target.Kind == "terrain" ? "terrain" : "items")) throw new ArgumentException("gridTypeMismatch");
+        var terrain = target.Kind == "terrain" ? ReadTerrainGrid(target) : null;
+        var grid = terrain is null ? ReadItemGrid(target) : null;
+        var points = GridPoints(target, selection);
+        var origin = GridCoordinate(target, anchor);
+        var repeat = buffer.Entries.Length == 1 && points.Length > 1;
+        if (!repeat && grid is not null && buffer.Entries.Length == 1)
+            origin = GridRoot(grid.Layer, origin) ?? origin;
+        var entries = repeat
+            ? points.Select(p => new GridEntry(p.X, p.Y, buffer.Entries[0].Data)).ToList()
+            : buffer.Entries.Select(e => new GridEntry(origin.X + e.X, origin.Y + e.Y, e.Data)).ToList();
+        if (terrain is not null)
+        {
+            foreach (var e in entries)
+            {
+                if (!terrain.Contains(e.X, e.Y)) throw new ArgumentException("roomPlacementBlocked");
+                terrain.GetTile(e.X, e.Y).CopyFrom(TerrainTile.GetArray(e.Data)[0]);
+            }
+            CommitMapPatches([MapPatch(SaveFile.Main.Offsets.LandMakingMap, terrain.DumpAll())]);
+            return;
+        }
+        var layer = grid!.Layer;
+        var planned = new List<(MapPoint Point, Item Item)>();
+        var covered = new HashSet<MapPoint>();
+        foreach (var entry in entries)
+        {
+            var point = new MapPoint(entry.X, entry.Y);
+            if (repeat && covered.Contains(point)) continue;
+            var item = Item.GetArray(entry.Data)[0]; ValidateMapItem(item);
+            if (target.Kind == "roomItems" && !WorkspaceCatalog.Contains(item.ItemId)) throw new ArgumentException("gridRoomItem");
+            var (w, h) = GridItemSize(item);
+            if (!layer.Contains(point.X, point.Y) || !layer.Contains(point.X + w - 1, point.Y + h - 1)) throw new ArgumentException("roomPlacementBlocked");
+            planned.Add((point, item));
+            for (var x = 0; x < w; x++) for (var y = 0; y < h; y++) covered.Add(new(point.X + x, point.Y + y));
+        }
+        var remove = new HashSet<MapPoint>();
+        foreach (var (point, item) in planned)
+        {
+            if (!layer.GetTile(point.X, point.Y).IsExtension && GridRoot(layer, point) is { } root) remove.Add(root);
+            if (noOverwrite) continue;
+            var (w, h) = GridItemSize(item);
+            for (var x = 0; x < w; x++) for (var y = 0; y < h; y++)
+                if (GridRoot(layer, new(point.X + x, point.Y + y)) is { } overlap) remove.Add(overlap);
+        }
+        foreach (var point in remove) ClearGridRoot(layer, point);
+        foreach (var (point, item) in planned)
+        {
+            if (layer.IsOccupied(item, point.X, point.Y) != PlacedItemPermission.NoCollision) throw new ArgumentException("roomPlacementBlocked");
+            layer.SetExtensionTiles(item, point.X, point.Y); layer.GetTile(point.X, point.Y).CopyFrom(item);
+        }
+        grid.Save();
+    }
+    public void EditGrid(GridTarget target, MapPoint[] selection, string operation)
+    {
+        if (operation is not ("delete" or "rotate")) throw new ArgumentException("invalidRequest");
+        if (target.Kind == "terrain")
+        {
+            var terrain = ReadTerrainGrid(target);
+            foreach (var point in GridPoints(target, selection))
+            {
+                var tile = terrain.GetTile(point.X, point.Y);
+                if (operation == "delete") tile.Clear(); else tile.TryRotate();
+            }
+            CommitMapPatches([MapPatch(SaveFile.Main.Offsets.LandMakingMap, terrain.DumpAll())]);
+            return;
+        }
+        var grid = ReadItemGrid(target); var layer = grid.Layer;
+        var roots = GridPoints(target, selection).Select(p => GridRoot(layer, p)).Where(p => p is not null).Distinct().Select(p => p!).ToArray();
+        var changed = roots.Select(p => (Point: p, Item: new Item(layer.GetTile(p.X, p.Y).RawValue))).ToArray();
+        foreach (var point in roots) ClearGridRoot(layer, point);
+        if (operation == "rotate") foreach (var (point, item) in changed)
+        {
+            item.Rotation = (item.Rotation + 1) & 3;
+            if (layer.IsOccupied(item, point.X, point.Y) != PlacedItemPermission.NoCollision) throw new ArgumentException("roomPlacementBlocked");
+            layer.SetExtensionTiles(item, point.X, point.Y); layer.GetTile(point.X, point.Y).CopyFrom(item);
+        }
+        grid.Save();
+    }
+}

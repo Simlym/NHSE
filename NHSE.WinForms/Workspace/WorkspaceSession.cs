@@ -23,7 +23,7 @@ internal sealed partial class WorkspaceSession(HorizonSave save)
     {
         title = SaveFile.GetSaveTitle("NHSE"),
         island = SaveFile.Players[0].Personal.TownName,
-        dirty = IsDirty, canUndo = UndoStack.Count != 0, canRedo = RedoStack.Count != 0,
+        clipboard = GridBuffer?.Info, dirty = IsDirty, canUndo = UndoStack.Count != 0, canRedo = RedoStack.Count != 0,
         islandSettings = GetIslandSettings(),
         turnips = GetTurnips(),
         residents = GetResidents(getVillagerImage),

@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue';
 import { t } from './i18n';
-import type { MapData, MapTarget, ItemView, MapBrush } from './bridge';
+import type { MapData, MapTarget, ItemView, MapBrush, GridClipboardInfo, GridTarget } from './bridge';
 import HousingFields from './HousingFields.vue';
 import MapTools from './MapTools.vue';
 import MapAdvanced from './MapAdvanced.vue';
+import GridToolbar from './GridToolbar.vue';
+import { useGridSelection, pointKey } from './gridSelection';
 const props = defineProps<{
-  data: MapData | null; busy: boolean;
+  data: MapData | null; busy: boolean; clipboard: GridClipboardInfo | null;
   execute: (command: string, payload?: Record<string, unknown>) => Promise<boolean>;
   navigate: (target: Partial<MapTarget>) => Promise<void>; pickItem: () => void;
 }>();
@@ -21,6 +23,36 @@ const strokeMeta = shallowRef<{ target: MapTarget; radius: number; randomVariati
 let pointerGrid: HTMLElement | null = null, pointerId = -1;
 let lastPoint: { x: number; y: number } | null = null;
 const strokeKeys = computed(() => new Set(strokePoints.value.map(p => `${p.x},${p.y}`)));
+const gridSelection = useGridSelection({
+  cells: () => props.data?.cells.filter(c => c.valid).map(c => ({ x: c.x, y: c.y })) ?? [],
+  scope: () => JSON.stringify([props.data?.target.mode, props.data?.target.acre, props.data?.target.layer]),
+  active: () => ({ x: props.data?.target.x ?? 0, y: props.data?.target.y ?? 0 }),
+  busy: () => props.busy,
+  activate: point => props.navigate(point), action: gridAction,
+});
+async function gridAction(name: 'copyGrid' | 'pasteGrid' | 'delete' | 'rotate') {
+  if (!props.data || props.busy || !gridSelection.selected.value.length || strokeMeta.value) return;
+  const target: GridTarget = { kind: props.data.target.mode === 'terrain' ? 'terrain' : 'mapItems', map: { ...props.data.target } };
+  const selection = gridSelection.selected.value.map(p => ({ ...p }));
+  const anchor = selection.length > 1 ? { x: Math.min(...selection.map(p => p.x)), y: Math.min(...selection.map(p => p.y)) } : { x: props.data.target.x, y: props.data.target.y };
+  const success = await props.execute(name === 'delete' || name === 'rotate' ? 'editGrid' : name, { target, selection, anchor, noOverwrite: noOverwrite.value, operation: name });
+  if (success && name !== 'copyGrid' && !brush.value.enabled) fields.value = stored();
+}
+function gridPointerDown(event: PointerEvent) {
+  if (brush.value.enabled && !event.ctrlKey && !event.metaKey && !event.shiftKey) startStroke(event);
+  else gridSelection.down(event);
+}
+function gridPointerMove(event: PointerEvent) { if (gridSelection.dragging.value) gridSelection.move(event); else moveStroke(event); }
+function gridPointerUp(event: PointerEvent) { if (gridSelection.dragging.value) void gridSelection.up(event); else void endStroke(event); }
+function cancelGridPointer() { gridSelection.cancel(); cancelStroke(); }
+function gridKeydown(event: KeyboardEvent) {
+  if (strokeMeta.value) {
+    strokeKeyboard(event);
+    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cancelStroke(); }
+    return;
+  }
+  gridSelection.keydown(event);
+}
 function gridPoint(event: PointerEvent) {
   if (!pointerGrid) return null;
   const box = pointerGrid.getBoundingClientRect();
@@ -81,7 +113,7 @@ async function edit(action = 'apply') {
   return await props.execute('editMap', { target: { ...props.data.target }, values: { ...fields.value }, action,
     autoExtensions: autoExtensions.value, noOverwrite: noOverwrite.value, snapFieldItems: snapFieldItems.value });
 }
-async function applyPending() { if (strokeMeta.value) return false; return (brush.value.enabled && props.data?.target.mode === 'terrain') || !pending.value || await edit(); }
+async function applyPending() { if (strokeMeta.value || gridSelection.dragging.value) return false; return (brush.value.enabled && props.data?.target.mode === 'terrain') || !pending.value || await edit(); }
 function chooseItem(item: ItemView) {
   fields.value = { 'Map.ItemId': item.itemId, 'Map.SystemParam': 0, 'Map.AdditionalParam': 0, 'Map.FreeParam': 0 };
 }
@@ -117,15 +149,16 @@ defineExpose({ applyPending, chooseItem });
       <div class="map-viewport">
         <img v-if="data.viewport" :src="data.viewport" alt="" />
         <img v-if="data.itemImage && data.target.mode === 'items'" :src="data.itemImage" alt="" />
-        <div v-if="['terrain', 'items'].includes(data.target.mode)" class="map-grid" tabindex="0" :class="{ 'brush-enabled': brush.enabled && data.target.mode === 'terrain' }"
-          @pointerdown="startStroke" @pointermove="moveStroke" @pointerup="endStroke" @pointercancel="cancelStroke" @lostpointercapture="cancelStroke" @keydown.esc.prevent="cancelStroke" @keydown="strokeKeyboard" :style="{ gridTemplateColumns: `repeat(${data.gridSize}, 1fr)` }">
-          <button v-for="cell in data.cells" :key="`${cell.x},${cell.y}`" :disabled="busy || !cell.valid"
+        <div v-if="['terrain', 'items'].includes(data.target.mode)" class="map-grid" tabindex="0" role="group" :aria-label="t('gridArea')" :class="{ 'brush-enabled': brush.enabled && data.target.mode === 'terrain' }"
+          @pointerdown="gridPointerDown" @pointermove="gridPointerMove" @pointerup="gridPointerUp" @pointercancel="cancelGridPointer" @lostpointercapture="cancelGridPointer" @keydown="gridKeydown" :data-columns="data.gridSize" :data-rows="data.gridSize" :style="{ gridTemplateColumns: `repeat(${data.gridSize}, 1fr)` }">
+          <button tabindex="-1" :aria-pressed="gridSelection.keys.value.has(pointKey(cell))" v-for="cell in data.cells" :key="`${cell.x},${cell.y}`" :disabled="busy || !cell.valid"
             :aria-label="`${cell.x}, ${cell.y}${cell.name ? ' · ' + cell.name : ''}`" :title="`${cell.relativeX}, ${cell.relativeY} ${cell.name}`"
-            :class="{ selected: cell.x === data.target.x && cell.y === data.target.y, occupied: !!cell.name, extension: cell.extension, 'stroke-preview': strokeKeys.has(`${cell.x},${cell.y}`) }"
-            @click="!brush.enabled && navigate({ x: cell.x, y: cell.y })" />
+            :class="{ selected: cell.x === data.target.x && cell.y === data.target.y, occupied: !!cell.name, extension: cell.extension, 'stroke-preview': strokeKeys.has(`${cell.x},${cell.y}`), 'multi-selected': gridSelection.keys.value.has(pointKey(cell)) }"
+            @click="!brush.enabled && gridSelection.click($event, cell)" />
         </div>
       </div>
     </div>
+    <GridToolbar v-if="['terrain', 'items'].includes(data.target.mode)" :count="gridSelection.selected.value.length" :clipboard="clipboard" :kind="data.target.mode === 'terrain' ? 'terrain' : 'items'" :busy="busy || !!strokeMeta || gridSelection.dragging.value" :action="gridAction" :clear="gridSelection.clear" />
     <p v-if="['terrain', 'items'].includes(data.target.mode)">X {{ data.target.x }} · Y {{ data.target.y }}</p>
     <form v-if="data.fields.length" ref="form" @submit.prevent="edit()">
       <div v-if="data.target.mode === 'items'" class="map-controls">
@@ -161,7 +194,8 @@ button[aria-pressed=true] { outline: 2px solid var(--accent); }
 .map-viewport { position: relative; aspect-ratio: 1; }
 .map-images img { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 .map-viewport img, .map-grid { position: absolute; inset: 0; }
-.map-grid { display: grid; }
+.map-grid { display: grid; touch-action: none; user-select: none; }
+.map-grid button.multi-selected { box-shadow: inset 0 0 0 1px #2f8fe8; background: #2f8fe830; }
 .map-grid.brush-enabled { touch-action: none; cursor: crosshair; }
 .map-grid button.stroke-preview { background: #36acfa80; }
 .map-grid button { padding: 0; min-width: 0; border: 1px solid #ffffff18; background: transparent; border-radius: 0; }

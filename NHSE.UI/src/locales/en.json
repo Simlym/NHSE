@@ -354,5 +354,22 @@
   "mapPresetFamilies": "Land|Water",
   "mapPresetCorner": "Corner shape",
   "mapPresetCorners": "Rounded|Angled|Inside corner",
-  "mapPresetTile": "Terrain preset"
+  "mapPresetTile": "Terrain preset",
+  "gridActions": "Selection actions",
+  "gridSelected": "{0} cells selected",
+  "gridCopy": "Copy",
+  "gridPaste": "Paste",
+  "gridDelete": "Clear selection contents",
+  "gridRotate": "Rotate selection",
+  "gridClearSelection": "Deselect",
+  "gridClipboardInfo": "Clipboard: {0} records · {1}",
+  "gridHelp": "Selection and keyboard help",
+  "gridSelectionHelp": "Drag to select a rectangle. Ctrl/Cmd-click toggles cells; Shift-click extends a rectangle. Ctrl/Cmd+A selects this grid. Arrows move; Shift+arrows extend. Ctrl/Cmd+C/V copies/pastes; Delete clears; R rotates; Esc cancels. In brush mode, hold Shift to select. Text fields keep their normal shortcuts.",
+  "gridClipboardHelp": "The editor clipboard is shared within the current save. Copy uses applied values, includes whole objects and skips empty cells. One object fills the selection by its footprint; multiple records retain their layout. Paste and clear each use one undo step; bounds and overlap checks still apply.",
+  "gridEmptyCopy": "There are no objects to copy in this selection.",
+  "gridNoClipboard": "Copy a selection first.",
+  "gridTypeMismatch": "Terrain and object clipboards cannot be mixed.",
+  "gridRoomItem": "Field objects cannot be pasted into a room.",
+  "gridCopied": "Selection copied to the editor clipboard.",
+  "gridArea": "Editable grid"
 }

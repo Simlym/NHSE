@@ -354,5 +354,22 @@
   "mapPresetFamilies": "Terre|Eau",
   "mapPresetCorner": "Forme des angles",
   "mapPresetCorners": "Arrondi|Biseau|Angle intérieur",
-  "mapPresetTile": "Modèle de terrain"
+  "mapPresetTile": "Modèle de terrain",
+  "gridActions": "Actions de sélection",
+  "gridSelected": "{0} cases sélectionnées",
+  "gridCopy": "Copier",
+  "gridPaste": "Coller",
+  "gridDelete": "Vider le contenu sélectionné",
+  "gridRotate": "Tourner la sélection",
+  "gridClearSelection": "Désélectionner",
+  "gridClipboardInfo": "Presse-papiers : {0} entrées · {1}",
+  "gridHelp": "Aide sélection et raccourcis",
+  "gridSelectionHelp": "Glisser sélectionne un rectangle. Ctrl/Cmd-clic ajoute ou retire une case ; Maj-clic étend le rectangle. Ctrl/Cmd+A sélectionne la grille. Les flèches déplacent, Maj+flèches étend. Ctrl/Cmd+C/V copie/colle, Suppr efface, R tourne, Échap annule. En mode pinceau, maintenir Maj pour sélectionner. Les champs texte gardent leurs raccourcis.",
+  "gridClipboardHelp": "Le presse-papiers de l’éditeur est partagé dans la sauvegarde actuelle. Il copie les valeurs appliquées et les objets entiers sans les cases vides. Un objet remplit la sélection selon son emprise ; plusieurs entrées conservent leur disposition. Coller et effacer s’annulent chacun en une étape ; les limites et chevauchements sont vérifiés.",
+  "gridEmptyCopy": "Aucun objet à copier dans la sélection.",
+  "gridNoClipboard": "Copiez d’abord une sélection.",
+  "gridTypeMismatch": "Les presse-papiers de terrain et d’objets ne sont pas compatibles.",
+  "gridRoomItem": "Les objets extérieurs ne peuvent pas être collés dans une pièce.",
+  "gridCopied": "Sélection copiée dans le presse-papiers de l’éditeur.",
+  "gridArea": "Grille modifiable"
 }

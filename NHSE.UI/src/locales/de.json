@@ -354,5 +354,22 @@
   "mapPresetFamilies": "Land|Wasser",
   "mapPresetCorner": "Eckenform",
   "mapPresetCorners": "Rund|Schräg|Innenecke",
-  "mapPresetTile": "Geländevorlage"
+  "mapPresetTile": "Geländevorlage",
+  "gridActions": "Auswahlaktionen",
+  "gridSelected": "{0} Zellen ausgewählt",
+  "gridCopy": "Kopieren",
+  "gridPaste": "Einfügen",
+  "gridDelete": "Auswahlinhalt leeren",
+  "gridRotate": "Auswahl drehen",
+  "gridClearSelection": "Auswahl aufheben",
+  "gridClipboardInfo": "Zwischenablage: {0} Einträge · {1}",
+  "gridHelp": "Auswahl und Tastenkürzel",
+  "gridSelectionHelp": "Ziehen wählt ein Rechteck. Strg/Cmd-Klick schaltet Zellen um; Umschalt-Klick erweitert das Rechteck. Strg/Cmd+A wählt das Raster. Pfeile bewegen, Umschalt+Pfeile erweitern. Strg/Cmd+C/V kopiert/fügt ein, Entf leert, R dreht, Esc bricht ab. Im Pinselmodus mit Umschalt auswählen. Textfelder behalten ihre Kürzel.",
+  "gridClipboardHelp": "Die Editor-Zwischenablage gilt für den aktuellen Spielstand. Kopiert werden angewandte Werte und vollständige Objekte ohne Leerzellen. Einzelobjekte füllen die Auswahl nach Platzbedarf, mehrere Einträge behalten ihre Anordnung. Einfügen und Leeren sind je ein Rückgängig-Schritt; Grenzen und Überlappung werden geprüft.",
+  "gridEmptyCopy": "Keine kopierbaren Objekte in der Auswahl.",
+  "gridNoClipboard": "Zuerst eine Auswahl kopieren.",
+  "gridTypeMismatch": "Gelände- und Objektzwischenablage sind nicht kombinierbar.",
+  "gridRoomItem": "Außenobjekte können nicht in Räume eingefügt werden.",
+  "gridCopied": "Auswahl in die Editor-Zwischenablage kopiert.",
+  "gridArea": "Bearbeitbares Raster"
 }

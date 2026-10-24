@@ -8,6 +8,7 @@
     <Compile Include="..\NHSE.WinForms\Workspace\WorkspaceVillagers.cs" Link="WorkspaceVillagers.cs" />
     <Compile Include="..\NHSE.WinForms\Workspace\WorkspaceMapAdvanced.cs" Link="WorkspaceMapAdvanced.cs" />
     <Compile Include="..\NHSE.WinForms\Workspace\WorkspaceMapTools.cs" Link="WorkspaceMapTools.cs" />
+    <Compile Include="..\NHSE.WinForms\Workspace\WorkspaceGrid.cs" Link="WorkspaceGrid.cs" />
     <Compile Include="..\NHSE.WinForms\Workspace\WorkspaceMap.cs" Link="WorkspaceMap.cs" />
     <Compile Include="..\NHSE.WinForms\Workspace\WorkspaceDesigns.cs" Link="WorkspaceDesigns.cs" />
     <Compile Include="..\NHSE.WinForms\Workspace\WorkspaceHousing.cs" Link="WorkspaceHousing.cs" />

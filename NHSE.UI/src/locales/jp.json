@@ -354,5 +354,22 @@
   "mapPresetFamilies": "陸地|水域",
   "mapPresetCorner": "角の形",
   "mapPresetCorners": "丸い角|斜めの角|内側の角",
-  "mapPresetTile": "地形プリセット"
+  "mapPresetTile": "地形プリセット",
+  "gridActions": "選択範囲の操作",
+  "gridSelected": "{0} マス選択",
+  "gridCopy": "コピー",
+  "gridPaste": "貼り付け",
+  "gridDelete": "選択範囲を消去",
+  "gridRotate": "選択範囲を回転",
+  "gridClearSelection": "選択解除",
+  "gridClipboardInfo": "クリップボード：{0} 件 · {1}",
+  "gridHelp": "選択とショートカットの説明",
+  "gridSelectionHelp": "ドラッグで範囲選択。Ctrl/Cmd クリックで追加・解除、Shift クリックで矩形を拡張します。Ctrl/Cmd+A で現在のグリッド全選択、矢印で移動、Shift+矢印で拡張。Ctrl/Cmd+C/V でコピー・貼り付け、Delete で消去、R で回転、Esc で取消。ブラシ中は Shift で範囲選択します。入力欄の通常操作は維持します。",
+  "gridClipboardHelp": "エディターのクリップボードは現在のセーブ内で共有します。適用済みデータと物品の全占有範囲をコピーし、空マスは無視します。単一物品は占有範囲に合わせて選択内を埋め、複数記録は相対配置を維持します。貼り付けと消去は各 1 回で元に戻せ、境界と重複も検証します。",
+  "gridEmptyCopy": "選択内にコピーできる物品がありません。",
+  "gridNoClipboard": "先に範囲をコピーしてください。",
+  "gridTypeMismatch": "地形と物品のクリップボードは混在できません。",
+  "gridRoomItem": "屋外オブジェクトは部屋に貼り付けできません。",
+  "gridCopied": "エディターのクリップボードにコピーしました。",
+  "gridArea": "編集グリッド"
 }

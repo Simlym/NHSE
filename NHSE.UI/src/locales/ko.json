@@ -354,5 +354,22 @@
   "mapPresetFamilies": "육지|물",
   "mapPresetCorner": "모서리 모양",
   "mapPresetCorners": "둥근 모서리|사선 모서리|안쪽 모서리",
-  "mapPresetTile": "지형 프리셋"
+  "mapPresetTile": "지형 프리셋",
+  "gridActions": "선택 영역 작업",
+  "gridSelected": "{0}칸 선택됨",
+  "gridCopy": "복사",
+  "gridPaste": "붙여넣기",
+  "gridDelete": "선택 내용 지우기",
+  "gridRotate": "선택 영역 회전",
+  "gridClearSelection": "선택 해제",
+  "gridClipboardInfo": "클립보드: {0}개 기록 · {1}",
+  "gridHelp": "선택 및 단축키 도움말",
+  "gridSelectionHelp": "드래그로 사각형을 선택합니다. Ctrl/Cmd 클릭으로 칸을 추가·제거하고 Shift 클릭으로 확장합니다. Ctrl/Cmd+A는 현재 격자 전체 선택, 화살표는 이동, Shift+화살표는 확장입니다. Ctrl/Cmd+C/V는 복사·붙여넣기, Delete는 지우기, R은 회전, Esc는 취소입니다. 브러시에서는 Shift를 누르고 선택합니다. 텍스트 입력의 단축키는 유지됩니다.",
+  "gridClipboardHelp": "편집기 클립보드는 현재 저장 내에서 공유됩니다. 적용된 값과 아이템의 전체 점유 영역을 복사하며 빈칸은 건너뜁니다. 한 아이템은 점유 크기에 맞게 선택 영역을 채우고 여러 기록은 배치를 유지합니다. 붙여넣기와 지우기는 각각 한 단계로 실행 취소하며 경계와 겹침을 검사합니다.",
+  "gridEmptyCopy": "선택 영역에 복사할 아이템이 없습니다.",
+  "gridNoClipboard": "먼저 선택 영역을 복사하세요.",
+  "gridTypeMismatch": "지형과 아이템 클립보드는 혼용할 수 없습니다.",
+  "gridRoomItem": "야외 오브젝트는 방에 붙여넣을 수 없습니다.",
+  "gridCopied": "선택 영역을 편집기 클립보드에 복사했습니다.",
+  "gridArea": "편집 격자"
 }

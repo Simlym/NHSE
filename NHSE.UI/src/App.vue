@@ -41,6 +41,7 @@ import IslandPage from './IslandPage.vue';
 import ProgressPage from './ProgressPage.vue';
 import HousingPage from './HousingPage.vue';
 import DesignPage from './DesignPage.vue';
+import { editableTarget } from './gridSelection';
 import MapPage from './MapPage.vue';
 import {
   listenState,
@@ -338,8 +339,8 @@ async function command(
     }
     if (page.value === 'inventory') await loadInventory();
     if (page.value === 'progress') await loadProgress();
-    if (page.value === 'housing') await loadHousing();
-    if (page.value === 'mapEditor') await loadMap();
+    if (page.value === 'housing' && name !== 'copyGrid') await loadHousing();
+    if (page.value === 'mapEditor' && name !== 'copyGrid') await loadMap();
     if (page.value === 'designs') await loadDesigns();
     if (success) toast(success);
   });
@@ -386,6 +387,7 @@ async function applyWorldDrafts() {
   return true;
 }
 async function worldCommand(name: string, payload: Record<string, unknown> = {}) {
+  if (name === 'copyGrid') return await command(name, payload, 'gridCopied');
   if (['spawnMap', 'editMapParameters', 'replaceMapMatches'].includes(name)) {
     let applied = false;
     const completed = await run(async () => {
@@ -535,6 +537,7 @@ async function drop(event: DragEvent) {
   });
 }
 function keyboard(event: KeyboardEvent) {
+  if (event.defaultPrevented) return;
   if (event.key === 'Escape') {
     catalogOpen.value = false;
     helpOpen.value = false;
@@ -550,8 +553,7 @@ function keyboard(event: KeyboardEvent) {
     event.preventDefault();
     void save();
   }
-  const target = event.target as HTMLElement;
-  if (target.matches('input,textarea,select,[contenteditable=true]')) return;
+  if (editableTarget(event.target)) return;
   if (event.key.toLowerCase() === 'z') {
     event.preventDefault();
     void command(event.shiftKey ? 'redo' : 'undo');
@@ -1127,7 +1129,7 @@ onUnmounted(() => {
             </aside>
           </div>
         </section>
-        <MapPage v-else-if="page === 'mapEditor'" ref="mapPage" :data="mapData" :busy="busy"
+        <MapPage :clipboard="state.session?.clipboard ?? null" v-else-if="page === 'mapEditor'" ref="mapPage" :data="mapData" :busy="busy"
           :execute="worldCommand" :navigate="navigateMap" :pick-item="() => showCatalog('map')" />
         <DesignPage
           v-else-if="page === 'designs'"
@@ -1139,6 +1141,7 @@ onUnmounted(() => {
         <HousingPage
           v-else-if="page === 'housing'"
           ref="housingPage"
+          :clipboard="state.session?.clipboard ?? null"
           :data="housingData"
           :player="playerIndex"
           :busy="busy"

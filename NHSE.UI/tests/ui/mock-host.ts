@@ -265,6 +265,19 @@ export async function mockHost(page: Page, picker = false) {
         })),
       ]),
     );
+    type GridPoint = { x: number; y: number };
+    type GridTarget = { kind: string; map?: Record<string, unknown>; house?: number; room?: number; layer?: number };
+    let gridClipboard: { kind: string; count: number; width: number; height: number; entries: { x: number; y: number; values: Record<string, number> }[] } | null = null;
+    const gridRead = (target: GridTarget, point: GridPoint): Record<string, number> => {
+      if (target.kind === 'roomItems') return { ...(housingRecords.tiles[tileKey({ index: target.house, room: target.room, layer: target.layer }, point.x, point.y)] ?? { itemId: 65534, systemParam: 0, additionalParam: 0, freeParam: 0 }) };
+      const values = mapRecords[mapKey({ ...target.map, x: point.x, y: point.y })] ?? {};
+      if (target.kind === 'terrain') return { ...values };
+      return { itemId: values['Map.ItemId'] ?? 65534, systemParam: values['Map.SystemParam'] ?? 0, additionalParam: values['Map.AdditionalParam'] ?? 0, freeParam: values['Map.FreeParam'] ?? 0 };
+    };
+    const gridWrite = (target: GridTarget, point: GridPoint, values: Record<string, number>) => {
+      if (target.kind === 'roomItems') housingRecords.tiles[tileKey({ index: target.house, room: target.room, layer: target.layer }, point.x, point.y)] = { itemId: values.itemId!, systemParam: values.systemParam!, additionalParam: values.additionalParam!, freeParam: values.freeParam! };
+      else mapRecords[mapKey({ ...target.map, x: point.x, y: point.y })] = target.kind === 'terrain' ? { ...values } : { 'Map.ItemId': values.itemId!, 'Map.SystemParam': values.systemParam!, 'Map.AdditionalParam': values.additionalParam!, 'Map.FreeParam': values.freeParam! };
+    };
     let mapFlags: Record<string, boolean> = {};
     let mapRecords: Record<string, Record<string, number>> = {};
     const mapKey = (target: Record<string, unknown>) => JSON.stringify(target);
@@ -354,6 +367,7 @@ export async function mockHost(page: Page, picker = false) {
             dirty: revision !== savedRevision,
             canUndo: history.length > 0,
             canRedo: redo.length > 0,
+            clipboard: gridClipboard ? { kind: gridClipboard.kind, count: gridClipboard.count, width: gridClipboard.width, height: gridClipboard.height } : null,
             players,
             residents,
             islandSettings,
@@ -373,6 +387,35 @@ export async function mockHost(page: Page, picker = false) {
             );
             const p = message.payload;
             let data: unknown;
+            if (['copyGrid', 'pasteGrid', 'editGrid'].includes(message.command)) {
+              const target = p.target as GridTarget, selection = p.selection as GridPoint[];
+              const fail = (error: string) => { queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error } }))); };
+              if (message.command === 'copyGrid') {
+                const minX = Math.min(...selection.map(p => p.x)), minY = Math.min(...selection.map(p => p.y));
+                const entries = selection.map(point => ({ x: point.x - minX, y: point.y - minY, values: gridRead(target, point) })).filter(e => target.kind === 'terrain' || e.values.itemId !== 65534);
+                if (!entries.length) { fail('gridEmptyCopy'); return; }
+                gridClipboard = { kind: target.kind === 'terrain' ? 'terrain' : 'items', count: entries.length, width: Math.max(...selection.map(p => p.x)) - minX + 1, height: Math.max(...selection.map(p => p.y)) - minY + 1, entries };
+              } else if (message.command === 'pasteGrid') {
+                if (!gridClipboard) { fail('gridNoClipboard'); return; }
+                if (gridClipboard.kind !== (target.kind === 'terrain' ? 'terrain' : 'items')) { fail('gridTypeMismatch'); return; }
+                const controls = window as unknown as { nhseGridErrorNext?: string };
+                if (controls.nhseGridErrorNext) { fail(controls.nhseGridErrorNext); controls.nhseGridErrorNext = undefined; return; }
+                remember(); const anchor = p.anchor as GridPoint;
+                const entries = gridClipboard.entries.length === 1 && selection.length > 1 ? selection.map(point => ({ ...point, values: gridClipboard!.entries[0]!.values })) : gridClipboard.entries.map(e => ({ x: e.x + anchor.x, y: e.y + anchor.y, values: e.values }));
+                for (const entry of entries) gridWrite(target, entry, entry.values);
+              } else {
+                remember();
+                for (const point of selection) {
+                  const values = gridRead(target, point);
+                  if (target.kind === 'terrain') {
+                    if (p.operation === 'delete') for (const key of ['UnitModel', 'Variation', 'LandMakingAngle', 'UnitModelRoad', 'VariationRoad', 'LandMakingAngleRoad', 'Elevation']) values['Map.' + key] = 0;
+                    else values['Map.LandMakingAngle'] = ((values['Map.LandMakingAngle'] ?? 0) + 1) % 4;
+                  } else if (p.operation === 'delete') Object.assign(values, { itemId: 65534, systemParam: 0, additionalParam: 0, freeParam: 0 });
+                  else values.systemParam = ((values.systemParam ?? 0) & ~3) | (((values.systemParam ?? 0) + 1) & 3);
+                  gridWrite(target, point, values);
+                }
+              }
+            }
             let mapAdvancedCount: { requested: number; applied: number; cancelled: boolean } | null = null;
             if (['spawnMap', 'editMapParameters', 'replaceMapMatches'].includes(message.command)) {
               const controls = window as unknown as { nhseMapCancelNext?: boolean; nhseMapErrorNext?: string };
@@ -412,7 +455,7 @@ export async function mockHost(page: Page, picker = false) {
               mapRecords[mapKey(p.target as Record<string, unknown>)] = { ...(p.values as Record<string, number>) };
             }
             if (message.command === 'language') locale = String(p.language);
-            if (message.command === 'open' || message.command === 'openRecent') opened = true;
+            if (message.command === 'open' || message.command === 'openRecent') { opened = true; gridClipboard = null; }
             if (['setRecipe', 'setReaction', 'setAchievement'].includes(message.command)) {
               remember();
               const section = (
@@ -721,7 +764,11 @@ export async function mockHost(page: Page, picker = false) {
             } else data = snapshot();
             if (mapAdvancedCount) data = { state: snapshot(), ...mapAdvancedCount };
             const response = structuredClone({ id: message.id, ok: true, data });
-            queueMicrotask(() => listeners.forEach((fn) => fn({ data: response })));
+            const delayControls = window as unknown as { nhseDelayMapNext?: number };
+            if (message.command === 'map' && delayControls.nhseDelayMapNext) {
+              const delay = delayControls.nhseDelayMapNext; delayControls.nhseDelayMapNext = undefined;
+              setTimeout(() => listeners.forEach(fn => fn({ data: response })), delay);
+            } else queueMicrotask(() => listeners.forEach((fn) => fn({ data: response })));
           },
         },
       },

@@ -354,5 +354,22 @@
   "mapPresetFamilies": "Terra|Acqua",
   "mapPresetCorner": "Forma degli angoli",
   "mapPresetCorners": "Arrotondato|Diagonale|Interno",
-  "mapPresetTile": "Modello terreno"
+  "mapPresetTile": "Modello terreno",
+  "gridActions": "Azioni sulla selezione",
+  "gridSelected": "{0} caselle selezionate",
+  "gridCopy": "Copia",
+  "gridPaste": "Incolla",
+  "gridDelete": "Svuota contenuto selezionato",
+  "gridRotate": "Ruota selezione",
+  "gridClearSelection": "Deseleziona",
+  "gridClipboardInfo": "Appunti: {0} record · {1}",
+  "gridHelp": "Guida a selezione e scorciatoie",
+  "gridSelectionHelp": "Trascina per selezionare un rettangolo. Ctrl/Cmd-clic aggiunge o rimuove caselle; Maiusc-clic amplia il rettangolo. Ctrl/Cmd+A seleziona la griglia. Le frecce spostano, Maiusc+frecce amplia. Ctrl/Cmd+C/V copia/incolla, Canc svuota, R ruota, Esc annulla. Con il pennello, tieni Maiusc per selezionare. I campi di testo mantengono le scorciatoie.",
+  "gridClipboardHelp": "Gli appunti dell’editor sono condivisi nel salvataggio attuale. Copiano i valori applicati e gli oggetti interi saltando le caselle vuote. Un oggetto riempie la selezione secondo l’ingombro; più record mantengono la disposizione. Incolla e svuota si annullano ciascuno in un passaggio; si verificano limiti e sovrapposizioni.",
+  "gridEmptyCopy": "Nessun oggetto da copiare nella selezione.",
+  "gridNoClipboard": "Copia prima una selezione.",
+  "gridTypeMismatch": "Gli appunti di terreno e oggetti non sono compatibili.",
+  "gridRoomItem": "Gli oggetti esterni non si possono incollare nelle stanze.",
+  "gridCopied": "Selezione copiata negli appunti dell’editor.",
+  "gridArea": "Griglia modificabile"
 }

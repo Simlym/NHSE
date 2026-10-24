@@ -27,6 +27,12 @@ public partial class VillagerEditor : UserControl
         LoadVillagers();
 
         B_EditHouses.Visible = hasHouses;
+        PB_Villager.Cursor = Cursors.Hand;
+        PB_Villager.Click += B_ReplaceVillager_Click;
+        var menu = new ContextMenuStrip(components ??= new System.ComponentModel.Container());
+        menu.Items.Add(WorkspaceText.Get("villagerClipboard"), null, B_ReplaceVillagerFromClipboard_Click);
+        menu.Opening += (_, _) => menu.Items[0].Text = WorkspaceText.Get("villagerClipboard");
+        B_ReplaceVillager.ContextMenuStrip = menu;
     }
 
     public void Save() => SaveVillager(VillagerIndex);
@@ -280,7 +286,16 @@ public partial class VillagerEditor : UserControl
         TB_Catchphrase.Text = GameInfo.Strings.GetVillagerDefaultPhrase(internalName);
     }
 
-    private void B_ReplaceVillager_Click(object sender, EventArgs e)
+    private void B_ReplaceVillager_Click(object? sender, EventArgs e)
+    {
+        SaveVillager(VillagerIndex);
+        using var picker = new WorkspaceForm(false, Villagers, VillagerIndex);
+        if (picker.ShowDialog(FindForm()) != DialogResult.OK) return;
+        NUD_Villager.Value = picker.PickedResidentIndex;
+        if (picker.PickedVillager is { } id) ReplaceVillager(id);
+    }
+
+    private void B_ReplaceVillagerFromClipboard_Click(object? sender, EventArgs e)
     {
         if (!Clipboard.ContainsText())
         {
@@ -300,6 +315,11 @@ public partial class VillagerEditor : UserControl
             }
         }
 
+        ReplaceVillager(internalName);
+    }
+
+    private void ReplaceVillager(string internalName)
+    {
         var index = VillagerIndex;
         var villager = Villagers[index];
         if (villager is not Villager2 v2)
@@ -310,13 +330,15 @@ public partial class VillagerEditor : UserControl
 
         var houses = SAV.Main.GetVillagerHouses();
         var houseIndex = Array.FindIndex(houses, z => z.NPC1 == index);
-        var exist = new VillagerInfo(v2, houses[houseIndex]);
-        var replace = VillagerSwap.GetReplacementVillager(exist, internalName);
+        if (houseIndex < 0)
+        {
+            WinFormsUtil.Error(WorkspaceText.Get("villagerHouseMissing"));
+            return;
+        }
+        var replace = WorkspaceVillagers.CreateReplacement(v2, houses[houseIndex], internalName, SAV.Main.Offsets.VillagerHouseSize);
 
-        var nh = new VillagerHouse1(replace.House);
-        SAV.Main.SetVillagerHouse(nh, houseIndex);
-        var nv = new Villager2(replace.Villager);
-        LoadVillager(Villagers[index] = nv);
+        SAV.Main.SetVillagerHouse(replace.House, houseIndex);
+        LoadVillager(Villagers[index] = replace.Villager);
         System.Media.SystemSounds.Asterisk.Play();
     }
 }

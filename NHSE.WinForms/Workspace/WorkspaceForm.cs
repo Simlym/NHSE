@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -24,14 +26,21 @@ public sealed class WorkspaceForm : Form
     private Rectangle PreviousBounds;
     private FormWindowState PreviousState;
     private string? StartupPath;
+    private readonly Dictionary<int, string?> Avatars = new();
+    private readonly IVillager[]? PickerResidents;
+    private readonly int PickerInitialIndex;
+    public int PickedResidentIndex { get; private set; }
+    public string? PickedVillager { get; private set; }
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    public WorkspaceForm(bool processCommandLine = true)
+    public WorkspaceForm(bool processCommandLine = true, IVillager[]? pickerResidents = null, int pickerIndex = 0)
     {
+        PickerResidents = pickerResidents;
+        PickerInitialIndex = PickedResidentIndex = pickerIndex;
         StartupPath = processCommandLine ? Environment.GetCommandLineArgs().Skip(1).FirstOrDefault(x => Directory.Exists(x)
             || (File.Exists(x) && (x.EndsWith(".dat", StringComparison.OrdinalIgnoreCase) || x.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)))) : null;
         WorkspaceText.SetLanguage(Program.Settings.Language);
-        Text = "NHSE";
+        Text = PickerResidents is null ? "NHSE" : "NHSE · " + WorkspaceText.Get("villagerCatalogTitle");
         Icon = Properties.Resources.icon;
         AutoScaleMode = AutoScaleMode.Dpi;
         var area = Screen.FromControl(this).WorkingArea;
@@ -127,10 +136,39 @@ public sealed class WorkspaceForm : Form
             core.PostWebMessageAsJson(JsonSerializer.Serialize(value, Json));
     }
 
-    private object State() => new { language = GameInfo.CurrentLanguage, recent = Program.Settings.LastFilePath, session = Session?.Snapshot(), fullScreen = FullScreen };
+    private object State()
+    {
+        if (Session is not null) Text = Session.SaveFile.GetSaveTitle("NHSE");
+        return new { language = GameInfo.CurrentLanguage, recent = Program.Settings.LastFilePath, session = Session?.Snapshot(PlayerAvatar), fullScreen = FullScreen,
+            villagerPicker = PickerResidents is null ? null : new { index = PickerInitialIndex,
+                residents = PickerResidents.Select((v, i) => new { index = i, id = v.InternalName, name = GameInfo.Strings.GetVillager(v.InternalName), image = VillagerImage(v.InternalName), empty = v.Species >= (byte)VillagerSpecies.non }).ToArray() } };
+    }
+
+    private string? PlayerAvatar(int index)
+    {
+        if (Avatars.TryGetValue(index, out var cached)) return cached;
+        string? result = null;
+        try
+        {
+            var data = RequireSession().SaveFile.Players[index].Personal.GetPhotoData();
+            if (data.Length != 0)
+            {
+                using var source = new MemoryStream(data);
+                using var original = Image.FromStream(source);
+                using var thumbnail = new Bitmap(original, new Size(96, 96));
+                using var output = new MemoryStream();
+                thumbnail.Save(output, ImageFormat.Png);
+                result = "data:image/png;base64," + Convert.ToBase64String(output.ToArray());
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException or ExternalException or OutOfMemoryException) { }
+        Avatars[index] = result;
+        return result;
+    }
     private WorkspaceSession RequireSession() => Session ?? throw new ArgumentException("invalidRequest");
     private static int Int(JsonElement p, string key) => p.GetProperty(key).GetInt32();
     private static string Str(JsonElement p, string key) => p.GetProperty(key).GetString() ?? throw new ArgumentException("invalidRequest");
+    private static uint? OptionalUInt(JsonElement p, string key) => p.TryGetProperty(key, out var value) && value.ValueKind != JsonValueKind.Null ? value.GetUInt32() : null;
 
     private object? Dispatch(string? command, JsonElement p, CoreWebView2WebMessageReceivedEventArgs message)
     {
@@ -145,6 +183,28 @@ public sealed class WorkspaceForm : Form
             case "language":
                 WorkspaceText.SetLanguage(Str(p, "language"));
                 return State();
+            case "villagerCatalog":
+                var villagers = WorkspaceVillagers.Search(Str(p, "query"), Int(p, "species"), Int(p, "personality"), Int(p, "page"));
+                return new { villagers.Page, villagers.Pages, villagers.Total, villagers.Species, villagers.Personalities,
+                    items = villagers.Items.Select(v => new { v.Id, v.Name, v.Species, v.Personality, image = VillagerImage(v.Id) }).ToArray() };
+            case "pickVillager":
+            case "pickResident":
+                if (PickerResidents is null) throw new ArgumentException("invalidRequest");
+                var target = Int(p, "index");
+                if ((uint)target >= PickerResidents.Length) throw new ArgumentException("invalidRequest");
+                var chosen = command == "pickVillager" ? Str(p, "id") : null;
+                if (chosen is not null && (!WorkspaceVillagers.Contains(chosen) || PickerResidents.Where((_, i) => i != target).Any(v => v.InternalName == chosen)))
+                    throw new ArgumentException("invalidRequest");
+                PickedResidentIndex = target;
+                PickedVillager = chosen;
+                DialogResult = DialogResult.OK;
+                Close();
+                return null;
+            case "cancelVillager":
+                if (PickerResidents is null) throw new ArgumentException("invalidRequest");
+                DialogResult = DialogResult.Cancel;
+                Close();
+                return null;
             case "open":
                 if (!ConfirmLeave()) return State();
                 if (Str(p, "kind") == "folder")
@@ -173,16 +233,16 @@ public sealed class WorkspaceForm : Form
             case "redo": RequireSession().Redo(); return State();
             case "inventory": return Inventory(Int(p, "player"), Str(p, "container"), Int(p, "page"), Str(p, "query"));
             case "catalog":
-                var query = Str(p, "query");
-                return GameInfo.Strings.ItemDataSource.Where(x => x.Value < Item.FieldItemMin && x.Value > 0 && x.Text.Contains(query, StringComparison.CurrentCultureIgnoreCase))
-                    .Take(60).Select(x => ItemView(new Item((ushort)x.Value), -1, true)).ToArray();
+                var catalog = WorkspaceCatalog.Search(Str(p, "query"), Str(p, "category"), Int(p, "page"), p.TryGetProperty("subcategory", out var sub) ? sub.GetString() ?? "all" : "all");
+                return new { catalog.Page, catalog.Pages, catalog.Total, catalog.TotalAll, catalog.Categories, catalog.Subcategories,
+                    items = catalog.Items.Select(x => ItemView(new Item((ushort)x.ItemId), -1, true, x.Name)).ToArray() };
             case "setItem":
                 var session = RequireSession();
                 var player = Int(p, "player"); var container = Str(p, "container"); var index = Int(p, "index");
                 var items = session.GetItems(player, container);
                 if ((uint)index >= items.Length) throw new ArgumentException("invalidRequest");
                 var itemId = Int(p, "itemId"); var quantity = Int(p, "quantity");
-                if (!GameInfo.Strings.ItemDataSource.Any(x => x.Value == itemId) || itemId >= Item.FieldItemMin || itemId <= 0)
+                if (!WorkspaceCatalog.Contains(itemId))
                     throw new ArgumentException("invalidRequest");
                 var item = items[index].ItemId == itemId ? new Item(items[index].RawValue) : new Item((ushort)itemId);
                 var max = WorkspaceSession.MaxQuantity(item);
@@ -203,7 +263,8 @@ public sealed class WorkspaceForm : Form
                 }
                 return State();
             case "setPlayer":
-                RequireSession().SetPlayer(Int(p, "player"), p.GetProperty("wallet").GetUInt32(), p.GetProperty("bank").GetUInt32(), p.GetProperty("miles").GetUInt32(), p.GetProperty("earnedMiles").GetUInt32());
+                RequireSession().SetPlayer(Int(p, "player"), p.GetProperty("wallet").GetUInt32(), p.GetProperty("bank").GetUInt32(), p.GetProperty("miles").GetUInt32(), p.GetProperty("earnedMiles").GetUInt32(),
+                    Str(p, "name"), Str(p, "island"), OptionalUInt(p, "pocketCapacity"), OptionalUInt(p, "storageCapacity"), OptionalUInt(p, "hotelTickets"), OptionalUInt(p, "poki"));
                 return State();
             case "legacy":
                 using (var editor = new Editor(RequireSession().SaveFile))
@@ -213,6 +274,7 @@ public sealed class WorkspaceForm : Form
                     editor.ApplyWorkspaceChanges();
                 }
                 RequireSession().InvalidateHistory();
+                Avatars.Clear();
                 WorkspaceText.SetLanguage(Program.Settings.Language);
                 return State();
             case "fullScreen": ToggleFullScreen(); return State();
@@ -237,9 +299,9 @@ public sealed class WorkspaceForm : Form
             items = filtered.Skip(page * pageSize).Take(pageSize).Select(x => ItemView(x.item, x.index, session.IsSlotAvailable(player, container, x.index))).ToArray() };
     }
 
-    private static object ItemView(Item item, int index, bool available) => new
+    private static object ItemView(Item item, int index, bool available, string? name = null) => new
     {
-        index, itemId = item.ItemId, name = item.IsNone ? "" : GameInfo.Strings.GetItemName(item),
+        index, itemId = item.ItemId, name = name ?? (item.IsNone ? "" : GameInfo.Strings.GetItemName(item)),
         empty = item.IsNone, available, quantity = WorkspaceSession.Quantity(item), maxQuantity = WorkspaceSession.MaxQuantity(item),
         image = Sprite(item),
     };
@@ -254,12 +316,22 @@ public sealed class WorkspaceForm : Form
         return "data:image/png;base64," + Convert.ToBase64String(stream.ToArray());
     }
 
+    private static string? VillagerImage(string id)
+    {
+        var image = VillagerSprite.GetVillagerSprite(id);
+        if (image is null) return null;
+        using var output = new MemoryStream();
+        image.Save(output, ImageFormat.Png);
+        return "data:image/png;base64," + Convert.ToBase64String(output.ToArray());
+    }
+
     private void OpenPath(string path)
     {
         if (SaveFileLoader.TryGetSaveFile(path, out var save))
         {
             if (save.Players.Count == 0) throw new ArgumentException("invalidRequest");
             Session = new WorkspaceSession(save);
+            Avatars.Clear();
             Program.Settings.LastFilePath = path;
             Program.SaveSettings();
             Text = save.GetSaveTitle("NHSE");

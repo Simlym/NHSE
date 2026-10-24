@@ -2,12 +2,17 @@ export interface Player {
   index: number;
   name: string;
   island: string;
+  avatar: string | null;
   wallet: number;
   bank: number;
   miles: number;
   earnedMiles: number;
   pocketCapacity: number;
   storageCapacity: number;
+  maxPocketCapacity: number;
+  maxStorageCapacity: number;
+  hotelTickets: number | null;
+  poki: number | null;
 }
 export interface Session {
   title: string;
@@ -22,6 +27,26 @@ export interface State {
   recent: string;
   session: Session | null;
   fullScreen: boolean;
+  villagerPicker?: VillagerPickerContext | null;
+}
+export interface VillagerEntry {
+  id: string;
+  name: string;
+  species: number;
+  personality: number;
+  image: string | null;
+}
+export interface VillagerPickerContext {
+  index: number;
+  residents: { index: number; id: string; name: string; image: string | null; empty: boolean }[];
+}
+export interface VillagerCatalog {
+  page: number;
+  pages: number;
+  total: number;
+  species: { id: number; total: number }[];
+  personalities: { id: number; total: number }[];
+  items: VillagerEntry[];
 }
 export interface ItemView {
   index: number;
@@ -39,6 +64,15 @@ export interface Inventory {
   total: number;
   matched: number;
   used: number;
+  items: ItemView[];
+}
+export interface Catalog {
+  page: number;
+  pages: number;
+  total: number;
+  totalAll: number;
+  categories: { id: string; count: number }[];
+  subcategories: { id: string; count: number }[];
   items: ItemView[];
 }
 interface Response {

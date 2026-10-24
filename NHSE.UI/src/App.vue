@@ -6,6 +6,8 @@ import {
   CheckCheck,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   FolderOpen,
   Globe2,
   HelpCircle,
@@ -33,11 +35,13 @@ import {
   LockKeyhole,
 } from '@lucide/vue';
 import { languages, language, setLanguage, t, hasText } from './i18n';
+import VillagerPicker from './VillagerPicker.vue';
 import {
   listenState,
   native,
   request,
   type Inventory,
+  type Catalog,
   type ItemView,
   type Player,
   type State,
@@ -58,7 +62,36 @@ const draftItem = ref<ItemView | null>(null);
 const quantity = ref(1);
 const query = ref('');
 const catalogQuery = ref('');
-const catalog = ref<ItemView[]>([]);
+const catalog = ref<Catalog | null>(null);
+const catalogCategory = ref('all');
+const catalogSubcategory = ref('all');
+const clothingLabels = {
+  all: 'clothesAll',
+  tops: 'clothesTops',
+  bottoms: 'clothesBottoms',
+  dresses: 'clothesDresses',
+  headwear: 'clothesHeadwear',
+  accessories: 'clothesAccessories',
+  socks: 'clothesSocks',
+  shoes: 'clothesShoes',
+  bags: 'clothesBags',
+  umbrellas: 'clothesUmbrellas',
+  other: 'clothesOther',
+} as const;
+const catalogJump = ref(1);
+const catalogLabels = {
+  all: 'categoryAll',
+  furniture: 'categoryFurniture',
+  clothing: 'categoryClothing',
+  tools: 'categoryTools',
+  nature: 'categoryNature',
+  materials: 'categoryMaterials',
+  creatures: 'categoryCreatures',
+  interior: 'categoryInterior',
+  food: 'categoryFood',
+  recipes: 'categoryRecipes',
+  other: 'categoryOther',
+} as const;
 const catalogOpen = ref(false);
 const helpOpen = ref(false);
 const busy = ref(false);
@@ -68,9 +101,28 @@ const notice = ref('');
 const dragging = ref(false);
 const focused = ref(false);
 const theme = ref(localStorage.getItem('nhse.theme') ?? 'system');
-const fields = ref({ wallet: 0, bank: 0, miles: 0, earnedMiles: 0 });
+const fields = ref({
+  name: '',
+  island: '',
+  wallet: 0,
+  bank: 0,
+  miles: 0,
+  earnedMiles: 0,
+  pocketCapacity: 0,
+  storageCapacity: 0,
+  hotelTickets: null as number | null,
+  poki: null as number | null,
+});
+const playerForm = ref<HTMLFormElement | null>(null);
 const currentPlayer = computed(() => state.value.session?.players.find((p) => p.index === playerIndex.value));
 const currentItem = computed(() => draftItem.value ?? selected.value);
+const profilePending = computed(
+  () =>
+    currentPlayer.value &&
+    Object.entries(fields.value).some(
+      ([key, value]) => value !== (currentPlayer.value![key as keyof Player] ?? null),
+    ),
+);
 const balanceFields = ['wallet', 'bank', 'miles', 'earnedMiles'] as const;
 const nav = [
   { id: 'overview', icon: LayoutDashboard },
@@ -83,16 +135,23 @@ let inventoryToken = 0,
 let queryTimer: ReturnType<typeof setTimeout> | undefined;
 let catalogTimer: ReturnType<typeof setTimeout> | undefined;
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+let pendingCatalogPage: number | null = null;
 let lastFocus: HTMLElement | null = null;
 const dialog = ref<HTMLDialogElement | null>(null);
 
 function syncFields(player?: Player) {
   if (player)
     fields.value = {
+      name: player.name,
+      island: player.island,
       wallet: player.wallet,
       bank: player.bank,
       miles: player.miles,
       earnedMiles: player.earnedMiles,
+      pocketCapacity: player.pocketCapacity,
+      storageCapacity: player.storageCapacity,
+      hotelTickets: player.hotelTickets ?? null,
+      poki: player.poki ?? null,
     };
 }
 function accept(next: State) {
@@ -109,16 +168,18 @@ function toast(key: Parameters<typeof t>[0]) {
   noticeTimer = setTimeout(() => (notice.value = ''), 5000);
 }
 async function run(action: () => Promise<void>) {
-  if (busy.value) return;
+  if (busy.value) return false;
   busy.value = true;
   error.value = '';
   errorDetail.value = '';
   try {
     await action();
+    return true;
   } catch (reason) {
     const e = reason instanceof Error ? reason : new Error('operationFailed');
     error.value = t(hasText(e.message) ? e.message : 'operationFailed');
     errorDetail.value = typeof e.cause === 'string' ? e.cause : '';
+    return false;
   } finally {
     busy.value = false;
   }
@@ -145,7 +206,7 @@ async function command(
   payload: Record<string, unknown> = {},
   success?: Parameters<typeof t>[0],
 ) {
-  await run(async () => {
+  return await run(async () => {
     accept(await request<State>(name, payload));
     if (page.value === 'inventory') await loadInventory();
     if (success) toast(success);
@@ -157,8 +218,22 @@ async function open(kind: string) {
 }
 async function go(destination: Page) {
   if (busy.value) return;
+  if (page.value === 'player' && profilePending.value && !(await applyProfile())) return;
   page.value = destination;
   if (destination === 'inventory') await run(() => loadInventory(0));
+}
+async function applyProfile() {
+  if (!playerForm.value?.reportValidity()) return false;
+  return await command('setPlayer', { player: playerIndex.value, ...fields.value }, 'applied');
+}
+async function selectPlayer(index: number) {
+  if (busy.value || index === playerIndex.value) return;
+  if (page.value === 'player' && profilePending.value && !(await applyProfile())) return;
+  playerIndex.value = index;
+}
+async function save() {
+  if (page.value === 'player' && profilePending.value && !(await applyProfile())) return;
+  await command('save', {}, 'saveSuccess');
 }
 function chooseSlot(item: ItemView) {
   if (!item.available) return;
@@ -166,16 +241,43 @@ function chooseSlot(item: ItemView) {
   draftItem.value = null;
   quantity.value = item.quantity || 1;
 }
-async function searchCatalog() {
+async function searchCatalog(pageNumber = 0) {
+  if (busy.value) {
+    pendingCatalogPage = pageNumber;
+    return;
+  }
   const token = ++catalogToken;
-  const result = await request<ItemView[]>('catalog', { query: catalogQuery.value });
-  if (token === catalogToken) catalog.value = result;
+  const query = catalogQuery.value;
+  const category = catalogCategory.value;
+  const subcategory = catalogSubcategory.value;
+  await run(async () => {
+    const result = await request<Catalog>('catalog', { query, category, subcategory, page: pageNumber });
+    if (
+      token === catalogToken &&
+      query === catalogQuery.value &&
+      category === catalogCategory.value &&
+      subcategory === catalogSubcategory.value
+    ) {
+      catalog.value = result;
+      catalogJump.value = result.page + 1;
+      await nextTick();
+      dialog.value?.querySelector('.catalog-results')?.scrollTo(0, 0);
+    }
+  });
 }
 async function showCatalog() {
-  catalogQuery.value = '';
-  catalog.value = [];
-  await run(searchCatalog);
-  if (!error.value) catalogOpen.value = true;
+  catalogOpen.value = true;
+  await searchCatalog(catalog.value?.page ?? 0);
+}
+function categoryLabel(id: string) {
+  return t(catalogLabels[id as keyof typeof catalogLabels] ?? 'categoryOther');
+}
+function clothingLabel(id: string) {
+  return t(clothingLabels[id as keyof typeof clothingLabels] ?? 'clothesOther');
+}
+function chooseClothingGroup(id: string) {
+  catalogSubcategory.value = id;
+  void searchCatalog(0);
 }
 function chooseCatalog(item: ItemView) {
   draftItem.value = item;
@@ -231,7 +333,7 @@ function keyboard(event: KeyboardEvent) {
   if (!(event.ctrlKey || event.metaKey) || !state.value.session || event.altKey) return;
   if (event.key.toLowerCase() === 's') {
     event.preventDefault();
-    void command('save', {}, 'saveSuccess');
+    void save();
   }
   const target = event.target as HTMLElement;
   if (target.matches('input,textarea,select,[contenteditable=true]')) return;
@@ -261,7 +363,24 @@ watch(query, () => {
 });
 watch(catalogQuery, () => {
   clearTimeout(catalogTimer);
-  catalogTimer = setTimeout(() => void run(searchCatalog), 250);
+  catalogTimer = setTimeout(() => void searchCatalog(0), 250);
+});
+watch(catalogCategory, () => {
+  catalogSubcategory.value = 'all';
+  void searchCatalog(0);
+});
+watch(busy, (value) => {
+  if (!value && pendingCatalogPage !== null && catalogOpen.value) {
+    const next = pendingCatalogPage;
+    pendingCatalogPage = null;
+    void searchCatalog(next);
+  }
+});
+watch(catalogOpen, (value) => {
+  if (!value) {
+    pendingCatalogPage = null;
+    clearTimeout(catalogTimer);
+  }
 });
 watch(
   theme,
@@ -298,7 +417,9 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <VillagerPicker v-if="state.villagerPicker" :context="state.villagerPicker" />
   <div
+    v-else
     class="app"
     :class="{ 'is-focused': focused }"
     @dragover.prevent="dragging = true"
@@ -459,14 +580,7 @@ onUnmounted(() => {
             <h1>{{ t(page) }}</h1>
           </div>
           <div class="workspace-controls">
-            <label class="player-select"
-              ><UserRound :size="17" /><span class="sr-only">{{ t('player') }}</span
-              ><select v-model="playerIndex" :disabled="busy">
-                <option v-for="player in state.session.players" :key="player.index" :value="player.index">
-                  {{ player.name || `#${player.index + 1}` }}
-                </option>
-              </select></label
-            ><button
+            <button
               class="icon-button"
               :aria-label="focused ? t('exitFocus') : t('focus')"
               :title="focused ? t('exitFocus') : t('focus')"
@@ -475,6 +589,25 @@ onUnmounted(() => {
               <PanelLeftOpen v-if="focused" :size="20" /><PanelLeftClose v-else :size="20" />
             </button>
           </div>
+        </div>
+        <div class="player-switcher" role="group" :aria-label="t('switchPlayer')">
+          <button
+            v-for="player in state.session.players"
+            :key="player.index"
+            class="player-chip"
+            :class="{ active: player.index === playerIndex }"
+            :aria-pressed="player.index === playerIndex"
+            :aria-label="`${t('player')} ${player.name}`"
+            :title="player.name"
+            :disabled="busy"
+            @click="selectPlayer(player.index)"
+          >
+            <span class="player-avatar"
+              ><img v-if="player.avatar" :src="player.avatar" alt="" /><UserRound v-else :size="23"
+            /></span>
+            <span class="player-chip-name">{{ player.name || `#${player.index + 1}` }}</span>
+            <Check v-if="player.index === playerIndex" :size="15" class="player-active-mark" />
+          </button>
         </div>
         <nav v-if="focused" class="focus-nav" :aria-label="t('workspace')">
           <button
@@ -510,10 +643,41 @@ onUnmounted(() => {
         </section>
         <section v-else-if="page === 'player'" class="player-page">
           <p class="page-description">{{ t('playerHint') }}</p>
-          <form
-            class="balance-form"
-            @submit.prevent="command('setPlayer', { player: playerIndex, ...fields }, 'applied')"
-          >
+          <form ref="playerForm" class="balance-form" @submit.prevent="applyProfile">
+            <div class="form-section-title">
+              <UserRound :size="19" />
+              <h2>{{ t('identity') }}</h2>
+            </div>
+            <label
+              ><span>{{ t('playerName') }}</span
+              ><input
+                v-model="fields.name"
+                :aria-label="t('playerName')"
+                aria-describedby="player-name-help"
+                required
+                maxlength="10"
+                :disabled="busy"
+                :spellcheck="false"
+                autocomplete="off"
+              /><small id="player-name-help" class="field-help">{{ t('nameHint') }}</small></label
+            >
+            <label
+              ><span>{{ t('islandName') }}</span
+              ><input
+                v-model="fields.island"
+                :aria-label="t('islandName')"
+                aria-describedby="island-name-help"
+                required
+                maxlength="10"
+                :disabled="busy"
+                :spellcheck="false"
+                autocomplete="off"
+              /><small id="island-name-help" class="field-help">{{ t('islandNameHint') }}</small></label
+            >
+            <div class="form-section-title">
+              <Package :size="19" />
+              <h2>{{ t('balancesAndCapacity') }}</h2>
+            </div>
             <label v-for="field in balanceFields" :key="field"
               ><span>{{ t(field) }}</span>
               <div class="unit-input">
@@ -528,6 +692,50 @@ onUnmounted(() => {
                 /><span>{{ t(field === 'wallet' || field === 'bank' ? 'currency' : 'milesUnit') }}</span>
               </div></label
             >
+            <label
+              ><span>{{ t('pocketCapacity') }}</span
+              ><input
+                v-model.number="fields.pocketCapacity"
+                type="number"
+                required
+                min="0"
+                :max="currentPlayer?.maxPocketCapacity ?? 40"
+                step="1"
+                :disabled="busy"
+            /></label>
+            <label
+              ><span>{{ t('storageCapacity') }}</span
+              ><input
+                v-model.number="fields.storageCapacity"
+                type="number"
+                required
+                min="0"
+                :max="currentPlayer?.maxStorageCapacity ?? 5000"
+                step="1"
+                :disabled="busy"
+            /></label>
+            <label v-if="currentPlayer?.hotelTickets != null"
+              ><span>{{ t('hotelTickets') }}</span
+              ><input
+                v-model.number="fields.hotelTickets"
+                type="number"
+                required
+                min="0"
+                max="2147483647"
+                step="1"
+                :disabled="busy"
+            /></label>
+            <label v-if="currentPlayer?.poki != null"
+              ><span>{{ t('poki') }}</span
+              ><input
+                v-model.number="fields.poki"
+                type="number"
+                required
+                min="0"
+                max="2147483647"
+                step="1"
+                :disabled="busy"
+            /></label>
             <div class="form-actions">
               <button class="button primary" :disabled="busy">{{ t('apply') }}<Check :size="17" /></button
               ><button
@@ -729,7 +937,7 @@ onUnmounted(() => {
               <Redo2 :size="19" /></button
             ><button class="button" :disabled="busy" @click="command('closeSave')">
               {{ t('closeSave') }}</button
-            ><button class="button primary" :disabled="busy" @click="command('save', {}, 'saveSuccess')">
+            ><button class="button primary" :disabled="busy" @click="save">
               <Save :size="17" />{{ t('save') }}
             </button>
           </div></template
@@ -745,6 +953,7 @@ onUnmounted(() => {
       v-if="catalogOpen || helpOpen"
       ref="dialog"
       class="modal"
+      :class="{ 'catalog-modal': catalogOpen }"
       :aria-label="catalogOpen ? t('catalogTitle') : t('howTitle')"
       @cancel.prevent="
         catalogOpen = false;
@@ -767,26 +976,120 @@ onUnmounted(() => {
           <X :size="21" />
         </button>
       </div>
-      <template v-if="catalogOpen"
-        ><p class="page-description">{{ t('catalogHint') }}</p>
+      <template v-if="catalogOpen">
+        <p class="page-description">{{ t('catalogHint') }}</p>
         <label class="search-field"
           ><Search :size="18" /><span class="sr-only">{{ t('searchItems') }}</span
           ><input v-model="catalogQuery" autofocus type="search" :placeholder="t('searchItems')"
         /></label>
-        <div class="catalog-results">
-          <button
-            v-for="item in catalog"
-            :key="item.itemId"
-            class="catalog-item"
-            :disabled="busy"
-            @click="chooseCatalog(item)"
-          >
-            <img v-if="item.image" :src="item.image" alt="" /><span>{{ item.name }}</span
-            ><Plus :size="17" />
-          </button>
-          <p v-if="catalog.length === 0">{{ t('noResults') }}</p>
-        </div></template
-      >
+        <div class="catalog-browser">
+          <nav class="catalog-categories" :aria-label="t('itemCategories')">
+            <button
+              v-for="category in catalog?.categories ?? []"
+              :key="category.id"
+              :class="{ active: catalogCategory === category.id }"
+              :aria-pressed="catalogCategory === category.id"
+              :disabled="busy || category.count === 0"
+              @click="catalogCategory = category.id"
+            >
+              <span>{{ categoryLabel(category.id) }}</span
+              ><small>{{ category.count.toLocaleString() }}</small>
+            </button>
+          </nav>
+          <section class="catalog-main" :aria-label="t('catalogTitle')" :aria-busy="busy">
+            <div
+              v-if="catalogCategory === 'clothing'"
+              class="catalog-subcategories"
+              role="group"
+              :aria-label="t('clothingSubcategories')"
+            >
+              <button
+                v-for="group in catalog?.subcategories ?? []"
+                :key="group.id"
+                :class="{ active: catalogSubcategory === group.id }"
+                :aria-pressed="catalogSubcategory === group.id"
+                :disabled="busy || group.count === 0"
+                @click="chooseClothingGroup(group.id)"
+              >
+                {{ clothingLabel(group.id) }} <small>{{ group.count.toLocaleString() }}</small>
+              </button>
+            </div>
+            <div class="catalog-summary" role="status">
+              <span
+                >{{ categoryLabel(catalogCategory) }} · {{ (catalog?.total ?? 0).toLocaleString() }}
+                {{ t('catalogItems') }}</span
+              ><span v-if="busy">{{ t('loading') }}</span
+              ><span v-else-if="catalog">{{ t('page') }} {{ catalog.page + 1 }} / {{ catalog.pages }}</span>
+            </div>
+            <div class="catalog-results">
+              <button
+                v-for="item in catalog?.items ?? []"
+                :key="item.itemId"
+                class="catalog-item"
+                :aria-label="item.name"
+                :title="item.name"
+                :disabled="busy"
+                @click="chooseCatalog(item)"
+              >
+                <span class="catalog-image"
+                  ><img v-if="item.image" :src="item.image" alt="" loading="lazy" /><Leaf
+                    v-else
+                    :size="30" /></span
+                ><span class="catalog-item-name">{{ item.name }}</span
+                ><small>#{{ item.itemId }}</small>
+              </button>
+              <p v-if="!busy && catalog?.items.length === 0" class="empty-result">{{ t('noResults') }}</p>
+            </div>
+            <form v-if="catalog" class="catalog-pagination" @submit.prevent="searchCatalog(catalogJump - 1)">
+              <div class="catalog-page-buttons">
+                <button
+                  type="button"
+                  class="icon-button"
+                  :disabled="busy || catalog.page === 0"
+                  :aria-label="t('firstPage')"
+                  @click="searchCatalog(0)"
+                >
+                  <ChevronsLeft :size="18" /></button
+                ><button
+                  type="button"
+                  class="icon-button"
+                  :disabled="busy || catalog.page === 0"
+                  :aria-label="t('previous')"
+                  @click="searchCatalog(catalog.page - 1)"
+                >
+                  <ChevronLeft :size="18" /></button
+                ><button
+                  type="button"
+                  class="icon-button"
+                  :disabled="busy || catalog.page >= catalog.pages - 1"
+                  :aria-label="t('next')"
+                  @click="searchCatalog(catalog.page + 1)"
+                >
+                  <ChevronRight :size="18" /></button
+                ><button
+                  type="button"
+                  class="icon-button"
+                  :disabled="busy || catalog.page >= catalog.pages - 1"
+                  :aria-label="t('lastPage')"
+                  @click="searchCatalog(catalog.pages - 1)"
+                >
+                  <ChevronsRight :size="18" />
+                </button>
+              </div>
+              <label
+                >{{ t('jumpToPage')
+                }}<input
+                  v-model.number="catalogJump"
+                  type="number"
+                  required
+                  min="1"
+                  :max="catalog.pages"
+                  :disabled="busy" /></label
+              ><button class="button" :disabled="busy">{{ t('go') }}</button>
+            </form>
+          </section>
+        </div>
+      </template>
       <div v-else class="help-steps">
         <article v-for="number in [1, 2, 3]" :key="number">
           <h3>{{ stepText(number, 'Title') }}</h3>

@@ -1,9 +1,19 @@
 # NHSE desktop workspace
 
 The Windows entry point now hosts a locally bundled Vue application in WebView2.
-The welcome page, player balances, pockets and home storage use this workspace.
+The welcome page, player names, island names, balances, capacity, pockets and home
+storage use this workspace. Players switch through portrait/name cards using the
+photos stored in the save, with a generic avatar when no photo is available.
 Villagers, maps, designs, detailed item properties and console tools continue to
 use their existing C# editors, reached through the workspace. No server is needed.
+
+The villager editor's Replace button and portrait now open the Vue portrait
+gallery. The current-resident strip can switch the resident being edited; the
+gallery filters by the game's species and template personality, searches localized
+names or IDs, paginates, and previews a replacement before confirmation. Already
+resident villagers are marked to avoid duplicate replacements. Clipboard-based
+replacement remains on the original button's context menu. Replacement preparation
+uses independent copies and retains house assignment fields for both house formats.
 
 ## Build and run
 
@@ -38,13 +48,31 @@ C# iteration, pass `-p:SkipWorkspaceBuild=true`.
 redo history. Applying a field or item changes memory only. Save calls the existing
 hashing, encryption and provider-flush code. Opening a save retains the existing
 validation and automatic-backup settings. Close, replace and exit prompt when
-applied changes have not been saved. Numeric drafts require Apply.
+applied changes have not been saved. Profile drafts can be applied explicitly;
+saving, leaving the profile page or switching players also applies valid drafts.
+Names are validated against the game's 10 UTF-16-code-unit limit. Renames update
+matching identity references across the save, using exact offset patches so undo
+does not accidentally rename pre-existing identities with the same new name.
+The profile also exposes pocket/storage capacity and, where available, hotel
+tickets and Poki. Unchanged pocket layouts are preserved.
 
 Pocket slots preserve the game's existing pocket/bag order. Locked slots cannot
 be edited. Stack quantities are presented starting at one and converted to the
 game's zero-based count only for stackable items; non-stack item parameters are
 preserved. Detailed native editing remains available for recipes, flowers,
 variants, wrapping and other specialized properties.
+
+The item catalog covers the same item IDs as the original inventory selector,
+excluding the empty/extension markers (empty slots use Remove). It is paginated
+at 96 items per page rather than truncating the results. Categories are grouped
+from the existing game `ItemKind` metadata, with an Other group so unfamiliar
+types remain reachable. It supports localized-name/decimal-ID search, category
+counts, first/last page navigation, direct page jumps and large picture/name
+tiles. Catalog navigation remains local to the editor and can reach every item.
+Clothing has a second filter level using the existing `ItemKind` values: tops,
+bottoms, dresses/outfits, headwear, accessories, socks, shoes, bags, umbrellas and
+an Other group. Every clothing entry remains represented, and counts respond to
+the current search. This does not infer clothing type from item names.
 
 The original editor shares the current in-memory save. Its fields are applied
 when it closes. Returning conservatively marks the session dirty and clears the
@@ -97,6 +125,11 @@ pwsh -NoProfile -STA -File NHSE.Tests/Workspace/Smoke-Workspace.ps1 `
   -BuildDirectory NHSE.WinForms/bin/Release/net10.0-windows `
   -FixtureDirectory artifacts/workspace-fixture `
   -OutputDirectory artifacts/workspace-native
+pwsh -NoProfile -STA -File NHSE.Tests/Workspace/Smoke-VillagerPicker.ps1 `
+  -BuildDirectory NHSE.WinForms/bin/Release/net10.0-windows `
+  -OutputDirectory artifacts/workspace-native
 ```
 
 Only the generated fixture is used. No actual console or user save is required.
+The picker smoke check uses in-memory residents and verifies cancellation, resident
+switching and replacement selection without modifying the source resident data.

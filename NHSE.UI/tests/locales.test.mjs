@@ -7,6 +7,8 @@ const english = JSON.parse(fs.readFileSync(new URL('en.json', base), 'utf8'));
 for (const code of ['en', 'jp', 'de', 'es', 'fr', 'it', 'ko', 'zhs', 'zht']) {
   test(`${code}: every UI and native dialog message is translated`, () => {
     const locale = JSON.parse(fs.readFileSync(new URL(`${code}.json`, base), 'utf8'));
+    assert.equal(locale.villagerSpeciesNames.split('|').length, 35);
+    assert.equal(locale.villagerPersonalityNames.split('|').length, 9);
     assert.deepEqual(Object.keys(locale).sort(), Object.keys(english).sort());
     for (const [key, value] of Object.entries(locale))
       assert.ok(typeof value === 'string' && value.trim().length > 0, key);

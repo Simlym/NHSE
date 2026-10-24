@@ -10,6 +10,7 @@ internal sealed class WorkspaceSession(HorizonSave save)
 {
     public HorizonSave SaveFile { get; } = save;
     private sealed record Change(Action Undo, Action Redo, long Before, long After);
+    private sealed record IdentityPatch(EncryptedFilePair File, int Offset, byte[] Before, byte[] After);
     private readonly Stack<Change> UndoStack = new();
     private readonly Stack<Change> RedoStack = new();
     private long Revision;
@@ -18,18 +19,22 @@ internal sealed class WorkspaceSession(HorizonSave save)
     private bool LegacyChanges;
     public bool IsDirty => LegacyChanges || Revision != SavedRevision;
 
-    public object Snapshot() => new
+    public object Snapshot(Func<int, string?>? getAvatar = null) => new
     {
         title = SaveFile.GetSaveTitle("NHSE"),
         island = SaveFile.Players[0].Personal.TownName,
         dirty = IsDirty, canUndo = UndoStack.Count != 0, canRedo = RedoStack.Count != 0,
         players = SaveFile.Players.Select((p, i) => new
         {
-            index = i, name = p.Personal.PlayerName, island = p.Personal.TownName,
+            index = i, name = p.Personal.PlayerName, island = p.Personal.TownName, avatar = getAvatar?.Invoke(i),
             wallet = (uint)p.Personal.Wallet, bank = (uint)p.Personal.Bank,
             miles = (uint)p.Personal.NookMiles, earnedMiles = (uint)p.Personal.TotalNookMiles,
             pocketCapacity = p.Personal.PocketCount + p.Personal.BagCount,
             storageCapacity = p.Personal.ItemChestCount,
+            maxPocketCapacity = p.Personal.Offsets.Pockets1Count + p.Personal.Offsets.Pockets2Count,
+            maxStorageCapacity = p.Personal.Offsets.ItemChestCount,
+            hotelTickets = p.Personal.Data30 is { IsInitialized30: true } addition ? (uint?)addition.HotelTickets : null,
+            poki = p.WhereAreN is { } where ? (uint?)where.Poki : null,
         }).ToArray(),
     };
 
@@ -95,23 +100,100 @@ internal sealed class WorkspaceSession(HorizonSave save)
         Commit(() => Apply(previous), () => Apply(next));
     }
 
-    public void SetPlayer(int player, uint wallet, uint bank, uint miles, uint earnedMiles)
+    public void SetPlayer(int player, uint wallet, uint bank, uint miles, uint earnedMiles,
+        string? name = null, string? island = null, uint? pocketCapacity = null, uint? storageCapacity = null,
+        uint? hotelTickets = null, uint? poki = null)
     {
         if (wallet > 999_999_999 || bank > 999_999_999 || miles > 999_999_999 || earnedMiles > 999_999_999)
             throw new ArgumentException("invalidRequest");
         var p = Player(player);
+        if (name is not null) ValidateName(name);
+        if (island is not null) ValidateName(island);
+        if (pocketCapacity > p.Offsets.Pockets1Count + p.Offsets.Pockets2Count || storageCapacity > p.Offsets.ItemChestCount
+            || hotelTickets > int.MaxValue || poki > int.MaxValue)
+            throw new ArgumentException("invalidRequest");
+        var addition = p.Data30 is { IsInitialized30: true } initialized ? initialized : null;
+        var where = SaveFile.Players[player].WhereAreN;
+        if ((hotelTickets is not null && addition is null) || (poki is not null && where is null))
+            throw new ArgumentException("invalidRequest");
         var before = new[] { (uint)p.Wallet, (uint)p.Bank, (uint)p.NookMiles, (uint)p.TotalNookMiles };
         var after = new[] { wallet, bank, miles, earnedMiles };
-        if (before.SequenceEqual(after))
+        var oldPocket = p.PocketCount;
+        var oldBag = p.BagCount;
+        var oldStorage = p.ItemChestCount;
+        var oldTickets = addition is null ? 0 : (uint)addition.HotelTickets;
+        var oldPoki = where is null ? 0 : (uint)where.Poki;
+        var patches = new List<IdentityPatch>();
+        if (name is not null && name != p.PlayerName)
+            CollectIdentityPatches(p.GetPlayerIdentity().ToArray(), name, patches);
+        if (island is not null && island != p.TownName)
+            CollectIdentityPatches(p.GetTownIdentity().ToArray(), island, patches);
+        if (before.SequenceEqual(after) && patches.Count == 0 && (!pocketCapacity.HasValue || pocketCapacity == oldPocket + oldBag)
+            && (!storageCapacity.HasValue || storageCapacity == oldStorage)
+            && (!hotelTickets.HasValue || hotelTickets == oldTickets) && (!poki.HasValue || poki == oldPoki))
             return;
-        void Apply(uint[] values)
+        void Apply(uint[] values, bool undo)
         {
+            foreach (var patch in patches)
+                (undo ? patch.Before : patch.After).CopyTo(patch.File.Data[patch.Offset..]);
             p.Wallet = p.Wallet with { Value = values[0] };
             p.Bank = p.Bank with { Value = values[1] };
             p.NookMiles = p.NookMiles with { Value = values[2] };
             p.TotalNookMiles = p.TotalNookMiles with { Value = values[3] };
+            if (undo)
+            {
+                p.PocketCount = oldPocket;
+                p.BagCount = oldBag;
+                p.ItemChestCount = oldStorage;
+            }
+            else
+            {
+                if (pocketCapacity is { } capacity && capacity != oldPocket + oldBag)
+                {
+                    p.PocketCount = Math.Min(capacity, (uint)p.Offsets.Pockets2Count);
+                    p.BagCount = capacity - p.PocketCount;
+                }
+                if (storageCapacity is { } storage) p.ItemChestCount = storage;
+            }
+            if (hotelTickets.HasValue && addition is not null)
+                addition.HotelTickets = addition.HotelTickets with { Value = undo ? oldTickets : hotelTickets.Value };
+            if (poki.HasValue && where is not null)
+                where.Poki = where.Poki with { Value = undo ? oldPoki : poki.Value };
         }
-        Commit(() => Apply(before), () => Apply(after));
+        Commit(() => Apply(before, true), () => Apply(after, false));
+    }
+
+    private static void ValidateName(string name)
+    {
+        // The game's names contain at most 10 UTF-16 code units. Never silently truncate.
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 10 || name.Any(char.IsControl))
+            throw new ArgumentException("invalidRequest");
+        for (var i = 0; i < name.Length; i++)
+        {
+            if (!char.IsSurrogate(name[i])) continue;
+            if (!char.IsHighSurrogate(name[i]) || i + 1 >= name.Length || !char.IsLowSurrogate(name[++i]))
+                throw new ArgumentException("invalidRequest");
+        }
+    }
+
+    private void CollectIdentityPatches(byte[] original, string name, List<IdentityPatch> patches)
+    {
+        var updated = original.ToArray();
+        StringUtil.GetBytes(name, 10).CopyTo(updated, 4);
+        // Match the existing ChangeIdentity scope, but record exact offsets for undo.
+        // Reversing a global replacement could also rename pre-existing matching identities.
+        foreach (var file in new[] { SaveFile.Main }.Cast<EncryptedFilePair>().Concat(SaveFile.Players.SelectMany(x => x)))
+        {
+            var offset = 0;
+            while (offset <= file.Data.Length - original.Length)
+            {
+                var found = file.Data[offset..].IndexOf(original);
+                if (found < 0) break;
+                offset += found;
+                patches.Add(new IdentityPatch(file, offset, original, updated));
+                offset += original.Length;
+            }
+        }
     }
 
     private void Commit(Action undo, Action redo)

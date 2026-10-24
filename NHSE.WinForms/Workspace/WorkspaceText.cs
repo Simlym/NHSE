@@ -10,13 +10,24 @@ namespace NHSE.WinForms;
 internal static class WorkspaceText
 {
     private static Dictionary<string, string> Current = Load("en");
-    public static string Get(string key) => Current.GetValueOrDefault(key, key);
+    private static string CurrentCode = "en";
+    public static string Get(string key)
+    {
+        if (CurrentCode != GameInfo.CurrentLanguage)
+        {
+            Current = Load("en");
+            foreach (var pair in Load(GameInfo.CurrentLanguage)) Current[pair.Key] = pair.Value;
+            CurrentCode = GameInfo.CurrentLanguage;
+        }
+        return Current.GetValueOrDefault(key, key);
+    }
 
     public static void SetLanguage(string language)
     {
         var index = GameLanguage.GetLanguageIndex(language);
         var code = GameInfo.SetLanguage2Char(index);
         Current = Load("en");
+        CurrentCode = code;
         foreach (var pair in Load(code))
             Current[pair.Key] = pair.Value;
         // Reset before applying translations so switching languages cannot leak old strings.

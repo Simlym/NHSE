@@ -2,6 +2,9 @@
   <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\NHSE.Core\NHSE.Core.csproj" />
+    <ProjectReference Include="..\NHSE.Villagers\NHSE.Villagers.csproj" />
     <Compile Include="..\NHSE.WinForms\Workspace\WorkspaceSession.cs" Link="WorkspaceSession.cs" />
+    <Compile Include="..\NHSE.WinForms\Workspace\WorkspaceCatalog.cs" Link="WorkspaceCatalog.cs" />
+    <Compile Include="..\NHSE.WinForms\Workspace\WorkspaceVillagers.cs" Link="WorkspaceVillagers.cs" />
   </ItemGroup>
 </Project>

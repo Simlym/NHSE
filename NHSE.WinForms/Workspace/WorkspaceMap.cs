@@ -14,7 +14,7 @@ internal sealed partial class WorkspaceSession
     internal sealed record MapCell(int X, int Y, int RelativeX, int RelativeY, bool Valid, bool Extension, int RootX, int RootY, string Name);
     internal sealed record MapData(MapTarget Target, int GridSize, int ItemWidth, int ItemHeight, int MarkerCount,
         HousingChoice[] Acres, HousingChoice[] Buildings, HousingChoice[] FieldObjects, HousingField[] Fields, MapCell[] Cells,
-        string? Overview = null, string? Viewport = null, string? ItemImage = null);
+        string? Overview = null, string? Viewport = null, string? ItemImage = null, bool? Active = null);
     private static readonly string[] TerrainKeys = ["UnitModel", "Variation", "LandMakingAngle", "UnitModelRoad", "VariationRoad", "LandMakingAngleRoad", "Elevation"];
     private static readonly (string Key, int Offset, Type Type)[] BuildingKeys =
     [
@@ -99,7 +99,7 @@ internal sealed partial class WorkspaceSession
         var buildings = m.Buildings.Select((b, i) => new HousingChoice(i, $"{i + 1} · {b}")).ToArray();
         var acres = AcreCoordinate.Exterior.Select((a, i) => new HousingChoice(i, a.Name)).ToArray();
         var objects = FieldItemList.Items.Select(v => new HousingChoice(v.Key, GameInfo.Strings.InternalNameTranslation.TryGetValue(v.Value.Name, out var translated) ? translated : v.Value.Name)).ToArray();
-        return new(target, size, m.FieldItemAcreWidth * 32, 6 * 32, MapMarkerCount, acres, buildings, objects, fields.ToArray(), cells.ToArray());
+        return new(target, size, m.FieldItemAcreWidth * 32, 6 * 32, MapMarkerCount, acres, buildings, objects, fields.ToArray(), cells.ToArray(), Active: MapActive(target));
     }
     private static string MapItemName(Item tile)
     {

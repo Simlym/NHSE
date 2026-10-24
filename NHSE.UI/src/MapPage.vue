@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { t } from './i18n';
 import type { MapData, MapTarget, ItemView } from './bridge';
 import HousingFields from './HousingFields.vue';
+import MapTools from './MapTools.vue';
 const props = defineProps<{
   data: MapData | null; busy: boolean;
   execute: (command: string, payload?: Record<string, unknown>) => Promise<boolean>;
@@ -83,6 +84,7 @@ defineExpose({ applyPending, chooseItem });
       </div>
     </form>
     <p v-else>{{ t('mapOutside') }}</p>
+    <MapTools :data="data" :busy="busy" :values="fields" :execute="execute" :apply-pending="applyPending" :navigate="navigate" :validate="() => !form || form.reportValidity()" />
   </section>
 </template>
 <style scoped>

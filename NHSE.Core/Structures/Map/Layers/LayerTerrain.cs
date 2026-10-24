@@ -55,14 +55,14 @@ public sealed record LayerTerrain : AcreSelectionGrid
 
     private TerrainTile GetTileSafe(int relX, int relY)
     {
-        if (Contains(relX, relY))
+        if (!Contains(relX, relY))
             return new TerrainTile();
         return GetTile(relX, relY);
     }
 
     private bool SetTileSafe(int relX, int relY, TerrainTile tile)
     {
-        if (Contains(relX, relY))
+        if (!Contains(relX, relY))
             return false;
         GetTile(relX, relY).CopyFrom(tile);
         return true;
@@ -112,7 +112,7 @@ public sealed record LayerTerrain : AcreSelectionGrid
     /// </summary>
     /// <remarks>
     /// If a tile at the specified coordinates is out of range, a default value is written for that tile.
-    /// The data is written in column-major order, with each tile's bytes written sequentially into the buffer.
+    /// The acre file is written row by row, unlike the full layer's column-major layout.
     /// </remarks>
     /// <param name="result">
     /// The buffer that receives the serialized tile data.
@@ -122,7 +122,7 @@ public sealed record LayerTerrain : AcreSelectionGrid
     /// <param name="relY">The relative Y-coordinate of the top-left tile of the acre to dump.</param>
     public void DumpAcre(Span<byte> result, int relX, int relY)
     {
-        // Store columns first. If the x,y is out of range, store default.
+        // Acre files store rows first. Out-of-range coordinates use a default tile.
         int offset = 0;
         for (int y = 0; y < TileInfo.ViewHeight; y++)
         {
@@ -132,7 +132,7 @@ public sealed record LayerTerrain : AcreSelectionGrid
                 var tileX = relX + x;
                 var tile = GetTileSafe(tileX, tileY);
                 tile.ToBytesClass().CopyTo(result[offset..]);
-                offset += Item.SIZE;
+                offset += TerrainTile.SIZE;
             }
         }
     }
@@ -158,7 +158,8 @@ public sealed record LayerTerrain : AcreSelectionGrid
             for (int x = 0; x < TileInfo.ViewWidth; x++)
             {
                 var tileX = relX + x;
-                SetTileSafe(tileX, tileY, tiles[i++]);
+                if (SetTileSafe(tileX, tileY, tiles[i++]))
+                    count++;
             }
         }
         return count;

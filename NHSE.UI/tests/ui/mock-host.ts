@@ -265,6 +265,7 @@ export async function mockHost(page: Page, picker = false) {
         })),
       ]),
     );
+    let mapFlags: Record<string, boolean> = {};
     let mapRecords: Record<string, Record<string, number>> = {};
     const mapKey = (target: Record<string, unknown>) => JSON.stringify(target);
     const mapData = (target: Record<string, unknown>) => {
@@ -280,9 +281,10 @@ export async function mockHost(page: Page, picker = false) {
         fieldObjects: [{ id: 60000, name: 'Tree' }],
         fields: names.map(name => ({ key: 'Map.' + name, value: values['Map.' + name] ?? 0, type: 'number', min: name === 'Bit' ? -128 : 0, max: 65535, options: null })),
         cells: Array.from({ length: gridSize ** 2 }, (_, i) => ({ x: i % gridSize, y: Math.floor(i / gridSize), relativeX: i % gridSize, relativeY: Math.floor(i / gridSize), valid: true, extension: false, rootX: 0, rootY: 0, name: '' })),
-        overview: avatar, viewport: avatar, itemImage: null };
+        overview: avatar, viewport: avatar, itemImage: null, active: mode === 'items' ? (mapFlags[mapKey(target)] ?? false) : null };
     };
     type Snapshot = {
+      mapFlags: typeof mapFlags;
       mapRecords: typeof mapRecords;
       designRecords: typeof designRecords;
       housingRecords: typeof housingRecords;
@@ -310,6 +312,7 @@ export async function mockHost(page: Page, picker = false) {
         housingRecords,
         designRecords,
         mapRecords,
+        mapFlags,
       });
     const restore = (value: Snapshot) => {
       turnips = value.turnips;
@@ -318,6 +321,7 @@ export async function mockHost(page: Page, picker = false) {
       housingRecords = value.housingRecords;
       designRecords = value.designRecords;
       mapRecords = value.mapRecords;
+      mapFlags = value.mapFlags;
       players = value.players;
       item = value.item;
       revision = value.revision;
@@ -368,6 +372,25 @@ export async function mockHost(page: Page, picker = false) {
             );
             const p = message.payload;
             let data: unknown;
+            if (message.command === 'setMapActive') {
+              remember(); mapFlags[mapKey(p.target as Record<string, unknown>)] = Boolean(p.active);
+            }
+            if (message.command === 'paintMap' || message.command === 'batchMap') {
+              remember();
+              const key = mapKey(p.target as Record<string, unknown>);
+              mapRecords[key] = { ...mapRecords[key], ...(p.values as Record<string, number>) };
+              if (p.operation === 'zeroElevation') mapRecords[key]!['Map.Elevation'] = 0;
+            }
+            if (message.command === 'mapImport') {
+              const controls = window as unknown as { nhseMapCancelNext?: boolean; nhseMapErrorNext?: string };
+              if (controls.nhseMapErrorNext) {
+                const error = controls.nhseMapErrorNext; controls.nhseMapErrorNext = undefined;
+                queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error } })));
+                return;
+              }
+              if (controls.nhseMapCancelNext) controls.nhseMapCancelNext = false;
+              else { remember(); }
+            }
             if (message.command === 'editMap') {
               remember();
               mapRecords[mapKey(p.target as Record<string, unknown>)] = { ...(p.values as Record<string, number>) };

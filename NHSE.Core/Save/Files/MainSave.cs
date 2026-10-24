@@ -229,7 +229,7 @@ public sealed class MainSave : EncryptedFilePair
     }
 
     private int FieldItemLayerSize => TotalFieldItemTileCount * Item.SIZE;
-    private int FieldItemFlagSize => TotalFieldItemTileCount / sizeof(byte); // bitflags
+    private int FieldItemFlagSize => TotalFieldItemTileCount / 8; // one bit per item tile
 
     private int FieldItemLayer0 => Offsets.FieldItem;
     private int FieldItemLayer1 => Offsets.FieldItem + FieldItemLayerSize;
@@ -237,6 +237,13 @@ public sealed class MainSave : EncryptedFilePair
     public int FieldItemFlag1 => Offsets.FieldItem + (FieldItemLayerSize * 2) + FieldItemFlagSize;
     public Memory<byte> FieldItemFlag0Data => Data.Slice(FieldItemFlag0, FieldItemFlagSize).ToArray();
     public Memory<byte> FieldItemFlag1Data => Data.Slice(FieldItemFlag1, FieldItemFlagSize).ToArray();
+
+    public void SetFieldItemFlags(int layer, ReadOnlySpan<byte> data)
+    {
+        if (layer is < 0 or > 1 || data.Length != FieldItemFlagSize)
+            throw new ArgumentException("Invalid field item flag layer or size.");
+        data.CopyTo(Data.Slice(layer == 0 ? FieldItemFlag0 : FieldItemFlag1, FieldItemFlagSize));
+    }
 
     public Item[] GetFieldItemLayer0() => Item.GetArray(Data.Slice(FieldItemLayer0, FieldItemLayerSize));
     public void SetFieldItemLayer0(IReadOnlyList<Item> array) => Item.SetArray(array).CopyTo(Data[FieldItemLayer0..]);

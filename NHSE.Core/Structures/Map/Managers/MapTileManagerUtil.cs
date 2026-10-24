@@ -19,8 +19,8 @@ public static class MapTileManagerUtil
             Layer0 = new LayerFieldItem(sav.GetFieldItemLayer0(), sav.FieldItemAcreWidth, sav.FieldItemAcreHeight),
             Layer1 = new LayerFieldItem(sav.GetFieldItemLayer1(), sav.FieldItemAcreWidth, sav.FieldItemAcreHeight),
         },
-        LayerItemFlag0 = new LayerFieldItemFlag(sav.FieldItemFlag0Data, sav.FieldItemAcreWidth, sav.FieldItemAcreHeight),
-        LayerItemFlag1 = new LayerFieldItemFlag(sav.FieldItemFlag1Data, sav.FieldItemAcreWidth, sav.FieldItemAcreHeight),
+        LayerItemFlag0 = new LayerFieldItemFlag(sav.FieldItemFlag0Data, sav.FieldItemAcreWidth * 32, sav.FieldItemAcreHeight * 32),
+        LayerItemFlag1 = new LayerFieldItemFlag(sav.FieldItemFlag1Data, sav.FieldItemAcreWidth * 32, sav.FieldItemAcreHeight * 32),
         Plaza = new MapStatePlaza { X = sav.EventPlazaLeftUpX, Z = sav.EventPlazaLeftUpZ },
     };
 
@@ -33,8 +33,8 @@ public static class MapTileManagerUtil
         sav.SetTerrainTiles(mgr.LayerTerrain.Tiles);
         sav.SetFieldItemLayer0(mgr.FieldItems.Layer0.Tiles);
         sav.SetFieldItemLayer1(mgr.FieldItems.Layer1.Tiles);
-        mgr.LayerItemFlag0.Save(sav.FieldItemFlag0Data.Span);
-        mgr.LayerItemFlag1.Save(sav.FieldItemFlag1Data.Span);
+        sav.SetFieldItemFlags(0, mgr.LayerItemFlag0.ExistingData);
+        sav.SetFieldItemFlags(1, mgr.LayerItemFlag1.ExistingData);
         sav.SetAcreBytes(mgr.LayerTerrain.BaseAcres.Span);
         sav.EventPlazaLeftUpX = mgr.Plaza.X;
         sav.EventPlazaLeftUpZ = mgr.Plaza.Z;

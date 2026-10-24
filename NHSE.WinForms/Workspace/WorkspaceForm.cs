@@ -267,6 +267,24 @@ public sealed partial class WorkspaceForm : Form
                     Str(p, "name"), Str(p, "island"), OptionalUInt(p, "pocketCapacity"), OptionalUInt(p, "storageCapacity"), OptionalUInt(p, "hotelTickets"), OptionalUInt(p, "poki"));
                 return State();
             case "map": return MapWorkspace(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"));
+            case "setMapActive":
+                RequireSession().SetMapActive(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), p.GetProperty("active").GetBoolean());
+                return State();
+            case "batchMap":
+                RequireSession().BatchMap(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), Str(p, "operation"),
+                    p.GetProperty("whole").GetBoolean(), p.GetProperty("interiorOnly").GetBoolean(), p.GetProperty("values").Deserialize<Dictionary<string, JsonElement>>() ?? throw new ArgumentException("invalidRequest"));
+                return State();
+            case "paintMap":
+                RequireSession().PaintMap(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), Int(p, "radius"), p.GetProperty("randomVariation").GetBoolean(),
+                    p.GetProperty("values").Deserialize<Dictionary<string, JsonElement>>() ?? throw new ArgumentException("invalidRequest"));
+                return State();
+            case "mapImport":
+            case "mapExport":
+                MapFile(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), Str(p, "resource"), p.GetProperty("whole").GetBoolean(), command == "mapImport");
+                return State();
+            case "mapPng":
+                ExportMapPng(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"));
+                return State();
             case "editMap":
                 RequireSession().EditMap(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"),
                     p.GetProperty("values").Deserialize<Dictionary<string, JsonElement>>() ?? throw new ArgumentException("invalidRequest"), Str(p, "action"),

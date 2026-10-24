@@ -240,5 +240,5 @@ export interface MapData {
   fieldObjects: { id: number; name: string }[]; fields: HousingField[];
   cells: { x: number; y: number; relativeX: number; relativeY: number; valid: boolean;
     extension: boolean; rootX: number; rootY: number; name: string }[];
-  overview: string | null; viewport: string | null; itemImage: string | null;
+  overview: string | null; viewport: string | null; itemImage: string | null; active: boolean | null;
 }

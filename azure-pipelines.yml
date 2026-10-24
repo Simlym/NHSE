@@ -19,6 +19,11 @@ variables:
   buildConfiguration: 'Release'
 
 steps:
+- task: NodeTool@0
+  inputs:
+    versionSpec: '22.x'
+  displayName: 'Use Node.js for the Vue workspace'
+
 # Restore
 - task: NuGetToolInstaller@1
 

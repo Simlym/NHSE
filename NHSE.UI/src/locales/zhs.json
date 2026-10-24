@@ -1,0 +1,13 @@
+{
+  "appTagline":"用心整理，你的岛屿生活", "language":"语言", "home":"首页", "overview":"岛屿概览", "player":"玩家资料", "inventory":"背包与仓库", "tools":"岛屿工具",
+  "openSave":"打开存档", "openFolder":"选择文件夹", "openRecent":"继续编辑", "homeEyebrow":"集合啦！动物森友会", "homeTitle":"让岛屿生活，更合心意。",
+  "homeDescription":"整理背包，照顾岛屿。让每一次修改都有清楚的指引。", "dropTitle":"将存档拖到这里", "dropHint":"支持存档文件夹、main.dat 或 ZIP 压缩包", "howTitle":"三步开始你的第一次编辑",
+  "step1Title":"打开存档", "step1Body":"选择已导出的存档文件夹或 main.dat，并保留同目录下的配套文件。", "step2Title":"按心意调整", "step2Body":"选择玩家，点选格子，在清楚的属性面板中修改。", "step3Title":"确认后保存", "step3Body":"修改会暂存在内存中，点击保存后才写入文件。自动备份沿用现有设置。",
+  "localNote":"存档文件在本机处理。", "recent":"接着上次的进度", "noRecent":"打开存档后，这里会显示最近使用的位置。", "backupOn":"已启用自动备份", "workspace":"编辑工作区",
+  "save":"保存存档", "closeSave":"关闭存档", "dirty":"有未保存的修改", "saved":"修改已保存", "undo":"撤销", "redo":"重做", "fullScreen":"全屏编辑", "exitFullScreen":"退出全屏", "focus":"专注模式", "exitFocus":"退出专注模式",
+  "playerHint":"调整资产与里程。修改姓名等高级设置可打开原有编辑器。", "wallet":"随身钱包", "bank":"银行存款", "miles":"可用狸端里程", "earnedMiles":"累计获得里程", "currency":"铃钱", "milesUnit":"里程", "apply":"应用修改", "applied":"已应用修改，确认后请保存存档。", "saveSuccess":"存档保存成功。",
+  "inventoryHint":"点选格子查看或替换物品，已应用的修改支持撤销。", "pocket":"随身背包", "storage":"房屋收纳", "searchInventory":"查找背包或仓库中的物品", "slot":"格子", "empty":"空格子", "locked":"未解锁的格子", "selectSlot":"选择一个格子", "selectSlotHint":"点选物品或空格子，开始编辑。", "itemDetails":"物品详情", "quantity":"数量", "quantityHint":"数量上限根据该物品的可堆叠数量确定。", "replace":"选择物品", "delete":"移除此物品", "advancedItem":"更多物品属性",
+  "catalogTitle":"查找物品", "catalogHint":"输入当前语言的物品名称，选择结果后应用到格子。", "searchItems":"搜索物品名称", "noResults":"未找到物品。", "previous":"上一页", "next":"下一页", "page":"页", "used":"已占用", "toolsTitle":"继续照顾你的岛屿", "toolsHint":"这些功能暂时在原有编辑器中打开，后续可逐步迁移。", "villagers":"岛民管理", "map":"地图与建筑", "designs":"自定义图案", "advanced":"高级工具", "legacy":"打开原有编辑器", "legacyHint":"可修改姓名、岛屿设置，使用导入、导出和主机连接。打开后会重新开始撤销记录。",
+  "loading":"正在处理…", "busy":"另一项操作正在进行，请稍后再试。", "operationFailed":"未能完成操作。", "invalidRequest":"请检查输入值和选中的格子后重试。", "unsavedPrompt":"离开前是否保存修改？选择“是”保存，“否”放弃，“取消”继续编辑。", "runtimeMissing":"新工作区未能启动。请安装 Microsoft Edge WebView2 Runtime，或使用下方的原有编辑器。", "missingAssets":"缺少工作区文件，请使用 npm 和 .NET SDK 重新构建应用。",
+  "cancel":"取消", "back":"返回", "closeDialog":"关闭对话框", "ready":"可以开始编辑", "offlinePreview":"浏览器预览 · 编辑真实存档请在 Windows 上打开 NHSE。", "overviewTitle":"欢迎回到你的岛屿", "overviewHint":"选择想要调整的内容，原有岛屿工具也可随时打开。", "editPlayer":"管理玩家资料", "editInventory":"整理背包与仓库", "quickStart":"开始使用", "theme":"外观", "system":"跟随系统", "light":"浅色", "dark":"深色", "keyHints":"Ctrl+S 保存 · Ctrl+Z 撤销 · F11 全屏"
+}

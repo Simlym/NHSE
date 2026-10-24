@@ -11,6 +11,10 @@ Save Editor for Animal Crossing: New Horizons
 Edits savedata dumped from the Nintendo Switch. 
 * Bring your own save file data; this program does not dump it from your console.
 
+The desktop app now includes a local Vue + WebView2 workspace backed by the
+existing C# save engine. See the [workspace build and migration guide](NHSE.UI/README.md)
+for build requirements, the nine supported languages, and validation commands.
+
 ## Other
 
 Refer to the [Wiki](https://github.com/kwsch/NHSE/wiki) for more information.

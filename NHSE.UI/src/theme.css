@@ -1,0 +1,42 @@
+:root {
+  color-scheme: light dark;
+  --canvas: light-dark(#f8faf7, #17211c);
+  --surface: light-dark(#ffffff, #202e26);
+  --ink: light-dark(#253c30, #e4eee7);
+  --muted: light-dark(#6a7b70, #adbfaf);
+  --line: light-dark(#e3e9e2, #36483c);
+  --line-strong: light-dark(#cdd8cc, #536a58);
+  --green: light-dark(#2c7355, #a4d6b2);
+  --on-green: light-dark(#ffffff, #173825);
+  --green-hover: light-dark(#245e47, #b9e3c5);
+  --green-soft: light-dark(#edf4eb, #293f2f);
+  --hover: light-dark(#f0f4ed, #2c3d31);
+  --focus: light-dark(#5a9a75, #b9e3c5);
+  --slot: light-dark(#f6f8f1, #28392c);
+  --inspector: light-dark(#fbfcf9, #1d2a22);
+  --drop-border: light-dark(#b5cbb6, #5a7a60);
+  --drop-bg: light-dark(#f1f6ed, #22372a);
+  --shadow: light-dark(#263d3214, #00000045);
+  --danger: light-dark(#a63d38, #ffaaa3);
+  --danger-soft: light-dark(#fff0ed, #492c2a);
+  --warning: light-dark(#a67119, #eac173);
+  --water: light-dark(#b8dfd4, #447a6c);
+  --water-soft: light-dark(#e1efea, #274d41);
+  --sand: light-dark(#efdfad, #b5a16a);
+  --grass: light-dark(#b3cc9b, #658953);
+  --sun: light-dark(#f5d591, #d1a853);
+  --sun-halo: light-dark(#fbf2dc, #3d3c2a);
+  --cloud: light-dark(#e6ece1, #354b3b);
+  --house: light-dark(#f9edcb, #d5c291);
+  --roof: light-dark(#bc8069, #aa7761);
+  --door: light-dark(#886954, #75604b);
+  --tree: light-dark(#63966c, #58805e);
+  --tree-shade: light-dark(#52825b, #466b4b);
+  --art-shadow: light-dark(#62804e22, #17221650);
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}

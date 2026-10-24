@@ -256,6 +256,19 @@ public sealed partial class Editor : Form
         SaveMain();
     }
 
+    /// <summary>Applies legacy form fields to the shared in-memory workspace session.</summary>
+    internal void ApplyWorkspaceChanges() => SaveAll();
+
+    internal void SelectWorkspaceSection(string section)
+    {
+        TC_Editors.SelectedTab = section switch
+        {
+            "villagers" => Tab_Villagers,
+            "map" or "designs" => Tab_Map,
+            _ => Tab_Players,
+        };
+    }
+
     private void LoadMain()
     {
         var m = SAV.Main;

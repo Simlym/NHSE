@@ -1,0 +1,113 @@
+export interface Player {
+  index: number;
+  name: string;
+  island: string;
+  wallet: number;
+  bank: number;
+  miles: number;
+  earnedMiles: number;
+  pocketCapacity: number;
+  storageCapacity: number;
+}
+export interface Session {
+  title: string;
+  island: string;
+  dirty: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  players: Player[];
+}
+export interface State {
+  language: string;
+  recent: string;
+  session: Session | null;
+  fullScreen: boolean;
+}
+export interface ItemView {
+  index: number;
+  itemId: number;
+  name: string;
+  empty: boolean;
+  available: boolean;
+  quantity: number;
+  maxQuantity: number;
+  image: string | null;
+}
+export interface Inventory {
+  page: number;
+  pages: number;
+  total: number;
+  matched: number;
+  used: number;
+  items: ItemView[];
+}
+interface Response {
+  id: string;
+  ok: boolean;
+  data?: unknown;
+  error?: string;
+  detail?: string;
+  eventName?: string;
+}
+interface WebView {
+  postMessage(message: unknown): void;
+  postMessageWithAdditionalObjects(message: unknown, objects: File[]): void;
+  addEventListener(
+    name: 'message',
+    listener: (event: MessageEvent<Response & { data: State }>) => void,
+  ): void;
+}
+declare global {
+  interface Window {
+    chrome?: { webview?: WebView };
+  }
+}
+
+export const native = !!window.chrome?.webview;
+let sequence = 0;
+const pending = new Map<string, { resolve(value: unknown): void; reject(reason: Error): void }>();
+export let onState: (state: State) => void = () => {};
+export function listenState(listener: (state: State) => void) {
+  onState = listener;
+}
+window.chrome?.webview?.addEventListener('message', (event) => {
+  const response = event.data;
+  if (response.eventName === 'state') {
+    onState(response.data);
+    return;
+  }
+  const task = pending.get(response.id);
+  if (!task) return;
+  pending.delete(response.id);
+  if (response.ok) task.resolve(response.data);
+  else task.reject(new Error(response.error ?? 'operationFailed', { cause: response.detail }));
+});
+
+export function request<T>(
+  command: string,
+  payload: Record<string, unknown> = {},
+  files?: File[],
+): Promise<T> {
+  if (!native) {
+    if (command === 'bootstrap' || command === 'language')
+      return Promise.resolve({
+        language: payload.language ?? localStorage.getItem('nhse.language') ?? 'en',
+        recent: '',
+        session: null,
+        fullScreen: false,
+      } as T);
+    return Promise.reject(new Error('offlinePreview'));
+  }
+  const id = String(++sequence);
+  return new Promise<T>((resolve, reject) => {
+    pending.set(id, { resolve: (value) => resolve(value as T), reject });
+    try {
+      const message = { id, command, payload };
+      if (files) window.chrome!.webview!.postMessageWithAdditionalObjects(message, files);
+      else window.chrome!.webview!.postMessage(message);
+    } catch (error) {
+      pending.delete(id);
+      reject(error);
+    }
+  });
+}

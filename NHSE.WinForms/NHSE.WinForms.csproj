@@ -14,11 +14,36 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
     <ProjectReference Include="..\NHSE.Core\NHSE.Core.csproj" />
     <ProjectReference Include="..\NHSE.Injection\NHSE.Injection.csproj" />
     <ProjectReference Include="..\NHSE.Sprites\NHSE.Sprites.csproj" />
     <ProjectReference Include="..\NHSE.Villagers\NHSE.Villagers.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\NHSE.UI\src\locales\*.json" LogicalName="Workspace.%(Filename).json" />
+    <WorkspaceInputs Include="..\NHSE.UI\src\**\*;..\NHSE.UI\package*.json;..\NHSE.UI\index.html;..\NHSE.UI\tsconfig.json;..\NHSE.UI\vite.config.ts" />
+  </ItemGroup>
+
+  <Target Name="BuildWorkspace" BeforeTargets="PrepareForBuild" Inputs="@(WorkspaceInputs)" Outputs="..\NHSE.UI\dist\index.html" Condition="'$(DesignTimeBuild)' != 'true' and '$(SkipWorkspaceBuild)' != 'true'">
+    <Exec WorkingDirectory="..\NHSE.UI" Command="npm ci --no-audit --no-fund" />
+    <Exec WorkingDirectory="..\NHSE.UI" Command="npm run build" />
+  </Target>
+  <Target Name="IncludeWorkspaceContent" BeforeTargets="AssignTargetPaths">
+    <Error Condition="'$(DesignTimeBuild)' != 'true' and !Exists('..\NHSE.UI\dist\index.html')" Text="Build the Vue workspace before skipping its build: cd NHSE.UI &amp;&amp; npm ci &amp;&amp; npm run build" />
+    <ItemGroup>
+      <WorkspaceAsset Include="..\NHSE.UI\dist\**\*" />
+      <Content Include="@(WorkspaceAsset)">
+        <Link>Workspace\%(WorkspaceAsset.RecursiveDir)%(WorkspaceAsset.Filename)%(WorkspaceAsset.Extension)</Link>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </Content>
+    </ItemGroup>
+  </Target>
+  <Target Name="RemoveUnusedWebViewWpfReference" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup><Reference Remove="@(Reference)" Condition="'%(Filename)' == 'Microsoft.Web.WebView2.Wpf'" /></ItemGroup>
+  </Target>
 
   <ItemGroup>
     <Compile Update="Properties\Resources.Designer.cs">

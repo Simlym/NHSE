@@ -36,6 +36,24 @@ public static class ItemSprite
         return GetItemSprite(id, count);
     }
 
+    /// <summary>Returns an owned copy without leaving custom sprite files locked.</summary>
+    public static Bitmap? GetItemSpriteCopy(Item item)
+    {
+        if (item.IsNone)
+            return null;
+        if (TryGetItemImageSprite(item.ItemId, out var path, item.Count))
+        {
+            try
+            {
+                using var source = Image.FromFile(path);
+                return new Bitmap(source);
+            }
+            catch (Exception ex) { Console.WriteLine(ex.Message); }
+        }
+        var shared = TryGetMenuIconSprite(item.ItemId, out var icon) ? icon : Resources.leaf;
+        return shared is null ? null : new Bitmap(shared);
+    }
+
     public static Image? GetItemSprite(ushort id, ushort count = 0)
     {
         if (id == Item.NONE)

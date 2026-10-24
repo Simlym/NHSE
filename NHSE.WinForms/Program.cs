@@ -14,7 +14,7 @@ internal static class Program
     /// <summary>
     /// Directory where the executable is located.
     /// </summary>
-    public static readonly string WorkingDirectory = Path.GetDirectoryName(Environment.ProcessPath) ?? "";
+    public static readonly string WorkingDirectory = Path.GetDirectoryName(typeof(Program).Assembly.Location) ?? AppContext.BaseDirectory;
 
     /// <summary>
     /// Settings file name.
@@ -52,7 +52,7 @@ internal static class Program
     /// The main entry point for the application.
     /// </summary>
     [STAThread]
-    private static void Main() => Application.Run(new Main());
+    private static void Main() => Application.Run(new WorkspaceForm());
 
     public static void SaveSettings() => Settings.Save(PathConfig);
 

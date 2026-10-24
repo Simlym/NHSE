@@ -277,6 +277,10 @@ FakesAssemblies/
 # Node.js Tools for Visual Studio
 .ntvs_analysis.dat
 node_modules/
+NHSE.UI/dist/
+NHSE.UI/playwright-report/
+NHSE.UI/test-results/
+*.WebView2/
 
 # Visual Studio 6 build log
 *.plg

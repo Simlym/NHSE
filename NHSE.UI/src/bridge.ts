@@ -23,6 +23,7 @@ export interface Session {
   players: Player[];
   residents: Resident[];
   islandSettings: IslandSettings;
+  turnips: TurnipSettings;
 }
 export interface Resident extends VillagerEntry {
   index: number;
@@ -31,6 +32,12 @@ export interface Resident extends VillagerEntry {
   movingOut: boolean;
   empty: boolean;
   canReplace: boolean;
+}
+export interface TurnipSettings {
+  buyPrice: number;
+  sellPrices: number[];
+  pattern: number;
+  feverStart: number;
 }
 export interface IslandSettings {
   airportColor: number;

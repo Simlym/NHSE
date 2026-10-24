@@ -25,6 +25,7 @@ internal sealed partial class WorkspaceSession(HorizonSave save)
         island = SaveFile.Players[0].Personal.TownName,
         dirty = IsDirty, canUndo = UndoStack.Count != 0, canRedo = RedoStack.Count != 0,
         islandSettings = GetIslandSettings(),
+        turnips = GetTurnips(),
         residents = GetResidents(getVillagerImage),
         players = SaveFile.Players.Select((p, i) => new
         {
@@ -54,6 +55,7 @@ internal sealed partial class WorkspaceSession(HorizonSave save)
         {
             "pocket" => p.Pocket.Concat(p.Bag).ToArray(),
             "storage" => p.ItemChest.ToArray(),
+            "recycle" => SaveFile.Main.RecycleBin.ToArray(),
             _ => throw new ArgumentException("invalidRequest"),
         };
     }
@@ -61,6 +63,7 @@ internal sealed partial class WorkspaceSession(HorizonSave save)
     public bool IsSlotAvailable(int player, string container, int index)
     {
         var p = Player(player);
+        if (container == "recycle") return (uint)index < MainSaveOffsets.RecycleBinCount;
         if (container == "storage")
             return (uint)index < Math.Min(p.ItemChestCount, (uint)p.Offsets.ItemChestCount);
         return index >= 0 && (index < p.Offsets.Pockets2Count
@@ -71,6 +74,11 @@ internal sealed partial class WorkspaceSession(HorizonSave save)
     private void PutItems(int player, string container, Item[] items)
     {
         var p = Player(player);
+        if (container == "recycle")
+        {
+            SaveFile.Main.RecycleBin = items;
+            return;
+        }
         if (container == "storage")
         {
             p.ItemChest = items;

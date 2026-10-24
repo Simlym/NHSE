@@ -264,6 +264,12 @@ async function applyWorldDrafts() {
   return true;
 }
 async function worldCommand(name: string, payload: Record<string, unknown> = {}) {
+  if (name === 'tool' && payload.tool === 'recycle') {
+    await go('inventory');
+    if (page.value !== 'inventory') return false;
+    container.value = 'recycle';
+    return true;
+  }
   return await command(
     name,
     { player: playerIndex.value, ...payload },
@@ -551,7 +557,9 @@ onUnmounted(() => {
             <div class="welcome-actions">
               <button class="button primary" :disabled="busy" @click="open('file')">
                 <FolderOpen :size="19" />{{ t('openSave') }}<ArrowRight :size="17" /></button
-              ><button class="button" :disabled="busy" @click="open('folder')">{{ t('openFolder') }}</button>
+              ><button class="button" :disabled="busy" @click="open('folder')">
+                {{ t('openFolder') }}
+              </button>
             </div>
             <div class="welcome-note"><ShieldCheck :size="15" />{{ t('localNote') }}</div>
           </div>
@@ -810,7 +818,13 @@ onUnmounted(() => {
                     :disabled="busy"
                     @click="container = 'storage'"
                   >
-                    {{ t('storage') }}
+                    {{ t('storage') }}</button
+                  ><button
+                    :class="{ active: container === 'recycle' }"
+                    :disabled="busy"
+                    @click="container = 'recycle'"
+                  >
+                    {{ t('recycle') }}
                   </button>
                 </div>
                 <span class="inventory-count"
@@ -824,7 +838,9 @@ onUnmounted(() => {
               <div
                 class="item-grid"
                 :class="{ 'pocket-grid': container === 'pocket' }"
-                :aria-label="t(container === 'pocket' ? 'pocket' : 'storage')"
+                :aria-label="
+                  t(container === 'pocket' ? 'pocket' : container === 'recycle' ? 'recycle' : 'storage')
+                "
               >
                 <button
                   v-for="item in inventory?.items ?? []"
@@ -852,7 +868,9 @@ onUnmounted(() => {
                   >
                 </button>
               </div>
-              <div v-if="inventory?.items.length === 0" class="empty-result">{{ t('noResults') }}</div>
+              <div v-if="inventory?.items.length === 0" class="empty-result">
+                {{ t('noResults') }}
+              </div>
               <div v-if="inventory && inventory.pages > 1" class="pagination">
                 <button
                   class="icon-button"
@@ -936,6 +954,7 @@ onUnmounted(() => {
           v-else-if="page === 'island'"
           ref="islandPage"
           :settings="state.session.islandSettings"
+          :turnips="state.session.turnips"
           :busy="busy"
           :execute="worldCommand"
         />
@@ -1075,7 +1094,8 @@ onUnmounted(() => {
                 :disabled="busy || group.count === 0"
                 @click="chooseClothingGroup(group.id)"
               >
-                {{ clothingLabel(group.id) }} <small>{{ group.count.toLocaleString() }}</small>
+                {{ clothingLabel(group.id) }}
+                <small>{{ group.count.toLocaleString() }}</small>
               </button>
             </div>
             <div class="catalog-summary" role="status">
@@ -1102,7 +1122,9 @@ onUnmounted(() => {
                 ><span class="catalog-item-name">{{ item.name }}</span
                 ><small>#{{ item.itemId }}</small>
               </button>
-              <p v-if="!busy && catalog?.items.length === 0" class="empty-result">{{ t('noResults') }}</p>
+              <p v-if="!busy && catalog?.items.length === 0" class="empty-result">
+                {{ t('noResults') }}
+              </p>
             </div>
             <form v-if="catalog" class="catalog-pagination" @submit.prevent="searchCatalog(catalogJump - 1)">
               <div class="catalog-page-buttons">

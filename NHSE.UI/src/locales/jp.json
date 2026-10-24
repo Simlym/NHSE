@@ -188,5 +188,17 @@
   "islandToolNames": "地形と建物|プレイヤーの家|住民の家|キャンプサイト|フルーツと花|リサイクルBOX|カブ価",
   "designToolNames": "マイデザイン|PROデザイン|島の旗|仕立て屋のデザイン",
   "specializedHint": "専用エディターを直接開きます。変更はワークスペースで元に戻せます。最後にセーブしてください。",
-  "residentHouse": "住民の家を編集"
+  "residentHouse": "住民の家を編集",
+  "recycle": "リサイクルBOX",
+  "turnips": "カブ価",
+  "turnipBuy": "購入価格",
+  "turnipPattern": "価格パターン",
+  "turnipFever": "高騰開始値",
+  "turnipFeverHint": "ゲーム内の生データです。意味が不明な場合は変更しないでください。",
+  "turnipDay": "曜日",
+  "turnipAM": "午前",
+  "turnipPM": "午後",
+  "turnipDays": "日曜日|月曜日|火曜日|水曜日|木曜日|金曜日|土曜日",
+  "turnipPatterns": "波型|跳ね大型|減少型|跳ね小型",
+  "turnipHint": "週間価格を編集します。適用または保存で共通の元に戻す履歴に追加します。日曜の売却価格も保存データの一部として表示します。"
 }

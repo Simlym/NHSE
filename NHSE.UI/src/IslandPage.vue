@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { Map, ArrowRight, Palette } from '@lucide/vue';
-import type { IslandSettings } from './bridge';
+import TurnipsEditor from './TurnipsEditor.vue';
+import type { TurnipSettings, IslandSettings } from './bridge';
 import { t } from './i18n';
 const props = defineProps<{
   settings: IslandSettings;
+  turnips: TurnipSettings;
   busy: boolean;
   execute: (name: string, payload?: Record<string, unknown>) => Promise<boolean>;
 }>();
+const turnipsEditor = ref<InstanceType<typeof TurnipsEditor> | null>(null);
 const fields = ref({ ...props.settings });
 const form = ref<HTMLFormElement | null>(null);
 const colors = ['#5796c4', '#e8bf46', '#dd8849', '#5a9f76'];
@@ -32,12 +35,20 @@ watch(
   () => JSON.stringify(props.settings),
   () => (fields.value = { ...props.settings }),
 );
-async function applyPending() {
+async function applyIsland() {
   if (!pending.value) return true;
   if (!form.value?.reportValidity()) return false;
   return await props.execute('setIsland', { ...fields.value });
 }
+async function applyPending() {
+  if (!(await applyIsland())) return false;
+  return (await turnipsEditor.value?.applyPending()) ?? true;
+}
 async function openTool(tool: string) {
+  if (tool === 'turnips') {
+    document.getElementById('turnips-editor')?.scrollIntoView({ block: 'start' });
+    return;
+  }
   if (await applyPending()) await props.execute('tool', { tool });
 }
 defineExpose({ applyPending });
@@ -46,7 +57,7 @@ defineExpose({ applyPending });
 <template>
   <section class="island-page">
     <p class="page-description">{{ t('islandSettingsHint') }}</p>
-    <form ref="form" class="balance-form island-form" @submit.prevent="applyPending">
+    <form ref="form" class="balance-form island-form" @submit.prevent="applyIsland">
       <div class="form-section-title">
         <Map :size="19" />
         <h2>{{ t('islandBasics') }}</h2>
@@ -73,7 +84,9 @@ defineExpose({ applyPending });
       <label
         ><span>{{ t('islandHemisphere') }}</span
         ><select v-model.number="fields.hemisphere" :disabled="busy">
-          <option v-for="(name, index) in hemispheres" :key="index" :value="index">{{ name }}</option></select
+          <option v-for="(name, index) in hemispheres" :key="index" :value="index">
+            {{ name }}
+          </option></select
         ><small class="field-help">{{ t('hemisphereHint') }}</small></label
       >
       <div class="form-section-title">
@@ -94,7 +107,9 @@ defineExpose({ applyPending });
       <label
         ><span>{{ t('tourHemisphere') }}</span
         ><select v-model.number="fields.tourHemisphere" :disabled="busy">
-          <option v-for="(name, index) in hemispheres" :key="index" :value="index">{{ name }}</option>
+          <option v-for="(name, index) in hemispheres" :key="index" :value="index">
+            {{ name }}
+          </option>
         </select></label
       >
       <label
@@ -112,6 +127,7 @@ defineExpose({ applyPending });
         <button class="button primary" :disabled="busy || !pending">{{ t('apply') }}</button>
       </div>
     </form>
+    <TurnipsEditor ref="turnipsEditor" :settings="turnips" :busy="busy" :execute="execute" />
     <div class="island-tools">
       <h2 class="world-tools-title">{{ t('mapEditor') }}</h2>
       <p class="page-description">{{ t('specializedHint') }}</p>

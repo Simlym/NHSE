@@ -188,5 +188,17 @@
   "islandToolNames": "Terrain & buildings|Player houses|Resident houses|Campsite|Fruit & flowers|Recycle box|Turnip prices",
   "designToolNames": "Patterns|PRO designs|Island flag|Tailor designs",
   "specializedHint": "Opens the specialized editor directly. Changes join this workspace’s undo history; save when ready.",
-  "residentHouse": "Edit resident house"
+  "residentHouse": "Edit resident house",
+  "recycle": "Recycle box",
+  "turnips": "Turnip prices",
+  "turnipBuy": "Purchase price",
+  "turnipPattern": "Price pattern",
+  "turnipFever": "Fever start",
+  "turnipFeverHint": "Raw game value; keep it unchanged unless you know the intended value.",
+  "turnipDay": "Day",
+  "turnipAM": "AM",
+  "turnipPM": "PM",
+  "turnipDays": "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday",
+  "turnipPatterns": "Fluctuating|Large spike|Decreasing|Small spike",
+  "turnipHint": "Edit the weekly prices in memory. Apply changes or save to include them in the shared undo history. Sunday sell values are retained for completeness."
 }

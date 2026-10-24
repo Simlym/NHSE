@@ -205,6 +205,44 @@ Check(!session.IsDirty, "cancelling an unchanged specialized tool keeps the save
 GameInfo.SetLanguage2Char(GameLanguage.GetLanguageIndex("zhs"));
 Check(WorkspaceCatalog.Search("", "all", 0).Total == expectedIds.Count, "catalog retains complete coverage after language switching");
 Check(WorkspaceVillagers.Search(targetVillager.Id, -1, -1, 0).Items.Single().Name == GameInfo.Strings.GetVillager(targetVillager.Id), "villager names follow the selected UI language");
+// Batch 1: native-free turnip and shared recycle edits must preserve exact bytes.
+var batchBefore = save.Main.Data.ToArray();
+var batch = new WorkspaceSession(save);
+var prices = Enumerable.Range(0, 14).Select(i => (uint)(100 + i)).ToArray();
+var turnipEdit = new WorkspaceSession.TurnipSettings(uint.MaxValue, prices, 3, uint.MaxValue);
+batch.SetTurnips(turnipEdit);
+var turnipBytes = save.Main.Data.ToArray();
+prices[0] = 999; // External drafts must not change captured history.
+batch.Undo();
+Check(save.Main.Data.SequenceEqual(batchBefore) && !batch.IsDirty, "turnip undo restores every original byte and the clean state");
+batch.Redo();
+Check(save.Main.Data.SequenceEqual(turnipBytes) && batch.GetTurnips().SellPrices[0] == 100, "turnip redo owns its arrays and preserves every field");
+Check(batch.GetTurnips().SellPrices.SequenceEqual(Enumerable.Range(100, 14).Select(x => (uint)x)), "turnip table retains the day and AM/PM order");
+ExpectInvalid(() => batch.SetTurnips(turnipEdit with { SellPrices = new uint[13] }));
+ExpectInvalid(() => batch.SetTurnips(turnipEdit with { Pattern = 4 }));
+Check(save.Main.Data.SequenceEqual(turnipBytes), "invalid turnip edits leave all bytes intact");
+batch.Save();
+batch.SetTurnips(batch.GetTurnips());
+Check(!batch.IsDirty, "unchanged turnip form adds no history");
+var recycleBefore = save.Main.Data.ToArray();
+var pocketBeforeRecycle = personal.Data.ToArray();
+batch.SetItem(0, "recycle", 39, item);
+Check(save.Main.RecycleBin[39].RawValue == item.RawValue && batch.GetItems(1, "recycle")[39].RawValue == item.RawValue, "recycle slot 40 is shared between players and preserves item parameters");
+Check(personal.Data.SequenceEqual(pocketBeforeRecycle), "recycle edits never change player inventories");
+ExpectInvalid(() => batch.SetItem(0, "recycle", 40, item));
+ExpectInvalid(() => batch.SetItem(0, "recycle", -1, item));
+batch.Undo();
+Check(save.Main.Data.SequenceEqual(recycleBefore), "recycle undo restores all original bytes");
+batch.Redo();
+batch.SetItem(1, "recycle", 39, new Item(Item.NONE));
+Check(save.Main.RecycleBin[39].IsNone, "recycle removal uses the same shared inventory");
+batch.Undo();
+batch.Save();
+var batchReload = new HorizonSave(provider);
+Check(batchReload.Main.RecycleBin[39].RawValue == item.RawValue && batchReload.Main.Turnips.BuyPrice == uint.MaxValue
+    && batchReload.Main.Turnips.FeverStart == uint.MaxValue && batchReload.Main.Turnips.SellSaturdayPM == 113
+    && batchReload.Main.Turnips.Pattern == TurnipPattern.SmallSpike, "turnip and recycle edits survive encrypted save and reload");
+Check(!batchReload.GetInvalidHashes().Any(), "batch 1 save has valid hashes");
 Console.WriteLine("All workspace integration checks passed.");
 if (args.Length == 2 && args[0] == "--fixture") provider.Export(args[1]);
 

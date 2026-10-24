@@ -9,7 +9,13 @@ replacement are editable in the workspace. Airport colors, both hemispheres and
 unsigned weather seeds are also editable here. Resident/house replacement is one
 undoable operation. No server is needed.
 
-Terrain, houses, campsite, fruit/flowers, recycle box, turnips and all four design
+Turnip prices now use a native Vue weekly AM/PM table, including purchase price,
+pattern and the raw fever-start value. Valid drafts apply on save or navigation.
+The shared 40-slot recycle box uses the workspace inventory grid and item catalog;
+it is accessible from both inventory and the island shortcut. Both editors join
+the same undo/redo history and only write to disk on Save.
+
+Terrain, houses, campsite, fruit/flowers and all four design
 editors open directly from the workspace's labeled shortcuts. These specialized
 C# editors share the current save; changed byte ranges across main and player
 files join the workspace's undo history. Unchanged dialogs add no history; an

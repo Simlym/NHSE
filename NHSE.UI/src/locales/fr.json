@@ -188,5 +188,17 @@
   "islandToolNames": "Terrain et bâtiments|Maisons des joueurs|Maisons des habitants|Camping|Fruits et fleurs|Boîte de recyclage|Prix des navets",
   "designToolNames": "Motifs|Créations PRO|Drapeau de l’île|Créations de la boutique",
   "specializedHint": "Ouvre directement l’éditeur spécialisé. Les modifications sont annulables dans cet espace ; enregistrez ensuite.",
-  "residentHouse": "Modifier la maison"
+  "residentHouse": "Modifier la maison",
+  "recycle": "Boîte de recyclage",
+  "turnips": "Cours du navet",
+  "turnipBuy": "Prix d’achat",
+  "turnipPattern": "Profil des prix",
+  "turnipFever": "Début du pic",
+  "turnipFeverHint": "Valeur brute du jeu ; conservez-la si vous ignorez sa signification.",
+  "turnipDay": "Jour",
+  "turnipAM": "Matin",
+  "turnipPM": "Après-midi",
+  "turnipDays": "Dimanche|Lundi|Mardi|Mercredi|Jeudi|Vendredi|Samedi",
+  "turnipPatterns": "Fluctuant|Grand pic|Décroissant|Petit pic",
+  "turnipHint": "Modifiez les prix de la semaine. Appliquer ou enregistrer ajoute les changements à l’historique partagé. Les prix de vente du dimanche sont conservés."
 }

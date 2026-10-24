@@ -188,5 +188,17 @@
   "islandToolNames": "Gelände und Gebäude|Spielerhäuser|Bewohnerhäuser|Campingplatz|Früchte und Blumen|Recyclingkiste|Rübenpreise",
   "designToolNames": "Muster|PRO-Designs|Inselflagge|Schneiderei-Designs",
   "specializedHint": "Öffnet den Spezialeditor direkt. Änderungen lassen sich im Arbeitsbereich rückgängig machen; speichere zum Schluss.",
-  "residentHouse": "Bewohnerhaus bearbeiten"
+  "residentHouse": "Bewohnerhaus bearbeiten",
+  "recycle": "Recyclingbox",
+  "turnips": "Rübenpreise",
+  "turnipBuy": "Kaufpreis",
+  "turnipPattern": "Preismuster",
+  "turnipFever": "Spitzenbeginn",
+  "turnipFeverHint": "Rohwert des Spiels; bei unbekannter Bedeutung unverändert lassen.",
+  "turnipDay": "Tag",
+  "turnipAM": "Vormittag",
+  "turnipPM": "Nachmittag",
+  "turnipDays": "Sonntag|Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag",
+  "turnipPatterns": "Schwankend|Große Spitze|Fallend|Kleine Spitze",
+  "turnipHint": "Wochenpreise bearbeiten. Anwenden oder Speichern übernimmt Änderungen in den gemeinsamen Rückgängig-Verlauf. Sonntagswerte bleiben vollständig erhalten."
 }

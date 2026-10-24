@@ -81,7 +81,16 @@ export async function mockHost(page: Page, picker = false) {
       weatherSeed: 12345,
       tourWeatherSeed: 54321,
     };
+    let turnips = {
+      buyPrice: 90,
+      sellPrices: Array.from({ length: 14 }, (_, i) => 100 + i),
+      pattern: 0,
+      feverStart: 0,
+    };
+    let recycleItem = { ...item, quantity: 5 };
     type Snapshot = {
+      turnips: typeof turnips;
+      recycleItem: typeof recycleItem;
       players: typeof players;
       item: typeof item;
       revision: number;
@@ -90,8 +99,11 @@ export async function mockHost(page: Page, picker = false) {
     };
     const history: Snapshot[] = [],
       redo: Snapshot[] = [];
-    const capture = (): Snapshot => structuredClone({ players, item, revision, residents, islandSettings });
+    const capture = (): Snapshot =>
+      structuredClone({ players, item, revision, residents, islandSettings, turnips, recycleItem });
     const restore = (value: Snapshot) => {
+      turnips = value.turnips;
+      recycleItem = value.recycleItem;
       players = value.players;
       item = value.item;
       revision = value.revision;
@@ -126,6 +138,7 @@ export async function mockHost(page: Page, picker = false) {
             players,
             residents,
             islandSettings,
+            turnips,
           }
         : null,
     });
@@ -157,16 +170,28 @@ export async function mockHost(page: Page, picker = false) {
             }
             if (message.command === 'setItem') {
               remember();
-              item = {
+              const replacement = {
                 ...catalog.find((entry) => entry.itemId === Number(p.itemId))!,
                 index: 0,
                 quantity: Number(p.quantity),
+              };
+              if (p.container === 'recycle') recycleItem = replacement;
+              else item = replacement;
+            }
+            if (message.command === 'setTurnips') {
+              remember();
+              turnips = {
+                buyPrice: Number(p.buyPrice),
+                sellPrices: [...(p.sellPrices as number[])],
+                pattern: Number(p.pattern),
+                feverStart: Number(p.feverStart),
               };
             }
             if (message.command === 'setIsland') {
               remember();
               Object.assign(
                 islandSettings,
+                turnips,
                 Object.fromEntries(Object.entries(p).filter(([key]) => key !== 'player')),
               );
             }
@@ -193,7 +218,8 @@ export async function mockHost(page: Page, picker = false) {
             }
             if (message.command === 'deleteItem') {
               remember();
-              item.empty = true;
+              if (p.container === 'recycle') recycleItem.empty = true;
+              else item.empty = true;
             }
             if (message.command === 'undo' && history.length) {
               redo.push(capture());
@@ -208,13 +234,14 @@ export async function mockHost(page: Page, picker = false) {
             if (message.command === 'inventory') {
               const items = Array.from({ length: 40 }, (_, index) =>
                 index === 0
-                  ? { ...item }
+                  ? { ...(p.container === 'recycle' ? recycleItem : item) }
                   : {
                       index,
                       itemId: 65534,
                       name: '',
                       empty: true,
-                      available: index < players[Number(p.player)]!.pocketCapacity,
+                      available:
+                        p.container === 'recycle' || index < players[Number(p.player)]!.pocketCapacity,
                       quantity: 0,
                       maxQuantity: 1,
                       image: null,

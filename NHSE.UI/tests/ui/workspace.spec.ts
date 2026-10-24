@@ -59,7 +59,7 @@ test('island settings validate unsigned seeds, autosave drafts and support undo 
   await expect(page.getByRole('spinbutton', { name: 'Island weather seed', exact: true })).toHaveValue('777');
   await page.locator('.icon-select select').first().selectOption('zhs');
   await seed.fill('4294967296');
-  await page.getByRole('button', { name: '应用修改', exact: true }).click();
+  await page.locator('.island-form').getByRole('button', { name: '应用修改', exact: true }).click();
   expect(
     await page.evaluate(() =>
       (window as unknown as { nhseTestMessages: string[] }).nhseTestMessages.includes('setIsland'),
@@ -72,7 +72,7 @@ test('island settings validate unsigned seeds, autosave drafts and support undo 
   await expect(seed).toHaveValue('12345');
   await page.getByRole('button', { name: '重做', exact: true }).click();
   await expect(seed).toHaveValue('4294967295');
-  await page.locator('.workspace-content').evaluate(el => el.scrollTo(0, 0));
+  await page.locator('.workspace-content').evaluate((el) => el.scrollTo(0, 0));
   await page.screenshot({ path: 'test-results/island-workspace-zhs.png', fullPage: true });
   for (const code of codes) {
     await page.locator('.icon-select select').first().selectOption(code);
@@ -271,8 +271,82 @@ test('villager gallery filters portraits and previews replacements without mutat
     await page.evaluate(
       () =>
         (
-          window as unknown as { nhseTestPayloads: { command: string; payload: { index: number } }[] }
+          window as unknown as {
+            nhseTestPayloads: { command: string; payload: { index: number } }[];
+          }
         ).nhseTestPayloads.find((x) => x.command === 'pickResident')?.payload.index,
     ),
   ).toBe(1);
+});
+
+test('turnip table validates drafts, saves on navigation and supports undo in nine languages', async ({
+  page,
+}) => {
+  await mockHost(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: '打开存档', exact: true }).click();
+  await page.locator('.sidebar nav').getByRole('button', { name: '岛屿设置', exact: true }).click();
+  const form = page.locator('#turnips-editor');
+  await expect(form.locator('tbody input')).toHaveCount(14);
+  const monday = form.getByRole('spinbutton', { name: '星期一 上午', exact: true });
+  await monday.fill('4294967296');
+  await form.getByRole('button', { name: '应用修改', exact: true }).click();
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { nhseTestMessages: string[] }).nhseTestMessages.includes('setTurnips'),
+    ),
+  ).toBe(false);
+  await monday.fill('650');
+  await page.locator('.icon-select select').first().selectOption('en');
+  await expect(form.getByRole('spinbutton', { name: 'Monday AM', exact: true })).toHaveValue('650');
+  await page.keyboard.press('Control+s');
+  await expect(page.locator('.statusbar')).toContainText(text('en').saved);
+  await page.getByRole('button', { name: text('en').undo, exact: true }).click();
+  await expect(form.getByRole('spinbutton', { name: 'Monday AM', exact: true })).toHaveValue('102');
+  await page.getByRole('button', { name: text('en').redo, exact: true }).click();
+  await expect(form.getByRole('spinbutton', { name: 'Monday AM', exact: true })).toHaveValue('650');
+  for (const code of codes) {
+    await page.locator('.icon-select select').first().selectOption(code);
+    await expect(form.getByRole('heading')).toHaveText(text(code).turnips);
+    for (const width of [1180, 800, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    }
+  }
+  await page.locator('.icon-select select').first().selectOption('zhs');
+  await monday.fill('651');
+  await page.getByRole('button', { name: '玩家资料', exact: true }).first().click();
+  await page.locator('.sidebar nav').getByRole('button', { name: '岛屿设置', exact: true }).click();
+  await expect(monday).toHaveValue('651');
+});
+
+test('recycle shortcut uses the workspace grid, stays shared and supports removal and undo', async ({
+  page,
+}) => {
+  await mockHost(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: '打开存档', exact: true }).click();
+  await page.locator('.sidebar nav').getByRole('button', { name: '岛屿设置', exact: true }).click();
+  await page.getByRole('button', { name: '回收箱', exact: true }).click();
+  await expect(page.locator('.item-slot')).toHaveCount(40);
+  await expect(page.locator('.item-slot').last()).toBeEnabled();
+  await page.locator('.item-slot').first().click();
+  await page.getByRole('spinbutton', { name: '数量', exact: true }).fill('20');
+  await page.getByRole('button', { name: '应用修改', exact: true }).click();
+  await page.locator('.player-chip').nth(1).click();
+  await expect(page.locator('.item-slot').first()).toContainText('20');
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(page.locator('.item-slot').first()).toContainText('5');
+  await page.getByRole('button', { name: '重做', exact: true }).click();
+  await expect(page.locator('.item-slot').first()).toContainText('20');
+  await page.locator('.item-slot').first().click();
+  await page.getByRole('button', { name: text('zhs').delete, exact: true }).click();
+  await expect(page.locator('.item-slot').first()).toHaveClass(/is-empty/);
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { nhseTestMessages: string[] }).nhseTestMessages.some(
+        (x) => x === 'legacy' || x === 'tool',
+      ),
+    ),
+  ).toBe(false);
 });

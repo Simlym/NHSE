@@ -188,5 +188,17 @@
   "islandToolNames": "지형과 건물|플레이어 집|주민 집|캠핑장|과일과 꽃|재활용함|무 가격",
   "designToolNames": "패턴|PRO 디자인|섬 깃발|옷가게 디자인",
   "specializedHint": "전용 편집기를 바로 엽니다. 변경 사항은 작업 공간에서 실행 취소할 수 있으며 마지막에 저장하세요.",
-  "residentHouse": "주민 집 편집"
+  "residentHouse": "주민 집 편집",
+  "recycle": "재활용함",
+  "turnips": "무 가격",
+  "turnipBuy": "구입 가격",
+  "turnipPattern": "가격 패턴",
+  "turnipFever": "급등 시작값",
+  "turnipFeverHint": "게임 내부 값입니다. 의미를 모르면 원래 값을 유지하세요.",
+  "turnipDay": "요일",
+  "turnipAM": "오전",
+  "turnipPM": "오후",
+  "turnipDays": "일요일|월요일|화요일|수요일|목요일|금요일|토요일",
+  "turnipPatterns": "변동형|대폭 상승형|하락형|소폭 상승형",
+  "turnipHint": "주간 가격을 편집합니다. 적용하거나 저장하면 공통 실행 취소 기록에 추가됩니다. 일요일 판매 가격도 보존합니다."
 }

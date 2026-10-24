@@ -266,6 +266,11 @@ public sealed partial class WorkspaceForm : Form
                 RequireSession().SetPlayer(Int(p, "player"), p.GetProperty("wallet").GetUInt32(), p.GetProperty("bank").GetUInt32(), p.GetProperty("miles").GetUInt32(), p.GetProperty("earnedMiles").GetUInt32(),
                     Str(p, "name"), Str(p, "island"), OptionalUInt(p, "pocketCapacity"), OptionalUInt(p, "storageCapacity"), OptionalUInt(p, "hotelTickets"), OptionalUInt(p, "poki"));
                 return State();
+            case "setTurnips":
+                RequireSession().SetTurnips(new WorkspaceSession.TurnipSettings(p.GetProperty("buyPrice").GetUInt32(),
+                    p.GetProperty("sellPrices").EnumerateArray().Select(x => x.GetUInt32()).ToArray(),
+                    p.GetProperty("pattern").GetUInt32(), p.GetProperty("feverStart").GetUInt32()));
+                return State();
             case "setIsland":
                 RequireSession().SetIsland(new WorkspaceSession.IslandSettings(Int(p, "airportColor"), Int(p, "hemisphere"), Int(p, "tourHemisphere"),
                     p.GetProperty("weatherSeed").GetUInt32(), p.GetProperty("tourWeatherSeed").GetUInt32()));

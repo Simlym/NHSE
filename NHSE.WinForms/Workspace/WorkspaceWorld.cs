@@ -10,6 +10,50 @@ internal sealed partial class WorkspaceSession
     internal sealed record Resident(int Index, string Id, string Name, int Species, int Personality, string Catchphrase,
         string DefaultCatchphrase, bool MovingOut, bool Empty, bool CanReplace, string? Image);
 
+    internal sealed record TurnipSettings(uint BuyPrice, uint[] SellPrices, uint Pattern, uint FeverStart);
+
+    public TurnipSettings GetTurnips()
+    {
+        var v = SaveFile.Main.Turnips;
+        return new(v.BuyPrice,
+            [v.SellSundayAM, v.SellSundayPM, v.SellMondayAM, v.SellMondayPM,
+             v.SellTuesdayAM, v.SellTuesdayPM, v.SellWednesdayAM, v.SellWednesdayPM,
+             v.SellThursdayAM, v.SellThursdayPM, v.SellFridayAM, v.SellFridayPM,
+             v.SellSaturdayAM, v.SellSaturdayPM], (uint)v.Pattern, v.FeverStart);
+    }
+
+    public void SetTurnips(TurnipSettings next)
+    {
+        if (next.SellPrices is null || next.SellPrices.Length != 14 || next.Pattern > 3)
+            throw new ArgumentException("invalidRequest");
+        // Own the arrays captured by history; callers cannot mutate a committed edit.
+        next = next with { SellPrices = next.SellPrices.ToArray() };
+        var before = GetTurnips();
+        if (before.BuyPrice == next.BuyPrice && before.Pattern == next.Pattern && before.FeverStart == next.FeverStart
+            && before.SellPrices.SequenceEqual(next.SellPrices)) return;
+        void Apply(TurnipSettings value) => SaveFile.Main.Turnips = new TurnipStonk
+        {
+            BuyPrice = value.BuyPrice,
+            SellSundayAM = value.SellPrices[0],
+            SellSundayPM = value.SellPrices[1],
+            SellMondayAM = value.SellPrices[2],
+            SellMondayPM = value.SellPrices[3],
+            SellTuesdayAM = value.SellPrices[4],
+            SellTuesdayPM = value.SellPrices[5],
+            SellWednesdayAM = value.SellPrices[6],
+            SellWednesdayPM = value.SellPrices[7],
+            SellThursdayAM = value.SellPrices[8],
+            SellThursdayPM = value.SellPrices[9],
+            SellFridayAM = value.SellPrices[10],
+            SellFridayPM = value.SellPrices[11],
+            SellSaturdayAM = value.SellPrices[12],
+            SellSaturdayPM = value.SellPrices[13],
+            Pattern = (TurnipPattern)value.Pattern,
+            FeverStart = value.FeverStart,
+        };
+        Commit(() => Apply(before), () => Apply(next));
+    }
+
     public IslandSettings GetIslandSettings() => new((int)SaveFile.Main.AirportThemeColor, (int)SaveFile.Main.Hemisphere,
         (int)SaveFile.Main.TourHemisphere, SaveFile.Main.WeatherSeed, SaveFile.Main.TourWeatherSeed);
 

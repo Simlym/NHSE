@@ -188,5 +188,17 @@
   "islandToolNames": "地形與建築|玩家房屋|島民房屋|露營地|水果與花卉|回收箱|大頭菜價格",
   "designToolNames": "普通圖案|專業設計|島旗圖案|服裝店設計",
   "specializedHint": "直接開啟對應的專用編輯器，修改後可在工作區復原，完成後請儲存存檔。",
-  "residentHouse": "編輯島民房屋"
+  "residentHouse": "編輯島民房屋",
+  "recycle": "回收箱",
+  "turnips": "大頭菜價格",
+  "turnipBuy": "購入價格",
+  "turnipPattern": "價格模式",
+  "turnipFever": "波峰起始值",
+  "turnipFeverHint": "遊戲原始數值；不了解其含義時請保留原值。",
+  "turnipDay": "星期",
+  "turnipAM": "上午",
+  "turnipPM": "下午",
+  "turnipDays": "星期日|星期一|星期二|星期三|星期四|星期五|星期六",
+  "turnipPatterns": "波動型|大漲型|遞減型|小漲型",
+  "turnipHint": "編輯一週價格。套用修改或儲存時納入共用復原歷史。保留週日賣價欄位，以完整呈現存檔資料。"
 }

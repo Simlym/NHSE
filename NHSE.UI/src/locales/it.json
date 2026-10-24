@@ -188,5 +188,17 @@
   "islandToolNames": "Terreno ed edifici|Case dei giocatori|Case degli abitanti|Campeggio|Frutta e fiori|Cassa del riciclo|Prezzi delle rape",
   "designToolNames": "Modelli|Modelli PRO|Bandiera dell’isola|Modelli della sartoria",
   "specializedHint": "Apre direttamente l’editor specializzato. Puoi annullare le modifiche in questo spazio; salva alla fine.",
-  "residentHouse": "Modifica casa abitante"
+  "residentHouse": "Modifica casa abitante",
+  "recycle": "Cassa del riciclo",
+  "turnips": "Prezzi delle rape",
+  "turnipBuy": "Prezzo d’acquisto",
+  "turnipPattern": "Andamento dei prezzi",
+  "turnipFever": "Inizio del picco",
+  "turnipFeverHint": "Valore interno del gioco; lascialo invariato se non ne conosci il significato.",
+  "turnipDay": "Giorno",
+  "turnipAM": "Mattina",
+  "turnipPM": "Pomeriggio",
+  "turnipDays": "Domenica|Lunedì|Martedì|Mercoledì|Giovedì|Venerdì|Sabato",
+  "turnipPatterns": "Fluttuante|Picco grande|Decrescente|Picco piccolo",
+  "turnipHint": "Modifica i prezzi settimanali. Applica o salva per aggiungere le modifiche alla cronologia condivisa. I prezzi di vendita della domenica vengono conservati."
 }

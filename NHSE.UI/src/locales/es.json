@@ -188,5 +188,17 @@
   "islandToolNames": "Terreno y edificios|Casas de jugadores|Casas de vecinos|Zona de acampada|Frutas y flores|Caja de reciclaje|Precios de nabos",
   "designToolNames": "Patrones|Diseños PRO|Bandera de la isla|Diseños de la sastrería",
   "specializedHint": "Abre el editor especializado directamente. Puedes deshacer los cambios en este espacio; guarda al terminar.",
-  "residentHouse": "Editar casa del vecino"
+  "residentHouse": "Editar casa del vecino",
+  "recycle": "Caja de reciclaje",
+  "turnips": "Precios de nabos",
+  "turnipBuy": "Precio de compra",
+  "turnipPattern": "Patrón de precios",
+  "turnipFever": "Inicio del pico",
+  "turnipFeverHint": "Valor interno del juego; consérvalo si no conoces su significado.",
+  "turnipDay": "Día",
+  "turnipAM": "Mañana",
+  "turnipPM": "Tarde",
+  "turnipDays": "Domingo|Lunes|Martes|Miércoles|Jueves|Viernes|Sábado",
+  "turnipPatterns": "Fluctuante|Pico grande|Decreciente|Pico pequeño",
+  "turnipHint": "Edita los precios semanales. Aplicar o guardar añade los cambios al historial compartido. Se conservan los precios de venta del domingo."
 }

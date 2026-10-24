@@ -275,5 +275,20 @@
   "designChooseFolder": "Scegli cartella",
   "designFileSize": "La dimensione non corrisponde al tipo di modello. Nessun modello modificato.",
   "designCapacity": "Più file degli spazi disponibili. Nessun modello modificato.",
-  "designNoFiles": "Nessun file di modello compatibile nella cartella selezionata."
+  "designNoFiles": "Nessun file di modello compatibile nella cartella selezionata.",
+  "mapModes": "Terreno e sentieri|Oggetti|Edifici|Modelli di settore|Motivi a terra e piazza",
+  "mapAdvanced": "Strumenti mappa avanzati (interfaccia originale)",
+  "mapAcre": "Settore",
+  "mapLayer": "Livello oggetti",
+  "mapSlot": "Indice del motivo a terra",
+  "mapSlotHint": "Gli indici indicano record salvati, non posizioni nell’anteprima.",
+  "mapPickItem": "Scegli oggetto",
+  "mapFieldObject": "Oggetto esterno",
+  "mapExtensions": "Gestisci automaticamente l’ingombro",
+  "mapNoOverwrite": "Evita sovrapposizioni",
+  "mapSnap": "Allinea gli oggetti alla griglia",
+  "mapClear": "Svuota casella",
+  "mapRotate": "Ruota casella",
+  "mapOutside": "Questa casella è fuori dall’area modificabile.",
+  "mapFieldNames": "Forma del terreno|Variante del terreno|Rotazione del terreno|Forma del sentiero|Variante del sentiero|Rotazione del sentiero|Altezza|Tipo di edificio|Coordinata X|Coordinata Y|Angolo|Indicatori|Tipo|Parametro del tipo|ID univoco|Valore riservato|Modello di settore|Piazza X|Piazza Y|Modello esterno|Modello area principale|Valore del motivo"
 }

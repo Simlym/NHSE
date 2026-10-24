@@ -33,6 +33,12 @@ const keys = [
   'SisterFlower',
 ];
 export function housingLabel(key: string): string {
+  if (key.startsWith('Map.')) {
+    const part = key.slice(4);
+    const mapKeys = ['UnitModel', 'Variation', 'LandMakingAngle', 'UnitModelRoad', 'VariationRoad', 'LandMakingAngleRoad', 'Elevation', 'BuildingType', 'X', 'Y', 'Angle', 'Bit', 'Type', 'TypeArg', 'UniqueID', 'Unused', 'AcreTemplate', 'PlazaX', 'PlazaY', 'OutsideTemplate', 'MainTemplate', 'DesignValue'];
+    const index = mapKeys.indexOf(part);
+    return index >= 0 ? t('mapFieldNames').split('|')[index]! : housingLabel(part);
+  }
   if (key.startsWith('EventFlag.')) return `${t('housingEventFlag')} #${key.split('.')[1]}`;
   const names = t('housingFieldNames').split('|');
   return key

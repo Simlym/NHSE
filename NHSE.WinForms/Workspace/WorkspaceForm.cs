@@ -266,6 +266,15 @@ public sealed partial class WorkspaceForm : Form
                 RequireSession().SetPlayer(Int(p, "player"), p.GetProperty("wallet").GetUInt32(), p.GetProperty("bank").GetUInt32(), p.GetProperty("miles").GetUInt32(), p.GetProperty("earnedMiles").GetUInt32(),
                     Str(p, "name"), Str(p, "island"), OptionalUInt(p, "pocketCapacity"), OptionalUInt(p, "storageCapacity"), OptionalUInt(p, "hotelTickets"), OptionalUInt(p, "poki"));
                 return State();
+            case "map": return MapWorkspace(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"));
+            case "editMap":
+                RequireSession().EditMap(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"),
+                    p.GetProperty("values").Deserialize<Dictionary<string, JsonElement>>() ?? throw new ArgumentException("invalidRequest"), Str(p, "action"),
+                    p.GetProperty("autoExtensions").GetBoolean(), p.GetProperty("noOverwrite").GetBoolean(), p.GetProperty("snapFieldItems").GetBoolean());
+                return State();
+            case "nativeMap":
+                OpenWorkspaceTool("terrain", Int(p, "player"), 0);
+                return State();
             case "designs": return RequireSession().GetDesignWorkspace(Str(p, "kind"), Int(p, "index"));
             case "designImport":
                 ImportDesignFiles(Str(p, "kind"), Int(p, "index"), Int(p, "player"), p.GetProperty("all").GetBoolean(), p.GetProperty("useCurrentPlayer").GetBoolean());

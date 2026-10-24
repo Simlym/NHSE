@@ -275,5 +275,20 @@
   "designChooseFolder": "Ordner wählen",
   "designFileSize": "Die Dateigröße passt nicht zum Designtyp. Keine Designs wurden geändert.",
   "designCapacity": "Mehr Designdateien als verfügbare Slots. Keine Designs wurden geändert.",
-  "designNoFiles": "Im gewählten Ordner wurden keine passenden Designdateien gefunden."
+  "designNoFiles": "Im gewählten Ordner wurden keine passenden Designdateien gefunden.",
+  "mapModes": "Gelände & Wege|Objekte|Gebäude|Abschnittsvorlagen|Bodendesigns & Festplatz",
+  "mapAdvanced": "Erweiterte Kartenwerkzeuge (alte Oberfläche)",
+  "mapAcre": "Abschnitt",
+  "mapLayer": "Objektebene",
+  "mapSlot": "Design-Slotindex",
+  "mapSlotHint": "Slots sind gespeicherte Einträge und keine Positionen in der Vorschau.",
+  "mapPickItem": "Objekt wählen",
+  "mapFieldObject": "Außenobjekt",
+  "mapExtensions": "Belegungsfläche automatisch verwalten",
+  "mapNoOverwrite": "Überlappung verhindern",
+  "mapSnap": "Außenobjekte am Raster ausrichten",
+  "mapClear": "Feld leeren",
+  "mapRotate": "Feld drehen",
+  "mapOutside": "Dieses Feld liegt außerhalb des bearbeitbaren Bereichs.",
+  "mapFieldNames": "Geländeform|Geländevariante|Geländedrehung|Wegform|Wegvariante|Wegdrehung|Höhe|Gebäudetyp|X-Koordinate|Y-Koordinate|Winkel|Flags|Typ|Typparameter|Eindeutige ID|Reservierter Wert|Abschnittsvorlage|Festplatz X|Festplatz Y|Außenvorlage|Hauptbereichsvorlage|Designwert"
 }

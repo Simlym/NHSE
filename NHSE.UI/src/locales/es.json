@@ -275,5 +275,20 @@
   "designChooseFolder": "Elegir carpeta",
   "designFileSize": "El tamaño no coincide con este tipo de diseño. No se cambió ningún diseño.",
   "designCapacity": "Hay más archivos que casillas disponibles. No se cambió ningún diseño.",
-  "designNoFiles": "No se encontraron diseños compatibles en la carpeta seleccionada."
+  "designNoFiles": "No se encontraron diseños compatibles en la carpeta seleccionada.",
+  "mapModes": "Terreno y caminos|Objetos|Edificios|Plantillas de parcela|Diseños del suelo y plaza",
+  "mapAdvanced": "Herramientas avanzadas de mapa (interfaz original)",
+  "mapAcre": "Parcela",
+  "mapLayer": "Capa de objetos",
+  "mapSlot": "Índice de diseño del suelo",
+  "mapSlotHint": "Los índices corresponden a registros guardados, no a posiciones en la vista previa.",
+  "mapPickItem": "Elegir objeto",
+  "mapFieldObject": "Objeto exterior",
+  "mapExtensions": "Gestionar la ocupación automáticamente",
+  "mapNoOverwrite": "Evitar superposiciones",
+  "mapSnap": "Alinear objetos a la cuadrícula",
+  "mapClear": "Vaciar casilla",
+  "mapRotate": "Girar casilla",
+  "mapOutside": "Esta casilla está fuera del área editable.",
+  "mapFieldNames": "Forma del terreno|Variante del terreno|Rotación del terreno|Forma del camino|Variante del camino|Rotación del camino|Altura|Tipo de edificio|Coordenada X|Coordenada Y|Ángulo|Indicadores|Tipo|Parámetro del tipo|Identificador único|Valor reservado|Plantilla de parcela|Plaza X|Plaza Y|Plantilla exterior|Plantilla de zona principal|Valor del diseño"
 }

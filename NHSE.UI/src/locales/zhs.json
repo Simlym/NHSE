@@ -275,5 +275,20 @@
   "designChooseFolder": "选择文件夹",
   "designFileSize": "文件尺寸与此设计类型不匹配，未修改任何设计。",
   "designCapacity": "设计文件数量超过可用槽位，未修改任何设计。",
-  "designNoFiles": "所选文件夹中没有匹配的设计文件。"
+  "designNoFiles": "所选文件夹中没有匹配的设计文件。",
+  "mapModes": "地形与道路|物品|建筑|分区模板|地砖图案与广场",
+  "mapAdvanced": "高级地图工具（原界面）",
+  "mapAcre": "分区",
+  "mapLayer": "物品图层",
+  "mapSlot": "地砖图案槽位索引",
+  "mapSlotHint": "槽位按存储索引排列，不表示预览图上的位置。",
+  "mapPickItem": "选择物品",
+  "mapFieldObject": "户外对象",
+  "mapExtensions": "自动管理占位",
+  "mapNoOverwrite": "防止重叠",
+  "mapSnap": "户外对象对齐整格",
+  "mapClear": "清空格子",
+  "mapRotate": "旋转格子",
+  "mapOutside": "此格子不在可编辑区域内。",
+  "mapFieldNames": "地形形状|地形变体|地形旋转|道路形状|道路变体|道路旋转|高度|建筑类型|X 坐标|Y 坐标|角度|标志位|类型|类型参数|唯一编号|保留值|分区模板|广场 X|广场 Y|外围模板|主区域模板|图案值"
 }

@@ -275,5 +275,20 @@
   "designChooseFolder": "폴더 선택",
   "designFileSize": "디자인 종류와 파일 크기가 맞지 않습니다. 변경된 디자인이 없습니다.",
   "designCapacity": "파일 수가 사용 가능한 슬롯보다 많습니다. 변경된 디자인이 없습니다.",
-  "designNoFiles": "선택한 폴더에 맞는 디자인 파일이 없습니다."
+  "designNoFiles": "선택한 폴더에 맞는 디자인 파일이 없습니다.",
+  "mapModes": "지형과 길|아이템|건물|구역 템플릿|바닥 디자인과 광장",
+  "mapAdvanced": "고급 지도 도구 (기존 화면)",
+  "mapAcre": "구역",
+  "mapLayer": "아이템 레이어",
+  "mapSlot": "바닥 디자인 슬롯 번호",
+  "mapSlotHint": "슬롯 번호는 저장 순서이며 미리 보기의 위치를 뜻하지 않습니다.",
+  "mapPickItem": "아이템 선택",
+  "mapFieldObject": "야외 오브젝트",
+  "mapExtensions": "점유 공간 자동 관리",
+  "mapNoOverwrite": "겹침 방지",
+  "mapSnap": "야외 오브젝트 격자 정렬",
+  "mapClear": "칸 지우기",
+  "mapRotate": "칸 회전",
+  "mapOutside": "이 칸은 편집 영역 밖에 있습니다.",
+  "mapFieldNames": "지형 모양|지형 변형|지형 회전|길 모양|길 변형|길 회전|높이|건물 종류|X 좌표|Y 좌표|각도|플래그|종류|종류 매개변수|고유 번호|예약 값|구역 템플릿|광장 X|광장 Y|외곽 템플릿|주 구역 템플릿|디자인 값"
 }

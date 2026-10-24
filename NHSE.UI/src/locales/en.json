@@ -275,5 +275,20 @@
   "designChooseFolder": "Choose folder",
   "designFileSize": "The design file size does not match this design type. No designs were changed.",
   "designCapacity": "There are more design files than available slots. No designs were changed.",
-  "designNoFiles": "No matching design files were found in the selected folder."
+  "designNoFiles": "No matching design files were found in the selected folder.",
+  "mapModes": "Terrain & paths|Items|Buildings|Acre templates|Placed designs & plaza",
+  "mapAdvanced": "Advanced map tools (original interface)",
+  "mapAcre": "Acre",
+  "mapLayer": "Item layer",
+  "mapSlot": "Design slot index",
+  "mapSlotHint": "Slots are indexed records; they do not indicate a position on this preview.",
+  "mapPickItem": "Choose item",
+  "mapFieldObject": "Field object",
+  "mapExtensions": "Manage footprint automatically",
+  "mapNoOverwrite": "Prevent overlap",
+  "mapSnap": "Align field objects to whole tiles",
+  "mapClear": "Clear tile",
+  "mapRotate": "Rotate tile",
+  "mapOutside": "This cell is outside the editable area.",
+  "mapFieldNames": "Terrain shape|Terrain variant|Terrain rotation|Path shape|Path variant|Path rotation|Elevation|Building|X coordinate|Y coordinate|Angle|Flags|Type|Type argument|Unique ID|Reserved value|Acre template|Plaza X|Plaza Y|Exterior template|Main field template|Design value"
 }

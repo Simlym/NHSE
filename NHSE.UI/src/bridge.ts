@@ -229,3 +229,16 @@ export interface DesignData {
   entries: { index: number; name: string; preview: string }[];
   selected: { name: string; player: string; town: string; compatibility: number; sheets: string[]; palette: string[] };
 }
+
+export interface MapTarget {
+  mode: 'terrain' | 'items' | 'buildings' | 'acres' | 'markers';
+  acre: number; layer: number; x: number; y: number; building: number; marker: number;
+}
+export interface MapData {
+  target: MapTarget; gridSize: number; itemWidth: number; itemHeight: number; markerCount: number;
+  acres: { id: number; name: string }[]; buildings: { id: number; name: string }[];
+  fieldObjects: { id: number; name: string }[]; fields: HousingField[];
+  cells: { x: number; y: number; relativeX: number; relativeY: number; valid: boolean;
+    extension: boolean; rootX: number; rootY: number; name: string }[];
+  overview: string | null; viewport: string | null; itemImage: string | null;
+}

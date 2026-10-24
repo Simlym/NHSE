@@ -265,7 +265,25 @@ export async function mockHost(page: Page, picker = false) {
         })),
       ]),
     );
+    let mapRecords: Record<string, Record<string, number>> = {};
+    const mapKey = (target: Record<string, unknown>) => JSON.stringify(target);
+    const mapData = (target: Record<string, unknown>) => {
+      const mode = String(target.mode), gridSize = mode === 'items' ? 32 : 16;
+      const names = mode === 'terrain' ? ['UnitModel', 'Variation', 'LandMakingAngle', 'UnitModelRoad', 'VariationRoad', 'LandMakingAngleRoad', 'Elevation']
+        : mode === 'items' ? ['ItemId', 'SystemParam', 'AdditionalParam', 'FreeParam']
+        : mode === 'buildings' ? ['BuildingType', 'X', 'Y', 'Angle', 'Bit', 'Type', 'TypeArg', 'UniqueID', 'Unused']
+        : mode === 'acres' ? ['AcreTemplate'] : ['PlazaX', 'PlazaY', 'OutsideTemplate', 'MainTemplate', 'DesignValue'];
+      const values = mapRecords[mapKey(target)] ?? {};
+      return { target, gridSize, itemWidth: 288, itemHeight: 192, markerCount: 13824,
+        acres: Array.from({ length: 72 }, (_, id) => ({ id, name: `Acre ${id}` })),
+        buildings: Array.from({ length: 46 }, (_, id) => ({ id, name: `Building ${id}` })),
+        fieldObjects: [{ id: 60000, name: 'Tree' }],
+        fields: names.map(name => ({ key: 'Map.' + name, value: values['Map.' + name] ?? 0, type: 'number', min: name === 'Bit' ? -128 : 0, max: 65535, options: null })),
+        cells: Array.from({ length: gridSize ** 2 }, (_, i) => ({ x: i % gridSize, y: Math.floor(i / gridSize), relativeX: i % gridSize, relativeY: Math.floor(i / gridSize), valid: true, extension: false, rootX: 0, rootY: 0, name: '' })),
+        overview: avatar, viewport: avatar, itemImage: null };
+    };
     type Snapshot = {
+      mapRecords: typeof mapRecords;
       designRecords: typeof designRecords;
       housingRecords: typeof housingRecords;
       progressRecords: typeof progressRecords;
@@ -291,6 +309,7 @@ export async function mockHost(page: Page, picker = false) {
         progressRecords,
         housingRecords,
         designRecords,
+        mapRecords,
       });
     const restore = (value: Snapshot) => {
       turnips = value.turnips;
@@ -298,6 +317,7 @@ export async function mockHost(page: Page, picker = false) {
       progressRecords = value.progressRecords;
       housingRecords = value.housingRecords;
       designRecords = value.designRecords;
+      mapRecords = value.mapRecords;
       players = value.players;
       item = value.item;
       revision = value.revision;
@@ -348,6 +368,10 @@ export async function mockHost(page: Page, picker = false) {
             );
             const p = message.payload;
             let data: unknown;
+            if (message.command === 'editMap') {
+              remember();
+              mapRecords[mapKey(p.target as Record<string, unknown>)] = { ...(p.values as Record<string, number>) };
+            }
             if (message.command === 'language') locale = String(p.language);
             if (message.command === 'open' || message.command === 'openRecent') opened = true;
             if (['setRecipe', 'setReaction', 'setAchievement'].includes(message.command)) {
@@ -540,7 +564,9 @@ export async function mockHost(page: Page, picker = false) {
             }
             if (message.command === 'save') savedRevision = revision;
             if (message.command === 'closeSave') opened = false;
-            if (message.command === 'designs') {
+            if (message.command === 'map') {
+              data = mapData(p.target as Record<string, unknown>);
+            } else if (message.command === 'designs') {
               const entries = designRecords[String(p.kind)]!;
               data = {
                 kind: p.kind,

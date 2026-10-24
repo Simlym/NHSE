@@ -41,10 +41,13 @@ import IslandPage from './IslandPage.vue';
 import ProgressPage from './ProgressPage.vue';
 import HousingPage from './HousingPage.vue';
 import DesignPage from './DesignPage.vue';
+import MapPage from './MapPage.vue';
 import {
   listenState,
   native,
   request,
+  type MapData,
+  type MapTarget,
   type DesignData,
   type DesignKind,
   type HousingData,
@@ -72,7 +75,8 @@ type Page =
   | 'tools'
   | 'progress'
   | 'housing'
-  | 'designs';
+  | 'designs'
+  | 'mapEditor';
 const state = ref<State>({ language: 'en', recent: '', session: null, fullScreen: false });
 const page = ref<Page>('overview');
 const playerIndex = ref(0);
@@ -141,7 +145,10 @@ const designTarget = ref<{ kind: DesignKind; index: number }>({ kind: 'patterns'
 const housingPage = ref<InstanceType<typeof HousingPage> | null>(null);
 const housingData = ref<HousingData | null>(null);
 const housingTarget = ref<HousingTarget>({ kind: 'playerHouses', index: 0, room: 0, layer: 0 });
-let catalogTarget: 'inventory' | 'housing' = 'inventory';
+const mapData = ref<MapData | null>(null);
+const mapPage = ref<InstanceType<typeof MapPage> | null>(null);
+const mapTarget = ref<MapTarget>({ mode: 'terrain', acre: 10, layer: 0, x: 0, y: 0, building: 0, marker: 0 });
+let catalogTarget: 'inventory' | 'housing' | 'map' = 'inventory';
 const progressPage = ref<InstanceType<typeof ProgressPage> | null>(null);
 const progressData = ref<ProgressData | null>(null);
 const progressSection = ref<ProgressSection>('recipes');
@@ -163,6 +170,7 @@ const nav = [
   { id: 'progress', icon: Check },
   { id: 'housing', icon: Map },
   { id: 'designs', icon: Palette },
+  { id: 'mapEditor', icon: Map },
   { id: 'villagers', icon: Users },
   { id: 'island', icon: Leaf },
   { id: 'tools', icon: Map },
@@ -229,6 +237,18 @@ async function run(action: () => Promise<void>) {
   } finally {
     busy.value = false;
   }
+}
+async function loadMap() {
+  if (state.value.session) mapData.value = await request<MapData>('map', { target: { ...mapTarget.value } });
+}
+async function navigateMap(part: Partial<MapTarget>) {
+  if (busy.value || !(await applyWorldDrafts())) return;
+  await run(async () => {
+    const next = { ...mapTarget.value, ...part };
+    const data = await request<MapData>('map', { target: next });
+    mapTarget.value = data.target;
+    mapData.value = data;
+  });
 }
 async function loadDesigns() {
   if (state.value.session) designData.value = await request<DesignData>('designs', { ...designTarget.value });
@@ -312,10 +332,14 @@ async function command(
     accept(await request<State>(name, payload));
     // Reopening a save may change the library capacity (50 vs 100 slots).
     if (['open', 'openRecent', 'closeSave'].includes(name))
+    {
       designTarget.value = { ...designTarget.value, index: 0 };
+      mapTarget.value = { ...mapTarget.value, marker: 0 };
+    }
     if (page.value === 'inventory') await loadInventory();
     if (page.value === 'progress') await loadProgress();
     if (page.value === 'housing') await loadHousing();
+    if (page.value === 'mapEditor') await loadMap();
     if (page.value === 'designs') await loadDesigns();
     if (success) toast(success);
   });
@@ -332,6 +356,7 @@ async function go(destination: Page) {
   if (destination === 'inventory') await run(() => loadInventory(0));
   if (destination === 'progress') await run(loadProgress);
   if (destination === 'housing') await run(loadHousing);
+  if (destination === 'mapEditor') await run(loadMap);
   if (destination === 'designs') await run(loadDesigns);
 }
 async function applyProfile() {
@@ -350,6 +375,7 @@ async function save() {
   await command('save', {}, 'saveSuccess');
 }
 async function applyWorldDrafts() {
+  if (page.value === 'mapEditor' && mapPage.value && !(await mapPage.value.applyPending())) return false;
   if (page.value === 'housing' && housingPage.value && !(await housingPage.value.applyPending()))
     return false;
   if (page.value === 'progress' && progressPage.value && !(await progressPage.value.applyPending()))
@@ -360,6 +386,8 @@ async function applyWorldDrafts() {
   return true;
 }
 async function worldCommand(name: string, payload: Record<string, unknown> = {}) {
+  if (name === 'tool' && payload.tool === 'terrain') { await go('mapEditor'); return page.value === 'mapEditor'; }
+  if (name === 'nativeMap' && !(await applyWorldDrafts())) return false;
   if (
     (name === 'tool' && ['patterns', 'proDesigns', 'flag', 'tailor'].includes(String(payload.tool))) ||
     (name === 'legacy' && payload.section === 'designs')
@@ -393,7 +421,7 @@ async function worldCommand(name: string, payload: Record<string, unknown> = {})
   return await command(
     name,
     { player: playerIndex.value, ...payload },
-    ['legacy', 'tool', 'designImport', 'designExport', 'designPng'].includes(name) ? undefined : 'applied',
+    ['legacy', 'tool', 'nativeMap', 'designImport', 'designExport', 'designPng'].includes(name) ? undefined : 'applied',
   );
 }
 function chooseSlot(item: ItemView) {
@@ -426,7 +454,7 @@ async function searchCatalog(pageNumber = 0) {
     }
   });
 }
-async function showCatalog(target: 'inventory' | 'housing' = 'inventory') {
+async function showCatalog(target: 'inventory' | 'housing' | 'map' = 'inventory') {
   catalogTarget = target;
   catalogOpen.value = true;
   await searchCatalog(catalog.value?.page ?? 0);
@@ -442,6 +470,11 @@ function chooseClothingGroup(id: string) {
   void searchCatalog(0);
 }
 function chooseCatalog(item: ItemView) {
+  if (catalogTarget === 'map') {
+    mapPage.value?.chooseItem(item);
+    catalogOpen.value = false;
+    return;
+  }
   if (catalogTarget === 'housing') {
     housingPage.value?.chooseItem(item);
     catalogOpen.value = false;
@@ -1079,6 +1112,8 @@ onUnmounted(() => {
             </aside>
           </div>
         </section>
+        <MapPage v-else-if="page === 'mapEditor'" ref="mapPage" :data="mapData" :busy="busy"
+          :execute="worldCommand" :navigate="navigateMap" :pick-item="() => showCatalog('map')" />
         <DesignPage
           v-else-if="page === 'designs'"
           :data="designData"

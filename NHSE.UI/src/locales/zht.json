@@ -275,5 +275,20 @@
   "designChooseFolder": "選擇資料夾",
   "designFileSize": "檔案尺寸與此設計類型不符，未修改任何設計。",
   "designCapacity": "設計檔案數量超過可用欄位，未修改任何設計。",
-  "designNoFiles": "所選資料夾中沒有符合的設計檔案。"
+  "designNoFiles": "所選資料夾中沒有符合的設計檔案。",
+  "mapModes": "地形與道路|物品|建築|分區範本|地磚圖案與廣場",
+  "mapAdvanced": "進階地圖工具（原介面）",
+  "mapAcre": "分區",
+  "mapLayer": "物品圖層",
+  "mapSlot": "地磚圖案欄位索引",
+  "mapSlotHint": "欄位按儲存索引排列，不表示預覽圖上的位置。",
+  "mapPickItem": "選擇物品",
+  "mapFieldObject": "戶外物件",
+  "mapExtensions": "自動管理佔用範圍",
+  "mapNoOverwrite": "防止重疊",
+  "mapSnap": "戶外物件對齊整格",
+  "mapClear": "清空格子",
+  "mapRotate": "旋轉格子",
+  "mapOutside": "此格子不在可編輯區域內。",
+  "mapFieldNames": "地形形狀|地形變體|地形旋轉|道路形狀|道路變體|道路旋轉|高度|建築類型|X 座標|Y 座標|角度|標記位元|類型|類型參數|唯一編號|保留值|分區範本|廣場 X|廣場 Y|外圍範本|主區域範本|圖案值"
 }

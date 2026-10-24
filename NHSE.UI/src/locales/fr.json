@@ -275,5 +275,20 @@
   "designChooseFolder": "Choisir un dossier",
   "designFileSize": "La taille ne correspond pas au type de motif. Aucun motif modifié.",
   "designCapacity": "Plus de fichiers que d’emplacements disponibles. Aucun motif modifié.",
-  "designNoFiles": "Aucun fichier de motif compatible dans le dossier sélectionné."
+  "designNoFiles": "Aucun fichier de motif compatible dans le dossier sélectionné.",
+  "mapModes": "Terrain et chemins|Objets|Bâtiments|Modèles de parcelle|Motifs au sol et place",
+  "mapAdvanced": "Outils de carte avancés (ancienne interface)",
+  "mapAcre": "Parcelle",
+  "mapLayer": "Couche des objets",
+  "mapSlot": "Indice du motif au sol",
+  "mapSlotHint": "Les indices désignent les entrées enregistrées, pas des positions sur cet aperçu.",
+  "mapPickItem": "Choisir un objet",
+  "mapFieldObject": "Objet extérieur",
+  "mapExtensions": "Gérer automatiquement l’emprise",
+  "mapNoOverwrite": "Éviter les chevauchements",
+  "mapSnap": "Aligner les objets sur la grille",
+  "mapClear": "Vider la case",
+  "mapRotate": "Tourner la case",
+  "mapOutside": "Cette case est hors de la zone modifiable.",
+  "mapFieldNames": "Forme du terrain|Variante du terrain|Rotation du terrain|Forme du chemin|Variante du chemin|Rotation du chemin|Hauteur|Type de bâtiment|Coordonnée X|Coordonnée Y|Angle|Indicateurs|Type|Paramètre du type|Identifiant unique|Valeur réservée|Modèle de parcelle|Place X|Place Y|Modèle extérieur|Modèle de zone principale|Valeur du motif"
 }

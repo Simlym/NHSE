@@ -279,7 +279,8 @@ export async function mockHost(page: Page, picker = false) {
         acres: Array.from({ length: 72 }, (_, id) => ({ id, name: `Acre ${id}` })),
         buildings: Array.from({ length: 46 }, (_, id) => ({ id, name: `Building ${id}` })),
         fieldObjects: [{ id: 60000, name: 'Tree' }],
-        fields: names.map(name => ({ key: 'Map.' + name, value: values['Map.' + name] ?? 0, type: 'number', min: name === 'Bit' ? -128 : 0, max: 65535, options: null })),
+        fields: names.map(name => ({ key: 'Map.' + name, value: values['Map.' + name] ?? 0, type: 'number', min: name === 'Bit' ? -128 : 0, max: 65535, options: name === 'UnitModel' ? [{ id: 0, name: 'Base' }, { id: 21, name: 'River8A' }, { id: 17, name: 'River5B' }, { id: 11, name: 'River3B' }, { id: 12, name: 'River3C' }, { id: 20, name: 'River7A' }, { id: 42, name: 'Cliff5B' }, { id: 33, name: 'Cliff3B' }, { id: 34, name: 'Cliff3C' }, { id: 45, name: 'Cliff7A' }] : null })),
+        parameters: ['ItemId', 'SystemParam', 'AdditionalParam', 'FreeParam', 'Rotation', 'RawValue', 'IsDropped', 'ExtensionX', 'IsRoot'].map(key => ({ key, type: ['IsDropped', 'IsRoot'].includes(key) ? 'boolean' : 'number', min: key === 'FreeParam' ? '-2147483648' : '0', max: key === 'RawValue' ? '18446744073709551615' : '65535', writable: !['ExtensionX', 'IsRoot'].includes(key) })),
         cells: Array.from({ length: gridSize ** 2 }, (_, i) => ({ x: i % gridSize, y: Math.floor(i / gridSize), relativeX: i % gridSize, relativeY: Math.floor(i / gridSize), valid: true, extension: false, rootX: 0, rootY: 0, name: '' })),
         overview: avatar, viewport: avatar, itemImage: null, active: mode === 'items' ? (mapFlags[mapKey(target)] ?? false) : null };
     };
@@ -372,10 +373,25 @@ export async function mockHost(page: Page, picker = false) {
             );
             const p = message.payload;
             let data: unknown;
+            let mapAdvancedCount: { requested: number; applied: number; cancelled: boolean } | null = null;
+            if (['spawnMap', 'editMapParameters', 'replaceMapMatches'].includes(message.command)) {
+              const controls = window as unknown as { nhseMapCancelNext?: boolean; nhseMapErrorNext?: string };
+              if (controls.nhseMapErrorNext) {
+                const error = controls.nhseMapErrorNext; controls.nhseMapErrorNext = undefined;
+                queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error } })));
+                return;
+              }
+              if (controls.nhseMapCancelNext) { controls.nhseMapCancelNext = false; mapAdvancedCount = { requested: 0, applied: 0, cancelled: true }; }
+              else {
+                remember();
+                const options = p.options as { count?: number } | undefined;
+                mapAdvancedCount = { requested: options?.count ?? 2, applied: options?.count ?? 2, cancelled: false };
+              }
+            }
             if (message.command === 'setMapActive') {
               remember(); mapFlags[mapKey(p.target as Record<string, unknown>)] = Boolean(p.active);
             }
-            if (message.command === 'paintMap' || message.command === 'batchMap') {
+            if (['paintMap', 'paintMapStroke', 'batchMap'].includes(message.command)) {
               remember();
               const key = mapKey(p.target as Record<string, unknown>);
               mapRecords[key] = { ...mapRecords[key], ...(p.values as Record<string, number>) };
@@ -703,6 +719,7 @@ export async function mockHost(page: Page, picker = false) {
                 items: filtered.slice(pg * 60, (pg + 1) * 60),
               };
             } else data = snapshot();
+            if (mapAdvancedCount) data = { state: snapshot(), ...mapAdvancedCount };
             const response = structuredClone({ id: message.id, ok: true, data });
             queueMicrotask(() => listeners.forEach((fn) => fn({ data: response })));
           },

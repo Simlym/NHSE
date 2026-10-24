@@ -274,6 +274,26 @@ public sealed partial class WorkspaceForm : Form
                 RequireSession().BatchMap(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), Str(p, "operation"),
                     p.GetProperty("whole").GetBoolean(), p.GetProperty("interiorOnly").GetBoolean(), p.GetProperty("values").Deserialize<Dictionary<string, JsonElement>>() ?? throw new ArgumentException("invalidRequest"));
                 return State();
+            case "paintMapStroke":
+                RequireSession().PaintMapStroke(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), Int(p, "radius"), p.GetProperty("randomVariation").GetBoolean(),
+                    p.GetProperty("values").Deserialize<Dictionary<string, JsonElement>>() ?? throw new ArgumentException("invalidRequest"), p.GetProperty("points").Deserialize<WorkspaceSession.MapPoint[]>() ?? throw new ArgumentException("invalidRequest"));
+                return State();
+            case "spawnMap":
+            case "editMapParameters":
+            case "replaceMapMatches":
+            {
+                var advancedTarget = p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest");
+                WorkspaceSession.MapEditCount? count;
+                if (command == "spawnMap") count = SpawnMap(advancedTarget,
+                    p.GetProperty("options").Deserialize<WorkspaceSession.MapSpawnOptions>(Json) ?? throw new ArgumentException("invalidRequest"),
+                    p.GetProperty("current").Deserialize<WorkspaceSession.RoomItem>(Json) ?? throw new ArgumentException("invalidRequest"));
+                else if (command == "editMapParameters") count = RequireSession().EditMapParameters(advancedTarget, p.GetProperty("whole").GetBoolean(),
+                    p.GetProperty("filters").Deserialize<WorkspaceSession.MapEditRule[]>(Json) ?? throw new ArgumentException("invalidRequest"),
+                    p.GetProperty("changes").Deserialize<WorkspaceSession.MapEditRule[]>(Json) ?? throw new ArgumentException("invalidRequest"));
+                else count = RequireSession().ReplaceMapMatches(advancedTarget, p.GetProperty("whole").GetBoolean(),
+                    p.GetProperty("current").Deserialize<WorkspaceSession.RoomItem>(Json) ?? throw new ArgumentException("invalidRequest"), p.GetProperty("remove").GetBoolean());
+                return new { state = State(), requested = count?.Requested ?? 0, applied = count?.Applied ?? 0, cancelled = count is null };
+            }
             case "paintMap":
                 RequireSession().PaintMap(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), Int(p, "radius"), p.GetProperty("randomVariation").GetBoolean(),
                     p.GetProperty("values").Deserialize<Dictionary<string, JsonElement>>() ?? throw new ArgumentException("invalidRequest"));

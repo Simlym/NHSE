@@ -35,6 +35,21 @@ public sealed partial class WorkspaceForm
         if (size != expected && MessageBox.Show(this, WorkspaceText.Get("mapConvertConfirm"), WorkspaceText.Get("mapImport"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         session.ImportMap(target, resource, whole, File.ReadAllBytes(picker.FileName));
     }
+    private WorkspaceSession.MapEditCount? SpawnMap(WorkspaceSession.MapTarget target, WorkspaceSession.MapSpawnOptions options, WorkspaceSession.RoomItem current)
+    {
+        var session = RequireSession();
+        session.GetMapWorkspace(target);
+        byte[]? bytes = null;
+        if (options.Source == "nhi")
+        {
+            using var dialog = new OpenFileDialog { Title = WorkspaceText.Get("mapSpawn"), Filter = "NHSE Inventory (*.nhi)|*.nhi|All files (*.*)|*.*" };
+            if (dialog.ShowDialog(this) != DialogResult.OK) return null;
+            var size = new FileInfo(dialog.FileName).Length;
+            if (size is < 8 or > 80000 || size % 8 != 0) throw new ArgumentException("mapNhiSize");
+            bytes = File.ReadAllBytes(dialog.FileName);
+        }
+        return session.SpawnMapItems(target, options, current, bytes);
+    }
     private void ExportMapPng(WorkspaceSession.MapTarget target)
     {
         RequireSession().GetMapWorkspace(target);

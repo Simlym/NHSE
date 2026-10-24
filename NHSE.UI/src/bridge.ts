@@ -240,5 +240,8 @@ export interface MapData {
   fieldObjects: { id: number; name: string }[]; fields: HousingField[];
   cells: { x: number; y: number; relativeX: number; relativeY: number; valid: boolean;
     extension: boolean; rootX: number; rootY: number; name: string }[];
-  overview: string | null; viewport: string | null; itemImage: string | null; active: boolean | null;
+  overview: string | null; viewport: string | null; itemImage: string | null; active: boolean | null; parameters: MapParameter[] | null;
 }
+export interface MapParameter { key: string; type: 'boolean' | 'number'; min: string; max: string; writable: boolean }
+export interface MapEditRule { key: string; operator: string; value: string }
+export interface MapBrush { enabled: boolean; radius: number; randomVariation: boolean }

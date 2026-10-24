@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 import { t } from './i18n';
-import type { MapData, MapTarget, ItemView } from './bridge';
+import type { MapData, MapTarget, ItemView, MapBrush } from './bridge';
 import HousingFields from './HousingFields.vue';
 import MapTools from './MapTools.vue';
+import MapAdvanced from './MapAdvanced.vue';
 const props = defineProps<{
   data: MapData | null; busy: boolean;
   execute: (command: string, payload?: Record<string, unknown>) => Promise<boolean>;
@@ -14,14 +15,73 @@ const form = ref<HTMLFormElement | null>(null);
 const autoExtensions = ref(true), noOverwrite = ref(true), snapFieldItems = ref(true);
 const stored = () => Object.fromEntries((props.data?.fields ?? []).map(f => [f.key, f.value]));
 const fields = ref(stored());
+const brush = ref<MapBrush>({ enabled: false, radius: 1, randomVariation: false });
+const strokePoints = ref<{ x: number; y: number }[]>([]);
+const strokeMeta = shallowRef<{ target: MapTarget; radius: number; randomVariation: boolean; values: Record<string, number | boolean | string> } | null>(null);
+let pointerGrid: HTMLElement | null = null, pointerId = -1;
+let lastPoint: { x: number; y: number } | null = null;
+const strokeKeys = computed(() => new Set(strokePoints.value.map(p => `${p.x},${p.y}`)));
+function gridPoint(event: PointerEvent) {
+  if (!pointerGrid) return null;
+  const box = pointerGrid.getBoundingClientRect();
+  const x = Math.floor((event.clientX - box.left) / box.width * 16), y = Math.floor((event.clientY - box.top) / box.height * 16);
+  return x >= 0 && x < 16 && y >= 0 && y < 16 && props.data?.cells.some(c => c.x === x && c.y === y && c.valid) ? { x, y } : null;
+}
+function collect(event: PointerEvent) {
+  const point = gridPoint(event);
+  if (!point) { lastPoint = null; return; }
+  let x = lastPoint?.x ?? point.x, y = lastPoint?.y ?? point.y;
+  const dx = Math.abs(point.x - x), dy = -Math.abs(point.y - y), sx = x < point.x ? 1 : -1, sy = y < point.y ? 1 : -1;
+  let error = dx + dy;
+  while (true) {
+    if (!strokePoints.value.some(p => p.x === x && p.y === y)) strokePoints.value.push({ x, y });
+    if (x === point.x && y === point.y) break;
+    const twice = 2 * error;
+    if (twice >= dy) { error += dy; x += sx; }
+    if (twice <= dx) { error += dx; y += sy; }
+  }
+  lastPoint = point;
+}
+function startStroke(event: PointerEvent) {
+  if (!brush.value.enabled || props.data?.target.mode !== 'terrain' || props.busy || event.button !== 0 || strokeMeta.value || !Number.isInteger(brush.value.radius) || brush.value.radius < 1 || brush.value.radius > 8 || !form.value?.reportValidity()) return;
+  event.preventDefault();
+  pointerGrid = event.currentTarget as HTMLElement; pointerId = event.pointerId;
+  if (!gridPoint(event)) { pointerGrid = null; return; }
+  strokeMeta.value = { target: { ...props.data.target }, radius: brush.value.radius, randomVariation: brush.value.randomVariation, values: { ...fields.value } };
+  strokePoints.value = []; lastPoint = null;
+  pointerGrid.focus({ preventScroll: true }); pointerGrid.setPointerCapture(pointerId); collect(event);
+}
+function strokeKeyboard(event: KeyboardEvent) {
+  if (strokeMeta.value && (event.ctrlKey || event.metaKey) && ['z', 'y'].includes(event.key.toLowerCase())) {
+    event.preventDefault(); event.stopPropagation(); cancelStroke();
+  }
+}
+function moveStroke(event: PointerEvent) { if (strokeMeta.value && event.pointerId === pointerId) collect(event); }
+function cancelStroke() {
+  const grid = pointerGrid, id = pointerId;
+  strokeMeta.value = null; strokePoints.value = []; lastPoint = null; pointerGrid = null; pointerId = -1;
+  if (grid?.hasPointerCapture(id)) grid.releasePointerCapture(id);
+}
+async function endStroke(event: PointerEvent) {
+  if (!strokeMeta.value || event.pointerId !== pointerId) return;
+  collect(event);
+  const payload = { ...strokeMeta.value, points: strokePoints.value.map(p => ({ ...p })) };
+  cancelStroke();
+  if (payload.points.length) await props.execute('paintMapStroke', payload);
+}
+function preset(values: Record<string, number>) { fields.value = { ...fields.value, ...values }; }
+watch(() => brush.value.enabled, enabled => { if (!enabled) { cancelStroke(); fields.value = stored(); } });
 const pending = computed(() => JSON.stringify(fields.value) !== JSON.stringify(stored()));
-watch(() => JSON.stringify([props.data?.target, stored()]), () => { fields.value = stored(); });
+watch(() => JSON.stringify([props.data?.target, stored()]), () => {
+  if (props.data?.target.mode !== 'terrain') brush.value.enabled = false;
+  if (!brush.value.enabled) fields.value = stored();
+});
 async function edit(action = 'apply') {
   if (!props.data || !form.value?.reportValidity()) return false;
   return await props.execute('editMap', { target: { ...props.data.target }, values: { ...fields.value }, action,
     autoExtensions: autoExtensions.value, noOverwrite: noOverwrite.value, snapFieldItems: snapFieldItems.value });
 }
-async function applyPending() { return !pending.value || await edit(); }
+async function applyPending() { if (strokeMeta.value) return false; return (brush.value.enabled && props.data?.target.mode === 'terrain') || !pending.value || await edit(); }
 function chooseItem(item: ItemView) {
   fields.value = { 'Map.ItemId': item.itemId, 'Map.SystemParam': 0, 'Map.AdditionalParam': 0, 'Map.FreeParam': 0 };
 }
@@ -57,11 +117,12 @@ defineExpose({ applyPending, chooseItem });
       <div class="map-viewport">
         <img v-if="data.viewport" :src="data.viewport" alt="" />
         <img v-if="data.itemImage && data.target.mode === 'items'" :src="data.itemImage" alt="" />
-        <div v-if="['terrain', 'items'].includes(data.target.mode)" class="map-grid" :style="{ gridTemplateColumns: `repeat(${data.gridSize}, 1fr)` }">
+        <div v-if="['terrain', 'items'].includes(data.target.mode)" class="map-grid" tabindex="0" :class="{ 'brush-enabled': brush.enabled && data.target.mode === 'terrain' }"
+          @pointerdown="startStroke" @pointermove="moveStroke" @pointerup="endStroke" @pointercancel="cancelStroke" @lostpointercapture="cancelStroke" @keydown.esc.prevent="cancelStroke" @keydown="strokeKeyboard" :style="{ gridTemplateColumns: `repeat(${data.gridSize}, 1fr)` }">
           <button v-for="cell in data.cells" :key="`${cell.x},${cell.y}`" :disabled="busy || !cell.valid"
             :aria-label="`${cell.x}, ${cell.y}${cell.name ? ' · ' + cell.name : ''}`" :title="`${cell.relativeX}, ${cell.relativeY} ${cell.name}`"
-            :class="{ selected: cell.x === data.target.x && cell.y === data.target.y, occupied: !!cell.name, extension: cell.extension }"
-            @click="navigate({ x: cell.x, y: cell.y })" />
+            :class="{ selected: cell.x === data.target.x && cell.y === data.target.y, occupied: !!cell.name, extension: cell.extension, 'stroke-preview': strokeKeys.has(`${cell.x},${cell.y}`) }"
+            @click="!brush.enabled && navigate({ x: cell.x, y: cell.y })" />
         </div>
       </div>
     </div>
@@ -84,7 +145,8 @@ defineExpose({ applyPending, chooseItem });
       </div>
     </form>
     <p v-else>{{ t('mapOutside') }}</p>
-    <MapTools :data="data" :busy="busy" :values="fields" :execute="execute" :apply-pending="applyPending" :navigate="navigate" :validate="() => !form || form.reportValidity()" />
+    <MapAdvanced @applied="fields = stored()" :data="data" :values="fields" :busy="busy" :execute="execute" :validate="() => !form || form.reportValidity()" />
+    <MapTools v-model:brush="brush" @preset="preset" :data="data" :busy="busy" :values="fields" :execute="execute" :apply-pending="applyPending" :navigate="navigate" :validate="() => !form || form.reportValidity()" />
   </section>
 </template>
 <style scoped>
@@ -100,6 +162,8 @@ button[aria-pressed=true] { outline: 2px solid var(--accent); }
 .map-images img { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 .map-viewport img, .map-grid { position: absolute; inset: 0; }
 .map-grid { display: grid; }
+.map-grid.brush-enabled { touch-action: none; cursor: crosshair; }
+.map-grid button.stroke-preview { background: #36acfa80; }
 .map-grid button { padding: 0; min-width: 0; border: 1px solid #ffffff18; background: transparent; border-radius: 0; }
 .map-grid button:disabled { background: #0005; }
 .map-grid button.selected { outline: 2px solid #ffcf40; z-index: 1; }

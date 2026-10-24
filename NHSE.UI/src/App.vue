@@ -386,6 +386,21 @@ async function applyWorldDrafts() {
   return true;
 }
 async function worldCommand(name: string, payload: Record<string, unknown> = {}) {
+  if (['spawnMap', 'editMapParameters', 'replaceMapMatches'].includes(name)) {
+    let applied = false;
+    const completed = await run(async () => {
+      const result = await request<{ state: State; requested: number; applied: number; cancelled: boolean }>(name, payload);
+      accept(result.state);
+      await loadMap();
+      if (!result.cancelled) {
+        applied = true;
+        notice.value = t('mapEditResult').replace('{0}', String(result.applied)).replace('{1}', String(result.requested));
+        clearTimeout(noticeTimer);
+        noticeTimer = setTimeout(() => (notice.value = ''), 8000);
+      }
+    });
+    return completed && applied;
+  }
   if (name === 'tool' && payload.tool === 'terrain') { await go('mapEditor'); return page.value === 'mapEditor'; }
   if (name === 'nativeMap' && !(await applyWorldDrafts())) return false;
   if (

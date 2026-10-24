@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, shallowRef, watch } from 'vue';
-import type { MapData, MapTarget } from './bridge';
+import type { MapData, MapTarget, MapBrush } from './bridge';
 import { t } from './i18n';
 const props = defineProps<{
   data: MapData; busy: boolean; values: Record<string, number | boolean | string>;
@@ -9,7 +9,19 @@ const props = defineProps<{
   navigate: (target: Partial<MapTarget>) => Promise<void>;
   validate: () => boolean;
 }>();
-const whole = ref(false), interiorOnly = ref(true), radius = ref(1), randomVariation = ref(false);
+const brush = defineModel<MapBrush>('brush', { required: true });
+const emit = defineEmits<{ preset: [values: Record<string, number>] }>();
+const family = ref('land'), corner = ref('round');
+function preset(index: number) {
+  const water = family.value === 'water';
+  const isCorner = [0, 2, 6, 8].includes(index);
+  const name = index === 4 ? (water ? 'River8A' : 'Base') : (water ? 'River' : 'Cliff') + (isCorner ? corner.value === 'inside' ? '7A' : corner.value === 'angle' ? '3C' : '3B' : '5B');
+  const model = props.data.fields.find(f => f.key === 'Map.UnitModel')?.options?.find(o => o.name === name);
+  if (!model) return;
+  const rotation = (isCorner && corner.value === 'inside' ? [3, 0, 2, 0, 0, 0, 0, 0, 1] : [0, 3, 3, 0, 0, 2, 1, 1, 2])[index]!;
+  emit('preset', { 'Map.UnitModel': model.id, 'Map.LandMakingAngle': rotation, 'Map.Variation': 0, 'Map.UnitModelRoad': 0, 'Map.VariationRoad': 0, 'Map.LandMakingAngleRoad': 0 });
+}
+const whole = ref(false), interiorOnly = ref(true);
 const resource = ref('terrain'), fileWhole = ref(true);
 const resources = ['items', 'terrain', 'buildings', 'acres', 'flags', 'designs'];
 const itemOperations = ['removeWeeds', 'removeTrees', 'fillHoles', 'removePlants', 'removeFences', 'removeObjects', 'removeAll', 'removePlaced', 'removeShells', 'removeBranches', 'removeFlowers', 'removeBushes', 'waterFlowers', 'waterAllFlowers'];
@@ -48,9 +60,9 @@ async function batch() {
     interiorOnly: interiorOnly.value, values: props.data.target.mode === 'terrain' ? { ...props.values } : {} }, operationName(operation.value), all);
 }
 async function paint() {
-  if (!props.validate() || !Number.isInteger(radius.value) || radius.value < 1 || radius.value > 8) return;
-  await props.execute('paintMap', { target: { ...props.data.target }, radius: radius.value,
-    randomVariation: randomVariation.value, values: { ...props.values } });
+  if (!props.validate() || !Number.isInteger(brush.value.radius) || brush.value.radius < 1 || brush.value.radius > 8) return;
+  await props.execute('paintMap', { target: { ...props.data.target }, radius: brush.value.radius,
+    randomVariation: brush.value.randomVariation, values: { ...props.values } });
 }
 async function file(importing: boolean) {
   if (!(await props.applyPending())) return;
@@ -71,9 +83,16 @@ async function active(value: boolean) {
     <details v-if="data.target.mode === 'terrain' && data.fields.length" class="map-brush">
       <summary>{{ t('mapBrush') }}</summary>
       <p>{{ t('mapBrushHint') }}</p>
+      <label><input v-model="brush.enabled" type="checkbox" :disabled="busy" />{{ t('mapDragBrush') }}</label>
+      <p v-if="brush.enabled">{{ t('mapDragHint') }}</p>
+      <div class="tool-row brush-presets">
+        <label>{{ t('mapPresetFamily') }}<select v-model="family" :disabled="busy"><option value="land">{{ t('mapPresetFamilies').split('|')[0] }}</option><option value="water">{{ t('mapPresetFamilies').split('|')[1] }}</option></select></label>
+        <label>{{ t('mapPresetCorner') }}<select v-model="corner" :disabled="busy"><option v-for="(kind, i) in ['round', 'angle', 'inside']" :key="kind" :value="kind">{{ t('mapPresetCorners').split('|')[i] }}</option></select></label>
+        <div class="preset-grid"><button v-for="(arrow, i) in ['↖', '↑', '↗', '←', '●', '→', '↙', '↓', '↘']" :key="i" type="button" :aria-label="`${t('mapPresetTile')} ${i + 1}`" :disabled="busy" @click="preset(i)">{{ arrow }}</button></div>
+      </div>
       <div class="tool-row">
-        <label>{{ t('mapBrushSize') }}<input v-model.number="radius" type="number" min="1" max="8" step="1" :disabled="busy" /></label>
-        <label><input v-model="randomVariation" type="checkbox" :disabled="busy" />{{ t('mapRandomVariation') }}</label>
+        <label>{{ t('mapBrushSize') }}<input v-model.number="brush.radius" type="number" min="1" max="8" step="1" :disabled="busy" /></label>
+        <label><input v-model="brush.randomVariation" type="checkbox" :disabled="busy" />{{ t('mapRandomVariation') }}</label>
         <button :disabled="busy" @click="paint">{{ t('mapPaint') }}</button>
       </div>
     </details>
@@ -111,6 +130,7 @@ async function active(value: boolean) {
 label { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; min-width: 0; }
 button, select, input[type=number] { max-width: 100%; box-sizing: border-box; padding: .5rem; border: 1px solid var(--line-strong); border-radius: .5rem; color: inherit; background: var(--surface); }
 input[type=number] { width: 5rem; }
+.preset-grid { display: grid; grid-template-columns: repeat(3, 2.5rem); gap: .25rem; }
 summary { cursor: pointer; font-weight: 600; }
 p { color: var(--muted); line-height: 1.5; }
 </style>

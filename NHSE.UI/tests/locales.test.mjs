@@ -13,6 +13,8 @@ for (const code of ['en', 'jp', 'de', 'es', 'fr', 'it', 'ko', 'zhs', 'zht']) {
     assert.equal(locale.hemisphereNames.split('|').length, 2);
     assert.equal(locale.islandToolNames.split('|').length, 7);
     assert.equal(locale.designToolNames.split('|').length, 4);
+    for (const [key, count] of Object.entries({ mapSpawnSources: 4, mapArrangeNames: 3, mapParamNames: 24, mapBooleanNames: 2, mapPresetFamilies: 2, mapPresetCorners: 3 }))
+      assert.equal(locale[key].split('|').length, count, key);
     assert.deepEqual(Object.keys(locale).sort(), Object.keys(english).sort());
     for (const [key, value] of Object.entries(locale))
       assert.ok(typeof value === 'string' && value.trim().length > 0, key);

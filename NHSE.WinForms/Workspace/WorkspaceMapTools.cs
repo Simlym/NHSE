@@ -155,13 +155,17 @@ internal sealed partial class WorkspaceSession
     }
 
     public void PaintMap(MapTarget target, int radius, bool randomVariation, Dictionary<string, JsonElement> values)
+        => PaintMapStroke(target, radius, randomVariation, values, [new(target.X, target.Y)]);
+
+    public void PaintMapStroke(MapTarget target, int radius, bool randomVariation, Dictionary<string, JsonElement> values, MapPoint[] points)
     {
         CheckMapTarget(target, MapMarkerCount);
-        if (target.Mode != "terrain" || radius is < 1 or > 8) throw new ArgumentException("invalidRequest");
-        var (cx, cy) = MapCoordinates(target, target.X, target.Y);
-        if (!TerrainConfig.IsCoordinateValidRelative(cx, cy)) throw new ArgumentException("mapInvalidAcre");
+        if (target.Mode != "terrain" || radius is < 1 or > 8 || points.Length is < 1 or > 256 || points.Any(p => p.X is < 0 or > 15 || p.Y is < 0 or > 15))
+            throw new ArgumentException("invalidRequest");
+        var (sx, sy) = MapCoordinates(target, target.X, target.Y);
+        if (!TerrainConfig.IsCoordinateValidRelative(sx, sy)) throw new ArgumentException("mapInvalidAcre");
         var layer = new LayerTerrain(SaveFile.Main.GetTerrainTiles(), SaveFile.Main.GetAcreBytes());
-        var template = TerrainTile.GetArray(TerrainTile.SetArray([layer.GetTile(cx, cy)]))[0];
+        var template = TerrainTile.GetArray(TerrainTile.SetArray([layer.GetTile(sx, sy)]))[0];
         foreach (var (key, value) in values)
         {
             if (!key.StartsWith("Map.", StringComparison.Ordinal) || !TerrainKeys.Contains(key[4..]) || !value.TryGetInt64(out var n) || n is < 0 or > ushort.MaxValue)
@@ -169,14 +173,19 @@ internal sealed partial class WorkspaceSession
             var p = typeof(TerrainTile).GetProperty(key[4..])!;
             p.SetValue(template, p.PropertyType.IsEnum ? Enum.ToObject(p.PropertyType, n) : (object)(ushort)n);
         }
-        for (var dx = -radius; dx < radius; dx++) for (var dy = -radius; dy < radius; dy++)
+        var painted = new HashSet<(int X, int Y)>();
+        foreach (var point in points)
         {
-            if (radius == 1 ? dx != 0 || dy != 0 : dx * dx + dy * dy >= radius * radius / 2) continue;
-            var x = cx + dx; var y = cy + dy;
-            if (!TerrainConfig.IsCoordinateValidRelative(x, y)) continue;
-            var tile = layer.GetTile(x, y);
-            tile.CopyFrom(template);
-            if (randomVariation && template.UnitModel is TerrainUnitModel.Cliff5B or TerrainUnitModel.River5B) tile.Variation = (ushort)Random.Shared.Next(4);
+            var (cx, cy) = MapCoordinates(target, point.X, point.Y);
+            if (!TerrainConfig.IsCoordinateValidRelative(cx, cy)) throw new ArgumentException("mapInvalidAcre");
+            for (var dx = -radius; dx < radius; dx++) for (var dy = -radius; dy < radius; dy++)
+            {
+                if (radius == 1 ? dx != 0 || dy != 0 : dx * dx + dy * dy >= radius * radius / 2) continue;
+                var x = cx + dx; var y = cy + dy;
+                if (!TerrainConfig.IsCoordinateValidRelative(x, y) || !painted.Add((x, y))) continue;
+                var tile = layer.GetTile(x, y); tile.CopyFrom(template);
+                if (randomVariation && template.UnitModel is TerrainUnitModel.Cliff5B or TerrainUnitModel.River5B) tile.Variation = (ushort)Random.Shared.Next(4);
+            }
         }
         CommitMapPatches([MapPatch(SaveFile.Main.Offsets.LandMakingMap, layer.DumpAll())]);
     }

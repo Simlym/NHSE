@@ -156,6 +156,59 @@ try {
     Run-Js "document.querySelectorAll('.player-chip')[1].click()" | Out-Null
     Wait-Condition "document.querySelector('input[aria-describedby=player-name-help]').value === 'Other'"
     'PASS real Vue player profile supports avatar/name switching and editable identity fields'
+    $mainRaw = [NHSE.Core.EncryptedFilePair].GetField('RawData',$flags).GetValue($save.Main)
+    $worldBefore = [Convert]::ToHexString($mainRaw)
+    $response = Rpc 'setIsland' @{ airportColor=2; hemisphere=1; tourHemisphere=1; weatherSeed=[uint32]::MaxValue; tourWeatherSeed=12345 }
+    if (!$response.ok -or $save.Main.WeatherSeed -ne [uint32]::MaxValue -or $save.Main.Hemisphere -ne 'Southern') { throw 'Native island editing failed' }
+    Rpc 'undo' | Out-Null
+    if ([Convert]::ToHexString($mainRaw) -ne $worldBefore) { throw 'Island undo did not restore exact main bytes' }
+    $response = Rpc 'setResident' @{index=0;personality=3;catchphrase='新口头禅';movingOut=$true}
+    if (!$response.ok -or $save.Main.GetVillager(0).CatchPhrase -ne '新口头禅' -or !$save.Main.GetVillager(0).MovingOut) { throw 'Native resident editing failed' }
+    Rpc 'undo' | Out-Null
+    $response = Rpc 'replaceResident' @{index=0;id='cat06'}
+    if (!$response.ok -or $save.Main.GetVillager(0).InternalName -ne 'cat06' -or $save.Main.GetVillagerHouse(0).NPC1 -ne 0) { throw 'Native resident replacement failed' }
+    Rpc 'undo' | Out-Null
+    if ([Convert]::ToHexString($mainRaw) -ne $worldBefore) { throw 'Resident and house undo did not restore exact main bytes' }
+    'PASS native island/profile/replacement commands share exact undo with both resident and house'
+    Run-Js "document.querySelectorAll('.sidebar nav button')[3].click()" | Out-Null
+    Wait-Condition "!!document.querySelector('.resident-profile h2') && !document.querySelector('[aria-busy=true]')"
+    $stream = [IO.File]::Create((Join-Path $OutputDirectory 'resident-workspace-zhs.png'))
+    try { Wait-Task ($browser.CoreWebView2.CapturePreviewAsync([Microsoft.Web.WebView2.Core.CoreWebView2CapturePreviewImageFormat]::Png,$stream)) | Out-Null } finally { $stream.Dispose() }
+    Run-Js "document.querySelector('.resident-profile .button').click()" | Out-Null
+    Wait-Condition "!!document.querySelector('.resident-picker-dialog[open] .villager-tile') && !document.querySelector('[aria-busy=true]')"
+    Run-Js "document.querySelector('.villager-picker-heading button').click()" | Out-Null
+    Wait-Condition "!document.querySelector('.resident-picker-dialog')"
+    Run-Js "document.querySelectorAll('.sidebar nav button')[4].click()" | Out-Null
+    Wait-Condition "document.querySelectorAll('.airport-colors input').length === 4"
+    Run-Js "document.querySelector('.workspace-content').scrollTo(0,0)" | Out-Null
+    $stream = [IO.File]::Create((Join-Path $OutputDirectory 'island-workspace-zhs.png'))
+    try { Wait-Task ($browser.CoreWebView2.CapturePreviewAsync([Microsoft.Web.WebView2.Core.CoreWebView2CapturePreviewImageFormat]::Png,$stream)) | Out-Null } finally { $stream.Dispose() }
+    $script:toolSeen = $false
+    $closeTool = [Windows.Forms.Timer]::new(); $closeTool.Interval = 100
+    $closeTool.Add_Tick({
+        $activeTools = @([Windows.Forms.Application]::OpenForms | Where-Object { $_.GetType().Name -eq 'PlayerItemEditor' })
+        foreach($activeTool in $activeTools) { $script:toolSeen = $true; $activeTool.DialogResult = [Windows.Forms.DialogResult]::Cancel; $activeTool.Close() }
+    })
+    try { $closeTool.Start(); $response = Rpc 'tool' @{tool='recycle';player=1} } finally { $closeTool.Stop(); $closeTool.Dispose() }
+    if (!$response.ok -or !$script:toolSeen -or [Convert]::ToHexString($mainRaw) -ne $worldBefore) { throw 'Direct specialized-tool cancel failed' }
+    $script:toolEdited = $false
+    $editTool = [Windows.Forms.Timer]::new(); $editTool.Interval = 100
+    $editTool.Add_Tick({
+        $priceEditors = @([Windows.Forms.Application]::OpenForms | Where-Object { $_.GetType().Name -like 'SingleObjectEditor*' })
+        foreach($priceEditor in $priceEditors) {
+            $grid = $priceEditor.GetType().GetField('PG_Item',$flags).GetValue($priceEditor)
+            $grid.SelectedObject.BuyPrice = 555
+            $script:toolEdited = $true
+            $priceEditor.DialogResult = [Windows.Forms.DialogResult]::OK
+            $priceEditor.Close()
+        }
+    })
+    try { $editTool.Start(); $response = Rpc 'tool' @{tool='turnips';player=0} } finally { $editTool.Stop(); $editTool.Dispose() }
+    if (!$response.ok -or !$script:toolEdited -or $save.Main.Turnips.BuyPrice -ne 555) { throw 'Direct specialized-tool edit failed' }
+    Rpc 'undo' | Out-Null
+    if ([Convert]::ToHexString($mainRaw) -ne $worldBefore) { throw 'Specialized-tool undo did not restore exact main bytes' }
+    'PASS real specialized editor edits join workspace undo history'
+    'PASS real Vue resident/island pages, embedded portrait gallery and direct specialized editor cancellation'
     $response = Rpc 'fullScreen'
     if (!$response.data.fullScreen -or $form.FormBorderStyle -ne 'None') { throw 'Fullscreen failed' }
     $response = Rpc 'fullScreen'

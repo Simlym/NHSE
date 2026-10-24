@@ -6,6 +6,85 @@ const codes = ['en', 'jp', 'de', 'es', 'fr', 'it', 'ko', 'zhs', 'zht'];
 const text = (code: string) =>
   JSON.parse(fs.readFileSync(new URL(`../../src/locales/${code}.json`, import.meta.url), 'utf8'));
 
+test('resident profile and embedded gallery apply edits, cancel, replace and undo in the workspace', async ({
+  page,
+}) => {
+  await mockHost(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: '打开存档', exact: true }).click();
+  await page.locator('.sidebar nav').getByRole('button', { name: '岛民管理', exact: true }).click();
+  await expect(page.locator('.resident-profile h2')).toHaveText('岛民001');
+  await page.getByRole('textbox', { name: '口头禅', exact: true }).fill('新口头禅');
+  await page.locator('.icon-select select').first().selectOption('en');
+  await expect(page.getByRole('textbox', { name: 'Catchphrase', exact: true })).toHaveValue('新口头禅');
+  await page.locator('.icon-select select').first().selectOption('zhs');
+  await page.locator('.residents-page .resident-chip').nth(1).click();
+  await expect(page.locator('.resident-profile h2')).toHaveText('岛民002');
+  await page.locator('.residents-page .resident-chip').first().click();
+  await expect(page.getByRole('textbox', { name: '口头禅', exact: true })).toHaveValue('新口头禅');
+  await page.getByRole('button', { name: '选择岛民', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { nhseTestMessages: string[] }).nhseTestMessages.includes('replaceResident'),
+    ),
+  ).toBe(false);
+  await page.getByRole('button', { name: '选择岛民', exact: true }).click();
+  await page.getByRole('searchbox', { name: '搜索岛民名字或编号' }).fill('v0004');
+  await expect(page.locator('.villager-tile')).toHaveCount(1);
+  await page.locator('.villager-tile').click();
+  await page.getByRole('button', { name: '确认替换', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.resident-profile h2')).toHaveText('岛民005');
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(page.locator('.resident-profile h2')).toHaveText('岛民001');
+  await expect(page.getByRole('textbox', { name: '口头禅', exact: true })).toHaveValue('新口头禅');
+  await page.screenshot({ path: 'test-results/resident-workspace-zhs.png', fullPage: true });
+});
+
+test('island settings validate unsigned seeds, autosave drafts and support undo in every language', async ({
+  page,
+}) => {
+  await mockHost(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: '打开存档', exact: true }).click();
+  await page.locator('.sidebar nav').getByRole('button', { name: '岛屿设置', exact: true }).click();
+  await page.getByRole('radio', { name: '绿色', exact: true }).check();
+  await page.getByRole('combobox', { name: '岛屿所在半球', exact: false }).selectOption('1');
+  const seed = page.getByRole('spinbutton', { name: '岛屿天气种子', exact: true });
+  await seed.fill('777');
+  await page.locator('.icon-select select').first().selectOption('en');
+  await expect(page.getByRole('spinbutton', { name: 'Island weather seed', exact: true })).toHaveValue('777');
+  await page.locator('.icon-select select').first().selectOption('zhs');
+  await seed.fill('4294967296');
+  await page.getByRole('button', { name: '应用修改', exact: true }).click();
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { nhseTestMessages: string[] }).nhseTestMessages.includes('setIsland'),
+    ),
+  ).toBe(false);
+  await seed.fill('4294967295');
+  await page.keyboard.press('Control+s');
+  await expect(page.locator('.statusbar')).toContainText('修改已保存');
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(seed).toHaveValue('12345');
+  await page.getByRole('button', { name: '重做', exact: true }).click();
+  await expect(seed).toHaveValue('4294967295');
+  await page.locator('.workspace-content').evaluate(el => el.scrollTo(0, 0));
+  await page.screenshot({ path: 'test-results/island-workspace-zhs.png', fullPage: true });
+  for (const code of codes) {
+    await page.locator('.icon-select select').first().selectOption(code);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(text(code).island);
+    await expect(page.locator('.airport-colors label')).toHaveCount(4);
+    for (const width of [1180, 800, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    }
+  }
+});
+
 test('home keeps all nine languages and remains usable at desktop / compact widths', async ({ page }) => {
   await mockHost(page);
   await page.goto('/');

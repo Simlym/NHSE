@@ -2,12 +2,21 @@
 
 The Windows entry point now hosts a locally bundled Vue application in WebView2.
 The welcome page, player names, island names, balances, capacity, pockets and home
-storage use this workspace. Players switch through portrait/name cards using the
+storage, resident profiles and island settings use this workspace. Players switch through portrait/name cards using the
 photos stored in the save, with a generic avatar when no photo is available.
-Villagers, maps, designs, detailed item properties and console tools continue to
-use their existing C# editors, reached through the workspace. No server is needed.
+Resident personality, catchphrase, default phrase, moving-out status and template
+replacement are editable in the workspace. Airport colors, both hemispheres and
+unsigned weather seeds are also editable here. Resident/house replacement is one
+undoable operation. No server is needed.
 
-The villager editor's Replace button and portrait now open the Vue portrait
+Terrain, houses, campsite, fruit/flowers, recycle box, turnips and all four design
+editors open directly from the workspace's labeled shortcuts. These specialized
+C# editors share the current save; changed byte ranges across main and player
+files join the workspace's undo history. Unchanged dialogs add no history; an
+exception restores the pre-dialog bytes. Detailed properties, import/export and
+console tools remain available in the full original editor.
+
+The workspace and original villager editor's Replace button/portrait open the Vue portrait
 gallery. The current-resident strip can switch the resident being edited; the
 gallery filters by the game's species and template personality, searches localized
 names or IDs, paginates, and previews a replacement before confirmation. Already
@@ -114,10 +123,14 @@ The C# integration harness generates encrypted synthetic files entirely in memor
 and checks pocket order, raw parameter preservation, locked slots, undo branches,
 save/reload and hashes. Browser tests use an explicit test-only host and exercise
 all nine languages, compact widths, quantity edits and validation, dialogs, focus
-mode and saved state.
+mode and saved state. Resident/island form drafts survive language changes; saving
+or navigating applies valid drafts. The harness also covers resident/house replacement,
+full-byte undo/redo, invalid duplicate replacements and rollback of failed specialized tools.
 
 For an installed Windows WebView2 runtime, the native smoke script also checks the
-actual C# bridge, language switching, paging, full screen and origin restriction:
+actual C# bridge, language switching, paging, full screen and origin restriction.
+It also opens the real embedded villager gallery, cancels an unchanged specialized
+editor and verifies that a turnip-price edit can be undone from the workspace:
 
 ```powershell
 dotnet run --project NHSE.Workspace.Tests -c Release -- --fixture artifacts/workspace-fixture

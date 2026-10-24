@@ -16,7 +16,7 @@ using NHSE.Sprites;
 namespace NHSE.WinForms;
 
 /// <summary>Local-only Vue shell. Native file access stays behind a bounded command bridge.</summary>
-public sealed class WorkspaceForm : Form
+public sealed partial class WorkspaceForm : Form
 {
     private const string Origin = "https://nhse.local";
     private readonly WebView2 Browser = new() { Dock = DockStyle.Fill };
@@ -125,7 +125,7 @@ public sealed class WorkspaceForm : Form
         catch (Exception ex)
         {
             if (id is not null)
-                Reply(new { id, ok = false, error = ex is ArgumentException ? "invalidRequest" : "operationFailed", detail = ex.Message });
+                Reply(new { id, ok = false, error = ex.Message == "villagerHouseMissing" ? "villagerHouseMissing" : ex is ArgumentException ? "invalidRequest" : "operationFailed", detail = ex.Message });
         }
         finally { if (claimed) HandlingMessage = false; }
     }
@@ -139,7 +139,7 @@ public sealed class WorkspaceForm : Form
     private object State()
     {
         if (Session is not null) Text = Session.SaveFile.GetSaveTitle("NHSE");
-        return new { language = GameInfo.CurrentLanguage, recent = Program.Settings.LastFilePath, session = Session?.Snapshot(PlayerAvatar), fullScreen = FullScreen,
+        return new { language = GameInfo.CurrentLanguage, recent = Program.Settings.LastFilePath, session = Session?.Snapshot(PlayerAvatar, VillagerImage), fullScreen = FullScreen,
             villagerPicker = PickerResidents is null ? null : new { index = PickerInitialIndex,
                 residents = PickerResidents.Select((v, i) => new { index = i, id = v.InternalName, name = GameInfo.Strings.GetVillager(v.InternalName), image = VillagerImage(v.InternalName), empty = v.Species >= (byte)VillagerSpecies.non }).ToArray() } };
     }
@@ -266,10 +266,24 @@ public sealed class WorkspaceForm : Form
                 RequireSession().SetPlayer(Int(p, "player"), p.GetProperty("wallet").GetUInt32(), p.GetProperty("bank").GetUInt32(), p.GetProperty("miles").GetUInt32(), p.GetProperty("earnedMiles").GetUInt32(),
                     Str(p, "name"), Str(p, "island"), OptionalUInt(p, "pocketCapacity"), OptionalUInt(p, "storageCapacity"), OptionalUInt(p, "hotelTickets"), OptionalUInt(p, "poki"));
                 return State();
+            case "setIsland":
+                RequireSession().SetIsland(new WorkspaceSession.IslandSettings(Int(p, "airportColor"), Int(p, "hemisphere"), Int(p, "tourHemisphere"),
+                    p.GetProperty("weatherSeed").GetUInt32(), p.GetProperty("tourWeatherSeed").GetUInt32()));
+                return State();
+            case "setResident":
+                RequireSession().SetResident(Int(p, "index"), Int(p, "personality"), Str(p, "catchphrase"), p.GetProperty("movingOut").GetBoolean());
+                return State();
+            case "replaceResident":
+                RequireSession().ReplaceResident(Int(p, "index"), Str(p, "id"));
+                return State();
+            case "tool":
+                OpenWorkspaceTool(Str(p, "tool"), Int(p, "player"), p.TryGetProperty("resident", out var toolResident) ? toolResident.GetInt32() : 0);
+                return State();
             case "legacy":
                 using (var editor = new Editor(RequireSession().SaveFile))
                 {
-                    editor.SelectWorkspaceSection(Str(p, "section"));
+                    editor.SelectWorkspaceSection(Str(p, "section"), p.TryGetProperty("player", out var selectedPlayer) ? selectedPlayer.GetInt32() : 0,
+                        p.TryGetProperty("resident", out var selectedResident) ? selectedResident.GetInt32() : 0);
                     editor.ShowDialog(this);
                     editor.ApplyWorkspaceChanges();
                 }

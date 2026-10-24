@@ -6,7 +6,7 @@ using NHSE.Core;
 namespace NHSE.WinForms;
 
 /// <summary>Edits the existing C# save model. Nothing is written to disk until Save.</summary>
-internal sealed class WorkspaceSession(HorizonSave save)
+internal sealed partial class WorkspaceSession(HorizonSave save)
 {
     public HorizonSave SaveFile { get; } = save;
     private sealed record Change(Action Undo, Action Redo, long Before, long After);
@@ -19,11 +19,13 @@ internal sealed class WorkspaceSession(HorizonSave save)
     private bool LegacyChanges;
     public bool IsDirty => LegacyChanges || Revision != SavedRevision;
 
-    public object Snapshot(Func<int, string?>? getAvatar = null) => new
+    public object Snapshot(Func<int, string?>? getAvatar = null, Func<string, string?>? getVillagerImage = null) => new
     {
         title = SaveFile.GetSaveTitle("NHSE"),
         island = SaveFile.Players[0].Personal.TownName,
         dirty = IsDirty, canUndo = UndoStack.Count != 0, canRedo = RedoStack.Count != 0,
+        islandSettings = GetIslandSettings(),
+        residents = GetResidents(getVillagerImage),
         players = SaveFile.Players.Select((p, i) => new
         {
             index = i, name = p.Personal.PlayerName, island = p.Personal.TownName, avatar = getAvatar?.Invoke(i),

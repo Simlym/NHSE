@@ -36,6 +36,8 @@ import {
 } from '@lucide/vue';
 import { languages, language, setLanguage, t, hasText } from './i18n';
 import VillagerPicker from './VillagerPicker.vue';
+import ResidentsPage from './ResidentsPage.vue';
+import IslandPage from './IslandPage.vue';
 import {
   listenState,
   native,
@@ -51,7 +53,7 @@ function stepText(number: number, suffix: 'Title' | 'Body') {
   return t(('step' + number + suffix) as Parameters<typeof t>[0]);
 }
 
-type Page = 'overview' | 'player' | 'inventory' | 'tools';
+type Page = 'overview' | 'player' | 'inventory' | 'villagers' | 'island' | 'tools';
 const state = ref<State>({ language: 'en', recent: '', session: null, fullScreen: false });
 const page = ref<Page>('overview');
 const playerIndex = ref(0);
@@ -114,6 +116,8 @@ const fields = ref({
   poki: null as number | null,
 });
 const playerForm = ref<HTMLFormElement | null>(null);
+const residentsPage = ref<InstanceType<typeof ResidentsPage> | null>(null);
+const islandPage = ref<InstanceType<typeof IslandPage> | null>(null);
 const currentPlayer = computed(() => state.value.session?.players.find((p) => p.index === playerIndex.value));
 const currentItem = computed(() => draftItem.value ?? selected.value);
 const profilePending = computed(
@@ -128,6 +132,8 @@ const nav = [
   { id: 'overview', icon: LayoutDashboard },
   { id: 'player', icon: UserRound },
   { id: 'inventory', icon: Package },
+  { id: 'villagers', icon: Users },
+  { id: 'island', icon: Leaf },
   { id: 'tools', icon: Map },
 ] as const;
 let inventoryToken = 0,
@@ -155,12 +161,21 @@ function syncFields(player?: Player) {
     };
 }
 function accept(next: State) {
+  const previousPlayer = currentPlayer.value;
   state.value = next;
   setLanguage(next.language);
   localStorage.setItem('nhse.language', language.value);
   if (!next.session?.players.some((p) => p.index === playerIndex.value))
     playerIndex.value = next.session?.players[0]?.index ?? 0;
-  syncFields(currentPlayer.value);
+  const nextPlayer = currentPlayer.value;
+  if (
+    !previousPlayer ||
+    previousPlayer.index !== nextPlayer?.index ||
+    Object.keys(fields.value).some(
+      (key) => previousPlayer[key as keyof Player] !== nextPlayer?.[key as keyof Player],
+    )
+  )
+    syncFields(nextPlayer);
 }
 function toast(key: Parameters<typeof t>[0]) {
   notice.value = t(key);
@@ -206,6 +221,11 @@ async function command(
   payload: Record<string, unknown> = {},
   success?: Parameters<typeof t>[0],
 ) {
+  if (busy.value) return false;
+  if (['open', 'openRecent', 'closeSave', 'legacy'].includes(name)) {
+    if (page.value === 'player' && profilePending.value && !(await applyProfile())) return false;
+    if (!(await applyWorldDrafts())) return false;
+  }
   return await run(async () => {
     accept(await request<State>(name, payload));
     if (page.value === 'inventory') await loadInventory();
@@ -219,6 +239,7 @@ async function open(kind: string) {
 async function go(destination: Page) {
   if (busy.value) return;
   if (page.value === 'player' && profilePending.value && !(await applyProfile())) return;
+  if (!(await applyWorldDrafts())) return;
   page.value = destination;
   if (destination === 'inventory') await run(() => loadInventory(0));
 }
@@ -233,7 +254,21 @@ async function selectPlayer(index: number) {
 }
 async function save() {
   if (page.value === 'player' && profilePending.value && !(await applyProfile())) return;
+  if (!(await applyWorldDrafts())) return;
   await command('save', {}, 'saveSuccess');
+}
+async function applyWorldDrafts() {
+  if (page.value === 'villagers' && residentsPage.value && !(await residentsPage.value.applyPending()))
+    return false;
+  if (page.value === 'island' && islandPage.value && !(await islandPage.value.applyPending())) return false;
+  return true;
+}
+async function worldCommand(name: string, payload: Record<string, unknown> = {}) {
+  return await command(
+    name,
+    { player: playerIndex.value, ...payload },
+    name === 'legacy' || name === 'tool' ? undefined : 'applied',
+  );
 }
 function chooseSlot(item: ItemView) {
   if (!item.available) return;
@@ -590,7 +625,12 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
-        <div class="player-switcher" role="group" :aria-label="t('switchPlayer')">
+        <div
+          v-if="page === 'overview' || page === 'player' || page === 'inventory'"
+          class="player-switcher"
+          role="group"
+          :aria-label="t('switchPlayer')"
+        >
           <button
             v-for="player in state.session.players"
             :key="player.index"
@@ -634,9 +674,13 @@ onUnmounted(() => {
               <Package :size="27" /><strong>{{ t('editInventory') }}</strong
               ><span>{{ t('pocket') }} · {{ currentPlayer?.pocketCapacity }}</span
               ><ArrowRight :size="19" /></button
-            ><button class="task-card" @click="go('tools')">
-              <Map :size="27" /><strong>{{ t('tools') }}</strong
-              ><span>{{ t('map') }} · {{ t('villagers') }}</span
+            ><button class="task-card" @click="go('villagers')">
+              <Users :size="27" /><strong>{{ t('villagers') }}</strong
+              ><span>{{ t('residentProfile') }}</span
+              ><ArrowRight :size="19" /></button
+            ><button class="task-card" @click="go('island')">
+              <Map :size="27" /><strong>{{ t('island') }}</strong
+              ><span>{{ t('islandBasics') }}</span
               ><ArrowRight :size="19" />
             </button>
           </div>
@@ -881,6 +925,20 @@ onUnmounted(() => {
             </aside>
           </div>
         </section>
+        <ResidentsPage
+          v-else-if="page === 'villagers'"
+          ref="residentsPage"
+          :residents="state.session.residents"
+          :busy="busy"
+          :execute="worldCommand"
+        />
+        <IslandPage
+          v-else-if="page === 'island'"
+          ref="islandPage"
+          :settings="state.session.islandSettings"
+          :busy="busy"
+          :execute="worldCommand"
+        />
         <section v-else class="tools-page">
           <h2>{{ t('toolsTitle') }}</h2>
           <p class="page-description">{{ t('toolsHint') }}</p>
@@ -894,7 +952,13 @@ onUnmounted(() => {
               :key="tool.id"
               class="task-card"
               :disabled="busy"
-              @click="command('legacy', { section: tool.id })"
+              @click="
+                tool.id === 'villagers'
+                  ? go('villagers')
+                  : tool.id === 'map'
+                    ? go('island')
+                    : worldCommand('legacy', { section: tool.id })
+              "
             >
               <component :is="tool.icon" :size="28" /><strong>{{ t(tool.id) }}</strong
               ><ArrowRight :size="19" />

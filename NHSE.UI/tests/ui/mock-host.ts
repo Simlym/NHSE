@@ -61,14 +61,42 @@ export async function mockHost(page: Page, picker = false) {
       subcategory: index % 2 ? 'tops' : 'shoes',
     }));
     let item = { ...catalog[0]!, index: 0, quantity: 10 };
-    type Snapshot = { players: typeof players; item: typeof item; revision: number };
+    let residents = [0, 1].map((index) => ({
+      index,
+      id: 'v' + String(index).padStart(4, '0'),
+      name: '岛民' + String(index + 1).padStart(3, '0'),
+      species: [4, 31][index],
+      personality: index,
+      image: avatar,
+      catchphrase: index ? '喵喵' : '你好',
+      defaultCatchphrase: '默认',
+      movingOut: false,
+      empty: false,
+      canReplace: true,
+    }));
+    let islandSettings = {
+      airportColor: 0,
+      hemisphere: 0,
+      tourHemisphere: 0,
+      weatherSeed: 12345,
+      tourWeatherSeed: 54321,
+    };
+    type Snapshot = {
+      players: typeof players;
+      item: typeof item;
+      revision: number;
+      residents: typeof residents;
+      islandSettings: typeof islandSettings;
+    };
     const history: Snapshot[] = [],
       redo: Snapshot[] = [];
-    const capture = (): Snapshot => structuredClone({ players, item, revision });
+    const capture = (): Snapshot => structuredClone({ players, item, revision, residents, islandSettings });
     const restore = (value: Snapshot) => {
       players = value.players;
       item = value.item;
       revision = value.revision;
+      residents = value.residents;
+      islandSettings = value.islandSettings;
     };
     const remember = () => {
       history.push(capture());
@@ -96,6 +124,8 @@ export async function mockHost(page: Page, picker = false) {
             canUndo: history.length > 0,
             canRedo: redo.length > 0,
             players,
+            residents,
+            islandSettings,
           }
         : null,
     });
@@ -132,6 +162,34 @@ export async function mockHost(page: Page, picker = false) {
                 index: 0,
                 quantity: Number(p.quantity),
               };
+            }
+            if (message.command === 'setIsland') {
+              remember();
+              Object.assign(
+                islandSettings,
+                Object.fromEntries(Object.entries(p).filter(([key]) => key !== 'player')),
+              );
+            }
+            if (message.command === 'setResident') {
+              remember();
+              Object.assign(residents[Number(p.index)]!, {
+                personality: Number(p.personality),
+                catchphrase: String(p.catchphrase),
+                movingOut: Boolean(p.movingOut),
+              });
+            }
+            if (message.command === 'replaceResident') {
+              remember();
+              const id = String(p.id);
+              const i = Number(id.slice(1));
+              Object.assign(residents[Number(p.index)]!, {
+                id,
+                name: '岛民' + String(i + 1).padStart(3, '0'),
+                species: [4, 31, 34][i % 3],
+                personality: i % 8,
+                catchphrase: '默认',
+                movingOut: false,
+              });
             }
             if (message.command === 'deleteItem') {
               remember();

@@ -44,6 +44,18 @@ personal.ItemChestCount = 100;
 personal.Pocket = Enumerable.Range(0, 20).Select(_ => new Item(Item.NONE)).ToArray();
 personal.Bag = Enumerable.Range(0, 20).Select(_ => new Item(Item.NONE)).ToArray();
 personal.ItemChest = Enumerable.Range(0, personal.Offsets.ItemChestCount).Select(_ => new Item(Item.NONE)).ToArray();
+for (var i = 0; i < MainSaveOffsets.VillagerCount; i++)
+{
+    var blank = save.Main.GetVillager(i); blank.Species = (byte)VillagerSpecies.non; save.Main.SetVillager(blank, i);
+    var blankHouse = save.Main.GetVillagerHouse(i); blankHouse.NPC1 = -1; save.Main.SetVillagerHouse(blankHouse, i);
+}
+foreach (var (id, index) in new[] { ("ant00", 0), ("cat00", 1) })
+{
+    var template = VillagerResources.GetVillager(id);
+    save.Main.SetVillager(new Villager2(template.Villager), index);
+    var home = new VillagerHouse2(template.House) { NPC1 = (sbyte)index, NPC2 = -1, BuildPlayer = 0 };
+    save.Main.SetVillagerHouse(home, index);
+}
 var session = new WorkspaceSession(save);
 var stackId = GameInfo.Strings.ItemDataSource.First(x => x.Value is > 0 and < 60000 && ItemInfo.TryGetMaxStackCount((ushort)x.Value, out var max) && max > 1).Value;
 var item = new Item((ushort)stackId) { Count = 4, SystemParam = 128, AdditionalParam = 9 };
@@ -145,6 +157,51 @@ foreach (var size in new[] { VillagerHouse1.SIZE, VillagerHouse2.SIZE })
 }
 ExpectInvalid(() => WorkspaceVillagers.Search("", 50, -1, 0));
 ExpectInvalid(() => WorkspaceVillagers.CreateReplacement(originalVillager, originalHouse, "bad00", VillagerHouse2.SIZE));
+var beforeWorld = save.Main.Data.ToArray();
+var changedSettings = new WorkspaceSession.IslandSettings(3, 1, 1, uint.MaxValue, 12345);
+session.SetIsland(changedSettings);
+Check(session.GetIslandSettings() == changedSettings, "island settings preserve unsigned weather seeds and all five fields");
+session.Undo();
+Check(save.Main.Data.SequenceEqual(beforeWorld), "island undo restores all main bytes");
+session.Redo(); Check(session.GetIslandSettings() == changedSettings, "island redo reapplies settings");
+session.Undo();
+ExpectInvalid(() => session.SetIsland(changedSettings with { AirportColor = 4 }));
+ExpectInvalid(() => session.SetIsland(changedSettings with { Hemisphere = -1 }));
+ExpectInvalid(() => session.SetIsland(changedSettings with { TourHemisphere = 2 }));
+var sourceResident = save.Main.GetVillager(0).Write();
+session.SetResident(0, 3, "hello", true);
+Check(save.Main.GetVillager(0) is { Personality: VillagerPersonality.Smug, CatchPhrase: "hello", MovingOut: true }, "resident fields apply through the C# model");
+session.Undo(); Check(save.Main.GetVillager(0).Write().SequenceEqual(sourceResident), "resident undo restores all resident bytes");
+session.Redo(); Check(save.Main.GetVillager(0).MovingOut, "resident redo restores moving-out status");
+session.Undo();
+ExpectInvalid(() => session.SetResident(0, 9, "invalid", false));
+ExpectInvalid(() => session.SetResident(0, 0, new string('a', 25), false));
+ExpectInvalid(() => session.SetResident(0, 0, "\uD800", false));
+ExpectInvalid(() => session.SetResident(9, 0, "", false));
+ExpectInvalid(() => session.ReplaceResident(0, "cat00"));
+ExpectInvalid(() => session.ReplaceResident(0, "bad00"));
+Check(save.Main.Data.SequenceEqual(beforeWorld), "invalid resident edits and duplicate replacements leave save bytes intact");
+session.ReplaceResident(0, "cat05");
+Check(save.Main.GetVillager(0).InternalName == "cat05" && save.Main.GetVillagerHouse(0).NPC1 == 0, "workspace replacement updates resident and matching house together");
+session.Undo(); Check(save.Main.Data.SequenceEqual(beforeWorld), "replacement undo restores the entire original resident and house");
+session.Redo(); Check(save.Main.GetVillager(0).InternalName == "cat05", "replacement redo restores both records");
+session.SetIsland(changedSettings);
+session.Save();
+var worldReload = new HorizonSave(provider);
+Check(worldReload.Main.GetVillager(0).InternalName == "cat05" && worldReload.Main.WeatherSeed == uint.MaxValue, "world edits survive encryption and reload");
+Check(!worldReload.GetInvalidHashes().Any(), "saved world edits keep valid hashes");
+var nativeBeforeMain = save.Main.Data.ToArray();
+var nativeBeforePersonal = personal.Data.ToArray();
+session.EditNative(() => { save.Main.WeatherSeed = 54321; personal.PlayerName = "ToolName"; });
+Check(save.Main.WeatherSeed == 54321 && personal.PlayerName == "ToolName", "specialized tools record changes across main and player files");
+session.Undo();
+Check(save.Main.Data.SequenceEqual(nativeBeforeMain) && personal.Data.SequenceEqual(nativeBeforePersonal), "specialized tool undo restores every changed byte in all affected files");
+session.Redo(); Check(personal.PlayerName == "ToolName", "specialized tool redo reapplies changed byte ranges");
+session.Undo();
+ExpectInvalid(() => session.EditNative(() => { save.Main.WeatherSeed = 0; personal.PlayerName = "Failed"; throw new ArgumentException("invalidRequest"); }));
+Check(save.Main.Data.SequenceEqual(nativeBeforeMain) && personal.Data.SequenceEqual(nativeBeforePersonal), "failed specialized tools roll back partial writes and preserve history");
+session.EditNative(() => { });
+Check(!session.IsDirty, "cancelling an unchanged specialized tool keeps the saved revision clean");
 GameInfo.SetLanguage2Char(GameLanguage.GetLanguageIndex("zhs"));
 Check(WorkspaceCatalog.Search("", "all", 0).Total == expectedIds.Count, "catalog retains complete coverage after language switching");
 Check(WorkspaceVillagers.Search(targetVillager.Id, -1, -1, 0).Items.Single().Name == GameInfo.Strings.GetVillager(targetVillager.Id), "villager names follow the selected UI language");

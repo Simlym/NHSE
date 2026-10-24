@@ -4,7 +4,8 @@ import { Check, ChevronLeft, ChevronRight, Search, Users, X, ArrowRight } from '
 import { request, type VillagerCatalog, type VillagerEntry, type VillagerPickerContext } from './bridge';
 import { hasText, t } from './i18n';
 
-const props = defineProps<{ context: VillagerPickerContext }>();
+const props = defineProps<{ context: VillagerPickerContext; embedded?: boolean }>();
+const emit = defineEmits<{ pick: [choice: { index: number; id?: string }]; cancel: [] }>();
 const target = ref(props.context.index);
 const query = ref('');
 const species = ref(-1);
@@ -60,6 +61,10 @@ async function finish(editOnly = false) {
     (!editOnly && (resident.value?.empty || !selected.value || unavailable(selected.value.id)))
   )
     return;
+  if (props.embedded) {
+    emit('pick', { index: target.value, id: editOnly ? undefined : selected.value?.id });
+    return;
+  }
   loading.value = true;
   error.value = '';
   try {
@@ -75,6 +80,10 @@ async function finish(editOnly = false) {
   }
 }
 function cancel() {
+  if (props.embedded) {
+    emit('cancel');
+    return;
+  }
   void request('cancelVillager');
 }
 function keyboard(e: KeyboardEvent) {
@@ -174,8 +183,7 @@ onUnmounted(() => {
       </nav>
       <section class="villager-catalog-main" :aria-label="t('villagerCatalogTitle')">
         <div class="catalog-summary" role="status">
-          <span
-            >{{ species < 0 ? t('allSpecies') : speciesNames[species] }} · {{ catalog?.total ?? 0 }}</span
+          <span>{{ species < 0 ? t('allSpecies') : speciesNames[species] }} · {{ catalog?.total ?? 0 }}</span
           ><span>{{
             loading ? t('loading') : `${t('page')} ${1 + (catalog?.page ?? 0)} / ${catalog?.pages ?? 1}`
           }}</span>
@@ -248,7 +256,11 @@ onUnmounted(() => {
         <button
           class="button primary"
           :disabled="
-            loading || resident?.empty || !selected || selected.id === resident?.id || (selected && unavailable(selected.id))
+            loading ||
+            resident?.empty ||
+            !selected ||
+            selected.id === resident?.id ||
+            (selected && unavailable(selected.id))
           "
           @click="finish()"
         >

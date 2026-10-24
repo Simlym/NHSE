@@ -259,8 +259,11 @@ public sealed partial class Editor : Form
     /// <summary>Applies legacy form fields to the shared in-memory workspace session.</summary>
     internal void ApplyWorkspaceChanges() => SaveAll();
 
-    internal void SelectWorkspaceSection(string section)
+    internal void SelectWorkspaceSection(string section, int player = 0, int resident = 0)
     {
+        if ((uint)player >= SAV.Players.Count || (uint)resident >= MainSaveOffsets.VillagerCount) throw new ArgumentException("invalidRequest");
+        CB_Players.SelectedIndex = player;
+        Villagers.SelectWorkspaceResident(resident);
         TC_Editors.SelectedTab = section switch
         {
             "villagers" => Tab_Villagers,

@@ -21,6 +21,23 @@ export interface Session {
   canUndo: boolean;
   canRedo: boolean;
   players: Player[];
+  residents: Resident[];
+  islandSettings: IslandSettings;
+}
+export interface Resident extends VillagerEntry {
+  index: number;
+  catchphrase: string;
+  defaultCatchphrase: string;
+  movingOut: boolean;
+  empty: boolean;
+  canReplace: boolean;
+}
+export interface IslandSettings {
+  airportColor: number;
+  hemisphere: number;
+  tourHemisphere: number;
+  weatherSeed: number;
+  tourWeatherSeed: number;
 }
 export interface State {
   language: string;

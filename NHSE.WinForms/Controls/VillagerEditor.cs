@@ -39,6 +39,8 @@ public partial class VillagerEditor : UserControl
 
     public void Reload() => LoadVillagers();
 
+    internal void SelectWorkspaceResident(int index) => NUD_Villager.Value = index;
+
     private void LoadVillagers()
     {
         CB_Personality.Items.Clear();

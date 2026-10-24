@@ -193,3 +193,31 @@ export interface ProgressData {
   entries: ProgressEntry[];
   options: { id: number; name: string }[];
 }
+
+export type HousingKind = 'playerHouses' | 'residentHouses' | 'campsite' | 'fruitFlowers';
+export interface HousingField {
+  key: string;
+  value: number | boolean | string;
+  type: 'number' | 'boolean' | 'date';
+  min: number;
+  max: number;
+  options: { id: number; name: string }[] | null;
+}
+export interface RoomItem {
+  itemId: number;
+  systemParam: number;
+  additionalParam: number;
+  freeParam: number;
+}
+export interface HousingTile {
+  x: number; y: number; rootX: number; rootY: number;
+  empty: boolean; extension: boolean; name: string; item: RoomItem; image: string | null;
+}
+export interface HousingData {
+  kind: HousingKind; index: number;
+  entries: { index: number; name: string }[];
+  fields: HousingField[]; flags: HousingField[];
+  room: { room: number; layer: number; tiles: HousingTile[] } | null;
+  locked: boolean;
+}
+export interface HousingTarget { kind: HousingKind; index: number; room: number; layer: number; resident?: number }

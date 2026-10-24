@@ -18,6 +18,8 @@ internal static class WorkspaceVillagers
         .Where(x => x.data.Species < (byte)VillagerSpecies.non)
         .Select(x => new Metadata(x.id, x.data.Species, (int)x.data.Personality)).OrderBy(x => x.Id).ToArray());
 
+    internal static Entry[] All() => MetadataEntries.Value.Select(x => new Entry(x.Id, GameInfo.Strings.GetVillager(x.Id), x.Species, x.Personality)).ToArray();
+
     internal static bool Contains(string id) => MetadataEntries.Value.Any(x => x.Id == id);
 
     internal static Result Search(string query, int species, int personality, int page)

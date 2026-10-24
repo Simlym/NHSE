@@ -356,8 +356,110 @@ originalProgress.Save();
 var originalReload = new HorizonSave(originalProvider);
 Check(originalReload.Players[0].Personal.GetRecipeBook().GetIsKnown(2047) && originalReload.Players[0].Personal.Achievements.Counts[0] == 123
     && !originalReload.GetInvalidHashes().Any(), "original-format recipe and achievement edits survive encrypted save and reload");
+// Batch 3: house edits use the save's concrete house type, including hidden v2 offsets.
+var housing = new WorkspaceSession(save);
+var mainHousingBefore = save.Main.Data.ToArray();
+var housingPlayerBefore = personal.Data.ToArray();
+var housingOtherBefore = other.Data.ToArray();
+var houseData = housing.GetHousing("playerHouses", 0, 0, 0, 0);
+Check(houseData.Fields.Any(f => f.Key == "Loan") && houseData.Flags.Length == 128 && houseData.Room!.Tiles.Length == 400, "player housing exposes property fields, signed flags and a complete room grid");
+var unchangedHouseValues = houseData.Fields.Concat(houseData.Flags).ToDictionary(f => f.Key, f => System.Text.Json.JsonSerializer.SerializeToElement(f.Value));
+housing.SetHousing("playerHouses", 0, 0, unchangedHouseValues);
+Check(!housing.IsDirty && save.Main.Data.SequenceEqual(mainHousingBefore), "unchanged house form never normalizes encrypted fields or unknown bytes");
+housing.SetHousing("playerHouses", 0, 0, HousingValues(("HouseLevel", 7), ("NPC1", -1), ("Loan", uint.MaxValue), ("DoorDecoItemName.ItemId", 2213), ("DoorDecoItemName.FreeParam", int.MinValue), ("EventFlag.127", short.MinValue)));
+var houseUpdated = (PlayerHouse2)save.Main.GetPlayerHouse(0);
+Check(houseUpdated.HouseLevel == 7 && houseUpdated.NPC1 == -1 && (uint)houseUpdated.Loan == uint.MaxValue && houseUpdated.DoorDecoItemName.ItemId == 2213 && houseUpdated.DoorDecoItemName.FreeParam == int.MinValue && houseUpdated.EventFlags[127] == short.MinValue, "v2 house fields use concrete tail offsets and retain raw item parameters");
+var houseAfter = save.Main.Data.ToArray();
+ExpectInvalid(() => housing.SetHousing("playerHouses", 0, 0, HousingValues(("HouseLevel", 8), ("EventFlag.127", 32768))));
+ExpectInvalid(() => housing.SetHousing("playerHouses", 0, 0, HousingValues(("Data", 0))));
+ExpectInvalid(() => housing.GetHousing("playerHouses", 0, 8, 0, 0));
+Check(save.Main.Data.SequenceEqual(houseAfter), "invalid house fields cannot partially write valid fields");
+housing.Undo(); Check(save.Main.Data.SequenceEqual(mainHousingBefore), "house undo restores all main bytes");
+housing.Redo(); Check(save.Main.Data.SequenceEqual(houseAfter), "house redo restores all edited bytes");
+housing.Undo();
+housing.SetHousing("residentHouses", 0, 0, HousingValues(("NPC1", -1)));
+housing.SetHousing("residentHouses", 0, 5, HousingValues(("NPC1", 0), ("HouseStatus", uint.MaxValue)));
+Check(housing.FindResidentHouse(0) == 5 && save.Main.GetVillagerHouse(5) is VillagerHouse2 { HouseStatus: uint.MaxValue }, "resident shortcut resolves the house assignment instead of assuming matching slot numbers");
+housing.Undo(); housing.Undo();
+// Prepare an empty room; all non-room bytes and the other seven layers are retained.
+var batchRoomHouse = save.Main.GetPlayerHouse(0);
+var blankRoom = batchRoomHouse.GetRoom(0);
+var blankLayers = blankRoom.GetItemLayers();
+foreach (var l in blankLayers) foreach (var tile in l.Tiles) tile.Delete();
+blankRoom.SetItemLayers(blankLayers); batchRoomHouse.SetRoom(0, blankRoom); save.Main.SetPlayerHouse(batchRoomHouse, 0);
+var beforeRoom = save.Main.Data.ToArray();
+var furnitureId = GameInfo.Strings.ItemDataSource.Select(x => x.Value).Where(x => x is >= 0 and < 60000 && WorkspaceCatalog.Contains(x))
+    .First(id => { var size = ItemInfo.GetItemSize(new Item((ushort)id)); return size.Width > 1 && size.Height > 1 && size.Width < 10 && size.Height < 10; });
+var furniture = new WorkspaceSession.RoomItem(furnitureId, 1, 9, 123);
+var nextFurniture = furniture.ToItem();
+var footprint = ItemInfo.GetItemSize(nextFurniture);
+housing.SetRoomItem(0, 0, 0, 2, 3, furniture, true, true, false);
+var placedRoom = save.Main.GetPlayerHouse(0).GetRoom(0).GetItemLayers()[0];
+Check(placedRoom.GetTile(2, 3).RawValue == nextFurniture.RawValue && placedRoom.GetTile(3, 3).IsExtension && placedRoom.GetTile(3, 3).ExtensionItemId == furnitureId, "room placement uses the original multi-tile extension rules and preserves all item bytes");
+var placedMain = save.Main.Data.ToArray();
+housing.SetRoomItem(0, 0, 0, 2, 3, furniture, true, true, false);
+Check(save.Main.Data.SequenceEqual(placedMain), "reapplying the same room item preserves root and extension bytes");
+ExpectInvalid(() => housing.SetRoomItem(0, 0, 0, 19, 19, furniture, true, true, false));
+ExpectInvalid(() => housing.SetRoomItem(0, 0, 0, 1, 3, furniture, true, true, false));
+ExpectInvalid(() => housing.SetRoomItem(0, 6, 0, 0, 0, furniture, true, true, false));
+ExpectInvalid(() => housing.SetRoomItem(0, 0, 8, 0, 0, furniture, true, true, false));
+Check(save.Main.Data.SequenceEqual(placedMain), "blocked room placements never leak detached changes into the save");
+housing.SetRoomItem(0, 0, 0, 3, 3, furniture, true, true, true);
+Check(save.Main.GetPlayerHouse(0).GetRoom(0).GetItemLayers()[0].GetTile(2, 3).IsNone && save.Main.GetPlayerHouse(0).GetRoom(0).GetItemLayers()[0].GetTile(3, 3).IsNone, "deleting an extension tile also deletes its root and footprint");
+housing.Undo(); Check(save.Main.Data.SequenceEqual(placedMain), "room delete undo restores root and every extension byte");
+housing.Undo(); Check(save.Main.Data.SequenceEqual(beforeRoom), "room placement undo restores every layer and unrelated bytes");
+housing.Redo();
+// Campsite preserves the real date instead of replacing it with today's date.
+save.Main.CampsiteStatus = 1;
+Check(housing.GetHousing("campsite", 0, 0, 0, 0).Locked, "locked campsite is read-only");
+ExpectInvalid(() => housing.SetHousing("campsite", 0, 0, HousingValues(("Occupied", true))));
+save.Main.CampsiteStatus = 2;
+save.Main.CampTimestamp = new DateTime(2020, 3, 20);
+var camper = WorkspaceVillagers.All()[0];
+var camperCode = camper.Species * 256 + int.Parse(camper.Id.AsSpan(3));
+housing.SetHousing("campsite", 0, 0, HousingValues(("Occupied", true), ("VisitorCode", camperCode)));
+Check(save.Main.CampsiteStatus == 3 && save.Main.CampTimestamp.ToString() == "2020-03-20" && save.Main.CampsiteVillagerSpeciesID == camper.Species, "choosing a campsite visitor preserves the saved visit date");
+var beforeBadCamp = save.Main.Data.ToArray();
+ExpectInvalid(() => housing.SetHousing("campsite", 0, 0, HousingValues(("VisitDate", "2023-02-29"))));
+ExpectInvalid(() => housing.SetHousing("campsite", 0, 0, HousingValues(("VisitorCode", 65535))));
+Check(save.Main.Data.SequenceEqual(beforeBadCamp), "invalid campsite date and visitor cannot modify bytes");
+housing.SetHousing("campsite", 0, 0, HousingValues(("Occupied", false)));
+Check(save.Main.CampsiteStatus == 2 && save.Main.CampsiteVillagerSpeciesID == 35 && save.Main.CampsiteVillagerVariantID == 0 && save.Main.CampTimestamp.ToString() == "2020-03-20", "clearing campsite uses the game's empty visitor sentinel and preserves date");
+housing.Undo(); Check(save.Main.Data.SequenceEqual(beforeBadCamp), "campsite undo restores exact status, visitor and date");
+var beforeFruitMain = save.Main.Data.ToArray();
+var beforeFruitPlayer = personal.Data.ToArray();
+housing.SetHousing("fruitFlowers", 0, 0, HousingValues(("ProfileFruit", 2214), ("SpecialtyFruit", 2287), ("SisterFruit", 2285), ("SpecialtyFlower", 7), ("SisterFlower", 6)));
+Check(personal.ProfileFruit == 2214 && save.Main.SpecialtyFruit == 2287 && save.Main.FruitFlags.SequenceEqual(new byte[] { 0, 0, 0, 0, 1 }) && save.Main.SisterFruit == 2285 && save.Main.SpecialtyFlower == IslandFlowers.Pansy, "fruit and flower edits synchronize native fruit flags without conflating player profile fruit");
+var fruitAfterMain = save.Main.Data.ToArray(); var fruitAfterPersonal = personal.Data.ToArray();
+ExpectInvalid(() => housing.SetHousing("fruitFlowers", 0, 0, HousingValues(("SpecialtyFruit", 1), ("SpecialtyFlower", 0))));
+ExpectInvalid(() => housing.SetHousing("fruitFlowers", 0, 0, HousingValues(("SisterFlower", 8))));
+Check(save.Main.Data.SequenceEqual(fruitAfterMain) && personal.Data.SequenceEqual(fruitAfterPersonal), "invalid fruit and flower edits are atomic across main and player files");
+housing.Undo(); Check(save.Main.Data.SequenceEqual(beforeFruitMain) && personal.Data.SequenceEqual(beforeFruitPlayer), "one undo restores fruit settings across both files");
+housing.Redo();
+Check(other.Data.SequenceEqual(housingOtherBefore), "housing and island life never modify another player's personal file");
+housing.Save();
+var housingReload = new HorizonSave(provider);
+Check(housingReload.Main.CampsiteStatus == 3 && housingReload.Main.SpecialtyFruit == 2287 && housingReload.Players[0].Personal.ProfileFruit == 2214
+    && housingReload.Main.GetPlayerHouse(0).GetRoom(0).GetItemLayers()[0].GetTile(2, 3).RawValue == nextFurniture.RawValue && !housingReload.GetInvalidHashes().Any(), "housing, room furniture, campsite and fruit survive encrypted save and hash validation");
+// Original-format house fields and rooms use their own offsets.
+var oldHousing = new WorkspaceSession(originalSave);
+var oldBefore = originalSave.Main.Data.ToArray();
+oldHousing.SetHousing("playerHouses", 0, 0, HousingValues(("NPC1", -1), ("HouseLevel", 3), ("PostItemName.ItemId", 2213)));
+var oldHouse = (PlayerHouse1)originalSave.Main.GetPlayerHouse(0);
+Check(oldHouse.NPC1 == -1 && oldHouse.HouseLevel == 3 && oldHouse.PostItemName.ItemId == 2213, "original house format uses its own property offsets");
+oldHousing.Undo(); Check(originalSave.Main.Data.SequenceEqual(oldBefore), "original house format undo is byte-exact");
+var oldRoomHouse = originalSave.Main.GetPlayerHouse(0);
+var oldRoom = oldRoomHouse.GetRoom(0); var oldLayers = oldRoom.GetItemLayers();
+foreach (var l in oldLayers) foreach (var tile in l.Tiles) tile.Delete();
+oldRoom.SetItemLayers(oldLayers); oldRoomHouse.SetRoom(0, oldRoom); originalSave.Main.SetPlayerHouse(oldRoomHouse, 0);
+var oldRoomBefore = originalSave.Main.Data.ToArray();
+oldHousing.SetRoomItem(0, 0, 0, 2, 3, furniture, true, true, false);
+Check(originalSave.Main.GetPlayerHouse(0).GetRoom(0).GetItemLayers()[0].GetTile(3, 3).IsExtension, "original room format supports the same multi-tile placement rules");
+oldHousing.Undo(); Check(originalSave.Main.Data.SequenceEqual(oldRoomBefore), "original room placement undo preserves every byte");
 Console.WriteLine("All workspace integration checks passed.");
 if (args.Length == 2 && args[0] == "--fixture") provider.Export(args[1]);
+
+static Dictionary<string, System.Text.Json.JsonElement> HousingValues(params (string Key, object Value)[] fields) => fields.ToDictionary(f => f.Key, f => System.Text.Json.JsonSerializer.SerializeToElement(f.Value));
 
 static void Check(bool condition, string description)
 {

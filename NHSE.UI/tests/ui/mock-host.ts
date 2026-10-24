@@ -133,7 +133,111 @@ export async function mockHost(page: Page, picker = false) {
         thresholds: [10, 100, 500, 2000, 5000, 0],
       })),
     }));
+    type HousingValue = number | boolean | string;
+    type HousingValues = Record<string, HousingValue>;
+    let housingRecords = {
+      houses: Object.fromEntries(
+        ['playerHouses', 'residentHouses'].map((kind) => [
+          kind,
+          Array.from(
+            { length: kind === 'playerHouses' ? 8 : 10 },
+            () => ({ HouseLevel: 1, NPC1: 0, Loan: 100, 'EventFlag.127': 0 }) as HousingValues,
+          ),
+        ]),
+      ),
+      campsite: { Occupied: false, VisitorCode: 0, VisitDate: '2020-03-20' } as HousingValues,
+      fruitFlowers: {
+        SpecialtyFruit: 2213,
+        SisterFruit: 2285,
+        SpecialtyFlower: 0,
+        SisterFlower: 1,
+      } as HousingValues,
+      profileFruits: [2213, 2287],
+      tiles: {} as Record<
+        string,
+        { itemId: number; systemParam: number; additionalParam: number; freeParam: number }
+      >,
+    };
+    const tileKey = (p: Record<string, unknown>, x: number, y: number) =>
+      `${p.index}:${p.room}:${p.layer}:${x}:${y}`;
+    const housing = (p: Record<string, unknown>) => {
+      const kind = String(p.kind);
+      const index = p.resident === undefined ? Number(p.index) : 5;
+      p = { ...p, index };
+      let values: HousingValues;
+      if (kind === 'campsite') values = housingRecords.campsite;
+      else if (kind === 'fruitFlowers')
+        values = {
+          ...housingRecords.fruitFlowers,
+          ProfileFruit: housingRecords.profileFruits[Number(p.player)]!,
+        };
+      else values = housingRecords.houses[kind]![index]!;
+      const fruits = [2213, 2214, 2285, 2286, 2287].map((id) => ({ id, name: String(id) }));
+      const field = ([key, value]: [string, HousingValue]) => ({
+        key,
+        value,
+        type: typeof value === 'boolean' ? 'boolean' : typeof value === 'string' ? 'date' : 'number',
+        min: key === 'NPC1' ? -128 : key.startsWith('EventFlag') ? -32768 : 0,
+        max: key === 'NPC1' ? 127 : key.startsWith('EventFlag') ? 32767 : 4294967295,
+        options: key.includes('Fruit')
+          ? fruits
+          : key.includes('Flower')
+            ? Array.from({ length: 8 }, (_, id) => ({ id, name: String(id) }))
+            : key === 'VisitorCode'
+              ? [
+                  { id: 0, name: 'ant00' },
+                  { id: 4, name: 'ant04' },
+                ]
+              : null,
+      });
+      return {
+        kind,
+        index,
+        locked: false,
+        entries: kind.includes('Houses')
+          ? Array.from({ length: kind === 'playerHouses' ? 8 : 10 }, (_, index) => ({
+              index,
+              name: `House ${index + 1}`,
+            }))
+          : [],
+        fields: Object.entries(values)
+          .filter(([key]) => !key.startsWith('EventFlag'))
+          .map(field),
+        flags: Object.entries(values)
+          .filter(([key]) => key.startsWith('EventFlag'))
+          .map(field),
+        room:
+          kind === 'playerHouses'
+            ? {
+                room: Number(p.room),
+                layer: Number(p.layer),
+                tiles: Array.from({ length: 400 }, (_, i) => {
+                  const x = i % 20,
+                    y = Math.floor(i / 20);
+                  const item = housingRecords.tiles[tileKey(p, x, y)] ?? {
+                    itemId: 65534,
+                    systemParam: 0,
+                    additionalParam: 0,
+                    freeParam: 0,
+                  };
+                  return {
+                    x,
+                    y,
+                    rootX: x,
+                    rootY: y,
+                    item: { ...item },
+                    empty: item.itemId === 65534,
+                    extension: false,
+                    name: item.itemId === 65534 ? '' : `Item ${item.itemId}`,
+                    image: null,
+                  };
+                }),
+              }
+            : null,
+      };
+    };
     type Snapshot = {
+      housingRecords: typeof housingRecords;
       progressRecords: typeof progressRecords;
       turnips: typeof turnips;
       recycleItem: typeof recycleItem;
@@ -155,11 +259,13 @@ export async function mockHost(page: Page, picker = false) {
         turnips,
         recycleItem,
         progressRecords,
+        housingRecords,
       });
     const restore = (value: Snapshot) => {
       turnips = value.turnips;
       recycleItem = value.recycleItem;
       progressRecords = value.progressRecords;
+      housingRecords = value.housingRecords;
       players = value.players;
       item = value.item;
       revision = value.revision;
@@ -269,6 +375,35 @@ export async function mockHost(page: Page, picker = false) {
                 }
               }
             }
+            if (message.command === 'setHousing') {
+              remember();
+              const kind = String(p.kind);
+              const values = p.values as HousingValues;
+              if (kind === 'fruitFlowers') {
+                housingRecords.profileFruits[Number(p.player)] = Number(
+                  values.ProfileFruit ?? housingRecords.profileFruits[Number(p.player)],
+                );
+                Object.assign(
+                  housingRecords.fruitFlowers,
+                  Object.fromEntries(Object.entries(values).filter(([key]) => key !== 'ProfileFruit')),
+                );
+              } else
+                Object.assign(
+                  kind === 'campsite'
+                    ? housingRecords.campsite
+                    : housingRecords.houses[kind]![Number(p.index)]!,
+                  values,
+                );
+            }
+            if (message.command === 'setRoomItem') {
+              remember();
+              housingRecords.tiles[tileKey(p, Number(p.x), Number(p.y))] = {
+                itemId: p.delete ? 65534 : Number(p.itemId),
+                systemParam: p.delete ? 0 : Number(p.systemParam),
+                additionalParam: p.delete ? 0 : Number(p.additionalParam),
+                freeParam: p.delete ? 0 : Number(p.freeParam),
+              };
+            }
             if (message.command === 'setPlayer') {
               remember();
               const player = players[Number(p.player)]!;
@@ -344,7 +479,9 @@ export async function mockHost(page: Page, picker = false) {
             }
             if (message.command === 'save') savedRevision = revision;
             if (message.command === 'closeSave') opened = false;
-            if (message.command === 'progress') {
+            if (message.command === 'housing') {
+              data = housing(p);
+            } else if (message.command === 'progress') {
               data = {
                 section: p.section,
                 entries: progressRecords[Number(p.player)]![String(p.section)],

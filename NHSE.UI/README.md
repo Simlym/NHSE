@@ -15,7 +15,7 @@ The shared 40-slot recycle box uses the workspace inventory grid and item catalo
 it is accessible from both inventory and the island shortcut. Both editors join
 the same undo/redo history and only write to disk on Save.
 
-Terrain, houses, campsite, fruit/flowers and all four design
+Terrain and all four design
 editors open directly from the workspace's labeled shortcuts. These specialized
 C# editors share the current save; changed byte ranges across main and player
 files join the workspace's undo history. Unchanged dialogs add no history; an
@@ -46,6 +46,30 @@ operations ask for confirmation and apply to the entire selected player's list,
 regardless of the current search, as one undo step. Data is fetched on demand;
 progress edits record only changed personal-file byte ranges. No files are written
 until the workspace Save command is used.
+
+## Housing and island life
+
+Player houses, resident houses, campsite and fruit/flowers now open Vue pages from
+the island shortcuts and the Housing navigation entry. Resident shortcuts resolve
+the NPC-to-house assignment rather than assuming the two indexes match. House
+properties include exterior/order settings, loan, occupants, full raw item
+parameters and signed event flags. The concrete save format selects property
+offsets; unchanged encrypted values and unknown bytes are preserved.
+
+Player houses expose six rooms and eight 20×20 item layers. Tile selection can
+redirect extension tiles to their root. The existing item gallery supplies new
+items; system, additional and free parameters remain editable. Placement reuses
+the original footprint, rotation, bounds and optional collision rules. Auto-extension
+management places or deletes multi-tile items together as one undo step. Edits
+use detached house/room copies so rejected placements do not affect the live save.
+
+Campsite editing respects the game's unlock status, selects bundled visitor
+identities, preserves the actual saved visit date and uses the empty visitor
+sentinel when clearing occupancy. Fruit forms distinguish the selected player's
+profile from island fruit. Changing native island fruit updates its five flags;
+flower-only changes preserve unrelated fruit data. All pages share save/undo/redo
+and retain drafts through language changes. House and room import/export remains
+available in the original editor as part of the later import/export migration.
 
 ## Build and run
 

@@ -125,7 +125,7 @@ public sealed partial class WorkspaceForm : Form
         catch (Exception ex)
         {
             if (id is not null)
-                Reply(new { id, ok = false, error = ex.Message == "villagerHouseMissing" ? "villagerHouseMissing" : ex is ArgumentException ? "invalidRequest" : "operationFailed", detail = ex.Message });
+                Reply(new { id, ok = false, error = ex.Message is "villagerHouseMissing" or "roomPlacementBlocked" ? ex.Message : ex is ArgumentException ? "invalidRequest" : "operationFailed", detail = ex.Message });
         }
         finally { if (claimed) HandlingMessage = false; }
     }
@@ -265,6 +265,15 @@ public sealed partial class WorkspaceForm : Form
             case "setPlayer":
                 RequireSession().SetPlayer(Int(p, "player"), p.GetProperty("wallet").GetUInt32(), p.GetProperty("bank").GetUInt32(), p.GetProperty("miles").GetUInt32(), p.GetProperty("earnedMiles").GetUInt32(),
                     Str(p, "name"), Str(p, "island"), OptionalUInt(p, "pocketCapacity"), OptionalUInt(p, "storageCapacity"), OptionalUInt(p, "hotelTickets"), OptionalUInt(p, "poki"));
+                return State();
+            case "housing": return RequireSession().GetHousing(Str(p, "kind"), Int(p, "player"), p.TryGetProperty("resident", out var houseResident) ? RequireSession().FindResidentHouse(houseResident.GetInt32()) : Int(p, "index"), Int(p, "room"), Int(p, "layer"), Sprite);
+            case "setHousing":
+                RequireSession().SetHousing(Str(p, "kind"), Int(p, "player"), Int(p, "index"), p.GetProperty("values").Deserialize<Dictionary<string, JsonElement>>() ?? throw new ArgumentException("invalidRequest"));
+                return State();
+            case "setRoomItem":
+                RequireSession().SetRoomItem(Int(p, "index"), Int(p, "room"), Int(p, "layer"), Int(p, "x"), Int(p, "y"),
+                    new WorkspaceSession.RoomItem(Int(p, "itemId"), Int(p, "systemParam"), Int(p, "additionalParam"), Int(p, "freeParam")),
+                    p.GetProperty("autoExtensions").GetBoolean(), p.GetProperty("noOverwrite").GetBoolean(), p.GetProperty("delete").GetBoolean());
                 return State();
             case "progress": return RequireSession().GetProgress(Int(p, "player"), Str(p, "section"));
             case "setRecipe":

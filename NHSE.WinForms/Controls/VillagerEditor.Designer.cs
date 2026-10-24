@@ -349,7 +349,8 @@
             // VillagerEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.AutoScroll = true;
             this.Controls.Add(this.B_ReplaceVillager);
             this.Controls.Add(this.B_SetPhraseOriginal);
             this.Controls.Add(this.B_EditHouses);

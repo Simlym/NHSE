@@ -62,7 +62,7 @@ namespace NHSE.WinForms
             // SimpleHexEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(384, 343);
             this.Controls.Add(this.B_Update);
             this.Controls.Add(this.RTB_RAM);
@@ -73,6 +73,7 @@ namespace NHSE.WinForms
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "RAM Edit";
             this.ResumeLayout(false);
+            MinimumSize = Size;
 
         }
         #endregion

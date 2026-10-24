@@ -989,6 +989,7 @@
             TC_Editors.ResumeLayout(false);
             ResumeLayout(false);
             PerformLayout();
+            MinimumSize = Size;
 
         }
 

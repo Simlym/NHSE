@@ -214,7 +214,8 @@
             // 
             // PatternEditorPRO
             // 
-            AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
+            AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             ClientSize = new System.Drawing.Size(592, 328);
             Controls.Add(PB_Sheet3);
             Controls.Add(PB_Sheet2);
@@ -240,6 +241,7 @@
             ((System.ComponentModel.ISupportInitialize)PB_Sheet2).EndInit();
             ResumeLayout(false);
             PerformLayout();
+            MinimumSize = Size;
 
         }
 

@@ -268,6 +268,7 @@
             // 
             // FLP_Controls
             // 
+            this.FLP_Controls.AutoScroll = true;
             this.FLP_Controls.Controls.Add(this.L_ItemName);
             this.FLP_Controls.Controls.Add(this.ItemGrid);
             this.FLP_Controls.Controls.Add(this.PAN_Navigation);
@@ -305,7 +306,7 @@
             // ItemGridEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.Controls.Add(this.FLP_Controls);
             this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
             this.Name = "ItemGridEditor";

@@ -108,7 +108,7 @@
             // VillagerHouseEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(484, 283);
             this.Controls.Add(this.B_LoadHouse);
             this.Controls.Add(this.B_DumpHouse);
@@ -123,6 +123,7 @@
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "Villager House Editor";
             this.ResumeLayout(false);
+            MinimumSize = Size;
 
         }
 

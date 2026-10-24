@@ -42,7 +42,7 @@
             // SettingsEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(322, 310);
             this.Controls.Add(this.PG_Settings);
             this.Icon = global::NHSE.WinForms.Properties.Resources.icon;
@@ -55,6 +55,7 @@
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.SettingsEditor_FormClosing);
             this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.SettingsEditor_KeyDown);
             this.ResumeLayout(false);
+            MinimumSize = Size;
 
         }
 

@@ -21,8 +21,9 @@ public partial class ItemGrid : UserControl
 
     public void InitializeGrid(int width, int height, IGridItem info)
     {
-        sizeW = info.Width;
-        sizeH = info.Height;
+        // Slots are created after automatic scaling; their input dimensions are logical pixels.
+        sizeW = LogicalToDeviceUnits(info.Width);
+        sizeH = LogicalToDeviceUnits(info.Height);
         Generate(width, height);
         Slots = width * height;
     }

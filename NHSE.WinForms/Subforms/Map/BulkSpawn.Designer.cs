@@ -223,7 +223,7 @@
             // BulkSpawn
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(136, 235);
             this.Controls.Add(this.CB_SpawnArrange);
             this.Controls.Add(this.L_DIYStop);

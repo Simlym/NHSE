@@ -70,7 +70,7 @@
             // SingleObjectEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(324, 421);
             this.Controls.Add(this.PG_Item);
             this.Controls.Add(this.B_Cancel);
@@ -82,6 +82,7 @@
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "Property Editor";
             this.ResumeLayout(false);
+            MinimumSize = Size;
 
         }
 

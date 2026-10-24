@@ -126,7 +126,7 @@
             // PlayerHouseFlagEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(284, 261);
             this.Controls.Add(this.B_Load);
             this.Controls.Add(this.B_Dump);
@@ -144,6 +144,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.NUD_Count)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
+            MinimumSize = Size;
 
         }
 

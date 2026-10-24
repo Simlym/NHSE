@@ -135,6 +135,7 @@
             // 
             this.FLP_Count.SetFlowBreak(this.NUD_Count, true);
             this.NUD_Count.Location = new System.Drawing.Point(84, 3);
+            this.NUD_Count.Margin = new System.Windows.Forms.Padding(0);
             this.NUD_Count.Maximum = new decimal(new int[] {
             65535,
             0,
@@ -169,6 +170,7 @@
             // NUD_Uses
             // 
             this.NUD_Uses.Location = new System.Drawing.Point(84, 3);
+            this.NUD_Uses.Margin = new System.Windows.Forms.Padding(0);
             this.NUD_Uses.Maximum = new decimal(new int[] {
             65535,
             0,
@@ -192,6 +194,7 @@
             // 
             this.NUD_Flag0.Hexadecimal = true;
             this.NUD_Flag0.Location = new System.Drawing.Point(84, 3);
+            this.NUD_Flag0.Margin = new System.Windows.Forms.Padding(0);
             this.NUD_Flag0.Maximum = new decimal(new int[] {
             255,
             0,
@@ -215,6 +218,7 @@
             // 
             this.NUD_Flag1.Hexadecimal = true;
             this.NUD_Flag1.Location = new System.Drawing.Point(84, 3);
+            this.NUD_Flag1.Margin = new System.Windows.Forms.Padding(0);
             this.NUD_Flag1.Maximum = new decimal(new int[] {
             255,
             0,
@@ -249,11 +253,13 @@
             this.FLP_Controls.Controls.Add(this.FLP_Item);
             this.FLP_Controls.Controls.Add(this.FLP_Flag1Group);
             this.FLP_Controls.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.FLP_Controls.FlowDirection = System.Windows.Forms.FlowDirection.TopDown;
             this.FLP_Controls.Location = new System.Drawing.Point(0, 0);
             this.FLP_Controls.Margin = new System.Windows.Forms.Padding(0);
             this.FLP_Controls.Name = "FLP_Controls";
             this.FLP_Controls.Size = new System.Drawing.Size(222, 681);
             this.FLP_Controls.TabIndex = 15;
+            this.FLP_Controls.WrapContents = false;
             // 
             // PB_Item
             // 
@@ -271,6 +277,8 @@
             // 
             this.FLP_Meta.AutoSize = true;
             this.FLP_Meta.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.FLP_Meta.FlowDirection = System.Windows.Forms.FlowDirection.TopDown;
+            this.FLP_Meta.WrapContents = false;
             this.FLP_Meta.Controls.Add(this.CB_ItemID);
             this.FLP_Meta.Controls.Add(this.CHK_IsExtension);
             this.FLP_Meta.Controls.Add(this.PAN_DummyExtension);
@@ -387,6 +395,8 @@
             // FLP_Item
             // 
             this.FLP_Item.AutoSize = true;
+            this.FLP_Item.FlowDirection = System.Windows.Forms.FlowDirection.TopDown;
+            this.FLP_Item.WrapContents = false;
             this.FLP_Item.Controls.Add(this.FLP_Count);
             this.FLP_Item.Controls.Add(this.FLP_Uses);
             this.FLP_Item.Controls.Add(this.FLP_Flag0);
@@ -467,6 +477,8 @@
             // FLP_Flower
             // 
             this.FLP_Flower.AutoSize = true;
+            this.FLP_Flower.FlowDirection = System.Windows.Forms.FlowDirection.TopDown;
+            this.FLP_Flower.WrapContents = false;
             this.FLP_Flower.Controls.Add(this.FLP_Genetics);
             this.FLP_Flower.Controls.Add(this.PAN_DummyFlower);
             this.FLP_Flower.Controls.Add(this.FLP_FlowerFlags);
@@ -819,6 +831,8 @@
             // 
             this.FLP_Flag1Group.AutoSize = true;
             this.FLP_Flag1Group.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.FLP_Flag1Group.FlowDirection = System.Windows.Forms.FlowDirection.TopDown;
+            this.FLP_Flag1Group.WrapContents = false;
             this.FLP_Flag1Group.Controls.Add(this.FLP_Flag1);
             this.FLP_Flag1Group.Controls.Add(this.CHK_Wrapped);
             this.FLP_Flag1Group.Controls.Add(this.FLP_Wrapped);
@@ -854,6 +868,8 @@
             // FLP_Wrapped
             // 
             this.FLP_Wrapped.AutoSize = true;
+            this.FLP_Wrapped.FlowDirection = System.Windows.Forms.FlowDirection.TopDown;
+            this.FLP_Wrapped.WrapContents = false;
             this.FLP_Wrapped.Controls.Add(this.CB_WrapType);
             this.FLP_Wrapped.Controls.Add(this.CB_WrapColor);
             this.FLP_Wrapped.Controls.Add(this.CHK_WrapShowName);
@@ -891,6 +907,7 @@
             // CHK_WrapShowName
             // 
             this.FLP_Wrapped.SetFlowBreak(this.CHK_WrapShowName, true);
+            this.CHK_WrapShowName.AutoSize = true;
             this.CHK_WrapShowName.Location = new System.Drawing.Point(17, 42);
             this.CHK_WrapShowName.Margin = new System.Windows.Forms.Padding(17, 0, 0, 0);
             this.CHK_WrapShowName.Name = "CHK_WrapShowName";
@@ -902,6 +919,7 @@
             // CHK_Wrap80
             // 
             this.FLP_Wrapped.SetFlowBreak(this.CHK_Wrap80, true);
+            this.CHK_Wrap80.AutoSize = true;
             this.CHK_Wrap80.Location = new System.Drawing.Point(17, 59);
             this.CHK_Wrap80.Margin = new System.Windows.Forms.Padding(17, 0, 0, 0);
             this.CHK_Wrap80.Name = "CHK_Wrap80";
@@ -921,7 +939,7 @@
             // ItemEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.Controls.Add(this.FLP_Controls);
             this.Name = "ItemEditor";
             this.Size = new System.Drawing.Size(222, 681);

@@ -81,7 +81,7 @@
             // BuildingHelp
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(251, 107);
             this.Controls.Add(this.L_StructureValues);
             this.Controls.Add(this.CB_StructureValues);
@@ -95,6 +95,7 @@
             this.Text = "Building Help";
             this.ResumeLayout(false);
             this.PerformLayout();
+            MinimumSize = Size;
 
         }
 

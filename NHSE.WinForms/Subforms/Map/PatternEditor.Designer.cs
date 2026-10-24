@@ -175,7 +175,8 @@
             // 
             // PatternEditor
             // 
-            AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
+            AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             ClientSize = new System.Drawing.Size(592, 328);
             Controls.Add(PB_Palette);
             Controls.Add(L_PatternName);
@@ -195,6 +196,7 @@
             CM_Picture.ResumeLayout(false);
             ResumeLayout(false);
             PerformLayout();
+            MinimumSize = Size;
 
         }
 

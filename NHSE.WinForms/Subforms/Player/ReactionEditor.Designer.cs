@@ -83,7 +83,7 @@
             // ReactionEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(331, 287);
             this.Controls.Add(this.B_GiveAll);
             this.Controls.Add(this.PG_Manpu);
@@ -96,6 +96,7 @@
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "Reaction List Editor";
             this.ResumeLayout(false);
+            MinimumSize = Size;
 
         }
 

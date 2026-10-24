@@ -694,7 +694,7 @@ namespace NHSE.WinForms.Subforms.Map
             // TerrainBrushEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(511, 486);
             this.Controls.Add(this.cb_tileVariation);
             this.Controls.Add(this.tabControl1);
@@ -718,6 +718,7 @@ namespace NHSE.WinForms.Subforms.Map
             this.tabPage2.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
+            MinimumSize = Size;
 
         }
 

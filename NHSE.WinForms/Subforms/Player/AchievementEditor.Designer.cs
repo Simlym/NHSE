@@ -226,7 +226,7 @@
             // AchievementEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(589, 261);
             this.Controls.Add(this.B_Max);
             this.Controls.Add(this.B_ClearAll);
@@ -254,6 +254,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.NUD_Unk)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
+            MinimumSize = Size;
 
         }
 

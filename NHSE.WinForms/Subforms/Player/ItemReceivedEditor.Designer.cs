@@ -215,7 +215,7 @@
             // ItemReceivedEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(815, 473);
             this.Controls.Add(this.CB_VariantBodiesOnly);
             this.Controls.Add(this.CLB_Remake);
@@ -234,6 +234,7 @@
             this.CM_Buttons.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
+            MinimumSize = Size;
 
         }
 

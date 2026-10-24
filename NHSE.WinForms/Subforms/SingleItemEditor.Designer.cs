@@ -36,7 +36,7 @@
             // B_Save
             // 
             B_Save.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
-            B_Save.Location = new System.Drawing.Point(94, 339);
+            B_Save.Location = new System.Drawing.Point(159, 418);
             B_Save.Name = "B_Save";
             B_Save.Size = new System.Drawing.Size(75, 31);
             B_Save.TabIndex = 1;
@@ -47,7 +47,7 @@
             // B_Cancel
             // 
             B_Cancel.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
-            B_Cancel.Location = new System.Drawing.Point(13, 339);
+            B_Cancel.Location = new System.Drawing.Point(78, 418);
             B_Cancel.Name = "B_Cancel";
             B_Cancel.Size = new System.Drawing.Size(75, 31);
             B_Cancel.TabIndex = 2;
@@ -57,16 +57,18 @@
             // 
             // ItemEditor
             // 
+            ItemEditor.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
             ItemEditor.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             ItemEditor.Location = new System.Drawing.Point(12, 12);
             ItemEditor.Name = "ItemEditor";
-            ItemEditor.Size = new System.Drawing.Size(157, 316);
+            ItemEditor.Size = new System.Drawing.Size(222, 400);
             ItemEditor.TabIndex = 3;
             // 
             // SingleItemEditor
             // 
-            AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
-            ClientSize = new System.Drawing.Size(181, 382);
+            AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
+            AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            ClientSize = new System.Drawing.Size(246, 461);
             Controls.Add(ItemEditor);
             Controls.Add(B_Cancel);
             Controls.Add(B_Save);
@@ -77,6 +79,7 @@
             StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             Text = "Item Editor";
             ResumeLayout(false);
+            MinimumSize = Size;
 
         }
 

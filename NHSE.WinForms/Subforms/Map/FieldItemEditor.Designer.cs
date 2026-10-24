@@ -1561,7 +1561,8 @@
             // 
             // FieldItemEditor
             // 
-            AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
+            AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             ClientSize = new System.Drawing.Size(1164, 641);
             Controls.Add(tableLayoutPanel2);
             Controls.Add(TC_Editor);

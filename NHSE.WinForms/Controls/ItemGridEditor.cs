@@ -168,13 +168,18 @@ public partial class ItemGridEditor : UserControl
 
     private void SetItemSprite(Item item, PictureBox pb)
     {
-        var dw = Sprites.Width;
-        var dh = Sprites.Height;
+        // Render directly at the slot's device size so DPI-scaled text is not enlarged twice.
+        // Slots have a one-pixel FixedSingle border; ClientSize includes it before handle creation.
+        var dw = pb.Width - 2;
+        var dh = pb.Height - 2;
         var font = L_ItemName.Font;
         pb.BackColor = ItemColor.GetItemColor(item);
         pb.BackgroundImage = ItemSprite.GetItemSprite(item);
         var backing = new Bitmap(dw, dh);
+        backing.SetResolution(pb.DeviceDpi, pb.DeviceDpi);
+        var previous = pb.Image;
         pb.Image = ItemSprite.GetItemMarkup(item, font, dw, dh, backing);
+        previous?.Dispose();
     }
 
     private static int GetPageJump()

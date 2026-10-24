@@ -469,7 +469,7 @@
             // VillagerMemoryEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(506, 359);
             this.Controls.Add(this.TB_Island);
             this.Controls.Add(this.LBL_IslandName);
@@ -496,6 +496,7 @@
             this.Tab_Greet.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
+            MinimumSize = Size;
 
         }
 

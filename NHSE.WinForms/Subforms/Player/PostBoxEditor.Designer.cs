@@ -748,6 +748,7 @@ namespace NHSE.WinForms
             ((System.ComponentModel.ISupportInitialize)NUD_Post_Slots).EndInit();
             ResumeLayout(false);
             PerformLayout();
+            MinimumSize = Size;
         }
 
         #endregion

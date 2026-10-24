@@ -102,6 +102,8 @@ public static class ItemSprite
     }
 
     private static readonly StringFormat Center = new() { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+    private static readonly StringFormat TopRight = new() { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Near };
+    private static readonly StringFormat BottomLeft = new() { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Far };
 
     private static Bitmap CreateFake(Item item, Font font, int width, int height, Bitmap bmp)
     {
@@ -122,8 +124,8 @@ public static class ItemSprite
         if (item.UseCount != 0)
             gfx.DrawString(item.UseCount.ToString(), font, brush, width >> 1, height >> 1, Center);
         if (item.SystemParam != 0)
-            gfx.DrawString(item.SystemParam.ToString(), font, brush, width - 12, 0);
+            gfx.DrawString(item.SystemParam.ToString(), font, brush, width, 0, TopRight);
         if (item.AdditionalParam != 0)
-            gfx.DrawString(item.AdditionalParam.ToString(), font, brush, 0, height - 12);
+            gfx.DrawString(item.AdditionalParam.ToString(), font, brush, 0, height, BottomLeft);
     }
 }

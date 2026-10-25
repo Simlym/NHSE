@@ -30,6 +30,27 @@ const pending = computed(() => JSON.stringify(fields.value) !== JSON.stringify(s
 const selectedTile = computed(() =>
   props.data?.room?.tiles.find((t) => t.x === selected.value.x && t.y === selected.value.y),
 );
+const roomTiles = computed(() => new Map((props.data?.room?.tiles ?? []).map(tile => [pointKey(tile), tile])));
+function rootKey(tile: HousingTile) { return tile.extension ? `${tile.rootX},${tile.rootY}` : pointKey(tile); }
+const selectedRoot = computed(() => selectedTile.value && !selectedTile.value.empty ? rootKey(selectedTile.value) : null);
+function footprint(tile: HousingTile) {
+  if (tile.empty) return {};
+  const root = rootKey(tile);
+  const same = (x: number, y: number) => {
+    const neighbor = roomTiles.value.get(`${x},${y}`);
+    return neighbor && !neighbor.empty && rootKey(neighbor) === root;
+  };
+  return {
+    occupied: true,
+    'footprint-selected': root === selectedRoot.value,
+    'edge-top': !same(tile.x, tile.y - 1), 'edge-bottom': !same(tile.x, tile.y + 1),
+    'edge-left': !same(tile.x - 1, tile.y), 'edge-right': !same(tile.x + 1, tile.y),
+  };
+}
+function tileTitle(tile: HousingTile) {
+  const root = roomTiles.value.get(rootKey(tile));
+  return `${tile.x},${tile.y} · ${tile.empty ? t('empty') : root?.name || tile.name || t('housingExtension')}`;
+}
 const emptyItem = (): RoomItem => ({ itemId: 65534, systemParam: 0, additionalParam: 0, freeParam: 0 });
 const item = ref<RoomItem>(emptyItem());
 const pendingTile = computed(
@@ -221,30 +242,36 @@ defineExpose({ applyPending, chooseItem });
           >
         </div>
         <p class="field-help">{{ t('housingRoomHint') }}</p>
+        <div class="room-legend">
+          <span><i class="legend-empty" />{{ t('empty') }}</span>
+          <span><i class="legend-occupied" />{{ t('housingFootprint') }}</span>
+          <span><i class="legend-selected" />{{ t('housingSelectedFootprint') }}</span>
+          <span class="field-help">{{ t('housingGridCoordinates') }}</span>
+        </div>
         <GridToolbar :count="gridSelection.selected.value.length" :clipboard="clipboard" kind="items" :busy="busy || gridSelection.dragging.value" :action="gridAction" :clear="gridSelection.clear" />
         <div class="housing-room-layout">
           <div class="housing-grid-scroll">
+            <div class="housing-grid-ruler" aria-hidden="true"><span v-for="x in 20" :key="x">{{ x - 1 }}</span></div>
             <div class="housing-grid" tabindex="0" data-columns="20" data-rows="20" @pointerdown="gridSelection.down" @pointermove="gridSelection.move" @pointerup="gridSelection.up" @pointercancel="gridSelection.cancel" @lostpointercapture="gridSelection.cancel" @keydown="gridSelection.keydown" :aria-label="t('housingRoomEditor')" role="group">
               <button
                 v-for="tile in data.room.tiles"
                 :key="`${tile.x},${tile.y}`"
                 class="housing-tile"
                 tabindex="-1"
-                :class="{
+                :class="[footprint(tile), {
                   active: selected.x === tile.x && selected.y === tile.y,
                   empty: tile.empty,
                   extension: tile.extension,
                   'multi-selected': gridSelection.keys.value.has(pointKey(tile)),
-                }"
+                }]"
                 :aria-label="`${tile.x},${tile.y}: ${tile.empty ? t('empty') : tile.extension ? t('housingExtension') : tile.name}`"
                 :aria-pressed="gridSelection.keys.value.has(pointKey(tile))"
-                :title="`${tile.x},${tile.y} · ${tile.name}`"
+                :title="tileTitle(tile)"
                 :disabled="busy"
                 @click="gridSelection.click($event, tile)"
               >
-                <img v-if="tile.image" :src="tile.image" alt="" /><span v-else>{{
-                  tile.empty ? '·' : tile.extension ? '↖' : tile.item.itemId
-                }}</span>
+                <small v-if="tile.x === 0" class="room-row-number" aria-hidden="true">{{ tile.y }}</small>
+                <img v-if="tile.image && !tile.extension" :src="tile.image" alt="" /><span v-else-if="!tile.empty && !tile.extension">{{ tile.item.itemId }}</span>
               </button>
             </div>
           </div>
@@ -329,23 +356,34 @@ defineExpose({ applyPending, chooseItem });
 }
 .housing-grid-scroll {
   overflow: auto;
-  max-height: 660px;
-  border: 1px solid var(--line);
+  border: 2px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
 }
+.housing-grid-ruler { display: grid; grid-template-columns: repeat(20, minmax(24px, 1fr)); min-width: 480px; background: var(--hover); color: var(--muted); font-size: 10px; text-align: center; padding-block: 5px; }
+.room-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-block: 12px; font-size: 12px; color: var(--muted); }
+.room-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.room-legend i { width: 14px; height: 14px; border: 1px solid var(--line-strong); }
+.legend-empty { background: var(--surface); }
+.room-legend .legend-occupied { background: var(--green-soft); border-color: var(--green); }
+.room-legend .legend-selected { background: color-mix(in srgb, var(--green) 28%, var(--surface)); border: 2px solid var(--green); }
 .housing-grid {
   display: grid;
   touch-action: none;
   user-select: none;
-  grid-template-columns: repeat(20, minmax(28px, 1fr));
-  min-width: 560px;
+  grid-template-columns: repeat(20, minmax(24px, 1fr));
+  min-width: 480px;
 }
+.housing-grid:focus { outline: none; }
+.housing-grid:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
 .housing-tile {
+  position: relative;
   aspect-ratio: 1;
   padding: 1px;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--line);
-  background: var(--slot);
+  background: var(--surface);
   font-size: 9px;
 }
 .housing-tile.active {
@@ -354,9 +392,13 @@ defineExpose({ applyPending, chooseItem });
   background: var(--green-soft);
 }
 .housing-tile.multi-selected { box-shadow: inset 0 0 0 2px #2f8fe8; }
-.housing-tile.extension {
-  background: var(--hover);
-}
+.housing-tile.occupied { background: var(--green-soft); border-color: color-mix(in srgb, var(--green) 12%, var(--surface)); }
+.housing-tile.edge-top { border-top: 2px solid var(--green); }
+.housing-tile.edge-bottom { border-bottom: 2px solid var(--green); }
+.housing-tile.edge-left { border-left: 2px solid var(--green); }
+.housing-tile.edge-right { border-right: 2px solid var(--green); }
+.housing-tile.footprint-selected { background: color-mix(in srgb, var(--green) 28%, var(--surface)); }
+.room-row-number { position: absolute; top: 2px; left: 2px; font-size: 8px; line-height: 1; color: var(--muted); pointer-events: none; }
 .housing-tile img {
   width: 100%;
   height: 100%;

@@ -2,9 +2,12 @@
 import { t } from './i18n';
 import type { HousingField } from './bridge';
 import { housingLabel } from './housingLabels';
+import { buildingTypeName } from './mapBuildingLabels';
 const props = defineProps<{ fields: HousingField[]; busy: boolean }>();
 const model = defineModel<Record<string, number | boolean | string>>({ required: true });
 function options(field: HousingField) {
+  if (field.key === 'Map.BuildingType')
+    return field.options?.map(o => ({ ...o, name: buildingTypeName(o.id) }));
   if (field.key === 'SpecialtyFlower' || field.key === 'SisterFlower')
     return field.options?.map((o) => ({ ...o, name: t('housingFlowers').split('|')[o.id] ?? o.name }));
   return field.options;

@@ -28,8 +28,6 @@ import {
   Users,
   X,
   Save,
-  PanelLeftClose,
-  PanelLeftOpen,
   Palette,
   SunMoon,
 } from '@lucide/vue';
@@ -135,7 +133,6 @@ const error = ref('');
 const errorDetail = ref('');
 const notice = ref('');
 const dragging = ref(false);
-const focused = ref(false);
 const theme = ref(localStorage.getItem('nhse.theme') ?? 'system');
 const fields = ref({
   name: '',
@@ -156,6 +153,7 @@ const designTarget = ref<{ kind: DesignKind; index: number }>({ kind: 'patterns'
 const consoleData = ref<ConsoleState | null>(null);
 const advancedPage = ref<InstanceType<typeof AdvancedPage> | null>(null);
 const advancedData = ref<AdvancedData | null>(null);
+const advancedOrigin = ref<Page | null>(null);
 const advancedTarget = ref<AdvancedTarget>({ kind: 'flagsPlayer', player: 0, resident: 0, index: 0, container: 'pocket' });
 const museumPage = ref<InstanceType<typeof MuseumPage> | null>(null);
 const museumData = ref<MuseumData | null>(null);
@@ -261,14 +259,27 @@ async function run(action: () => Promise<void>) {
 async function loadMap() {
   if (state.value.session) mapData.value = await request<MapData>('map', { target: { ...mapTarget.value } });
 }
+const mapNavigating = ref(false);
+let queuedMapNavigation: Partial<MapTarget> | null = null;
 async function navigateMap(part: Partial<MapTarget>) {
+  if (mapNavigating.value) { queuedMapNavigation = { ...queuedMapNavigation, ...part }; return; }
   if (busy.value || !(await applyWorldDrafts())) return;
-  await run(async () => {
-    const next = { ...mapTarget.value, ...part };
-    const data = await request<MapData>('map', { target: next });
-    mapTarget.value = data.target;
-    mapData.value = data;
-  });
+  mapNavigating.value = true;
+  try {
+    await run(async () => {
+      let change: Partial<MapTarget> | null = part;
+      while (change) {
+        const next: MapTarget = { ...mapTarget.value, ...change };
+        const current = mapData.value;
+        const includeImages = !current || ['mode', 'acre', 'layer', 'building'].some(key => next[key as keyof MapTarget] !== current.target[key as keyof MapTarget]);
+        const data = await request<MapData>('map', { target: next, includeImages });
+        mapTarget.value = data.target;
+        mapData.value = includeImages || !current ? data : { ...data, overview: current.overview, viewport: current.viewport, itemImage: current.itemImage };
+        change = queuedMapNavigation;
+        queuedMapNavigation = null;
+      }
+    });
+  } finally { mapNavigating.value = false; queuedMapNavigation = null; }
 }
 async function loadDesigns() {
   if (state.value.session) designData.value = await request<DesignData>('designs', { ...designTarget.value });
@@ -303,6 +314,7 @@ async function openAdvanced(part: Partial<AdvancedTarget>) {
   const target = { ...advancedTarget.value, ...part };
   return await run(async () => {
     const data = await request<AdvancedData>('advancedData', { target });
+    advancedOrigin.value = page.value;
     advancedTarget.value = data.target; advancedData.value = data; page.value = 'advancedEditor';
   });
 }
@@ -403,6 +415,7 @@ async function go(destination: Page) {
   if (page.value === 'player' && profilePending.value && !(await applyProfile())) return;
   if (!(await applyWorldDrafts())) return;
   page.value = destination;
+  if (destination === 'advancedEditor') advancedOrigin.value = null;
   if (destination === 'inventory') await run(() => loadInventory(0));
   if (destination === 'progress') await run(loadProgress);
   if (destination === 'housing') await run(loadHousing);
@@ -503,6 +516,11 @@ function chooseSlot(item: ItemView) {
   draftItem.value = null;
   quantity.value = item.quantity || 1;
 }
+function clearInventorySelection() {
+  selected.value = null;
+  draftItem.value = null;
+  quantity.value = 1;
+}
 async function searchCatalog(pageNumber = 0) {
   if (busy.value) {
     pendingCatalogPage = pageNumber;
@@ -586,6 +604,7 @@ async function drop(event: DragEvent) {
   dragging.value = false;
   if (busy.value) return;
   const files = Array.from(event.dataTransfer?.files ?? []);
+  if (!files.length && !event.dataTransfer?.types.includes('Files')) return;
   if (files.length !== 1) {
     error.value = t('dropHint');
     return;
@@ -700,13 +719,12 @@ onUnmounted(() => {
   <div
     v-else
     class="app"
-    :class="{ 'is-focused': focused }"
-    @dragover.prevent="dragging = true"
+    @dragover.prevent="dragging = !busy && !!$event.dataTransfer?.types.includes('Files')"
     @dragleave.self="dragging = false"
     @drop.prevent="drop"
     :aria-busy="busy"
   >
-    <aside v-if="!focused" class="sidebar">
+    <aside class="sidebar">
       <div class="brand">
         <span class="brand-mark"><Leaf :size="25" /></span><span>NHSE<small>ISLAND STUDIO</small></span>
       </div>
@@ -740,7 +758,7 @@ onUnmounted(() => {
     <div class="app-body">
       <header class="topbar">
         <div class="breadcrumb">
-          <Leaf v-if="focused" :size="20" /><span>NHSE</span><span class="separator">/</span
+          <span>NHSE</span><span class="separator">/</span
           ><strong>{{ state.session ? state.session.island : t('home') }}</strong>
         </div>
         <div class="top-actions">
@@ -854,21 +872,11 @@ onUnmounted(() => {
           </div>
         </section>
       </main>
-      <main v-else class="workspace-content">
+      <main v-else class="workspace-content" :class="{ 'map-workspace-page': page === 'mapEditor' }">
         <div class="workspace-heading">
           <div>
             <div class="eyebrow muted">{{ state.session.island }}</div>
             <h1>{{ t(page) }}</h1>
-          </div>
-          <div class="workspace-controls">
-            <button
-              class="icon-button"
-              :aria-label="focused ? t('exitFocus') : t('focus')"
-              :title="focused ? t('exitFocus') : t('focus')"
-              @click="focused = !focused"
-            >
-              <PanelLeftOpen v-if="focused" :size="20" /><PanelLeftClose v-else :size="20" />
-            </button>
           </div>
         </div>
         <div
@@ -902,16 +910,6 @@ onUnmounted(() => {
             <Check v-if="player.index === playerIndex" :size="15" class="player-active-mark" />
           </button>
         </div>
-        <nav v-if="focused" class="focus-nav" :aria-label="t('workspace')">
-          <button
-            v-for="item in nav"
-            :key="item.id"
-            :class="{ active: page === item.id }"
-            @click="go(item.id)"
-          >
-            {{ t(item.id) }}
-          </button>
-        </nav>
         <section v-if="page === 'overview'" class="overview-page">
           <div class="overview-welcome">
             <span class="overview-leaf"><Leaf :size="32" /></span>
@@ -941,99 +939,110 @@ onUnmounted(() => {
         <section v-else-if="page === 'player'" class="player-page">
           <p class="page-description">{{ t('playerHint') }}</p>
           <form ref="playerForm" class="balance-form" @submit.prevent="applyProfile">
-            <div class="form-section-title">
-              <UserRound :size="19" />
-              <h2>{{ t('identity') }}</h2>
-            </div>
-            <label
-              ><span>{{ t('playerName') }}</span
-              ><input
-                v-model="fields.name"
-                :aria-label="t('playerName')"
-                aria-describedby="player-name-help"
-                required
-                maxlength="10"
-                :disabled="busy"
-                :spellcheck="false"
-                autocomplete="off"
-              /><small id="player-name-help" class="field-help">{{ t('nameHint') }}</small></label
-            >
-            <label
-              ><span>{{ t('islandName') }}</span
-              ><input
-                v-model="fields.island"
-                :aria-label="t('islandName')"
-                aria-describedby="island-name-help"
-                required
-                maxlength="10"
-                :disabled="busy"
-                :spellcheck="false"
-                autocomplete="off"
-              /><small id="island-name-help" class="field-help">{{ t('islandNameHint') }}</small></label
-            >
-            <div class="form-section-title">
-              <Package :size="19" />
-              <h2>{{ t('balancesAndCapacity') }}</h2>
-            </div>
-            <label v-for="field in balanceFields" :key="field"
-              ><span>{{ t(field) }}</span>
-              <div class="unit-input">
-                <input
-                  v-model.number="fields[field]"
+            <section class="player-card player-identity" aria-labelledby="player-identity-title">
+              <div class="form-section-title">
+                <UserRound :size="19" />
+                <h2 id="player-identity-title">{{ t('identity') }}</h2>
+              </div>
+              <label
+                ><span>{{ t('playerName') }}</span
+                ><input
+                  v-model="fields.name"
+                  :aria-label="t('playerName')"
+                  aria-describedby="player-name-help"
+                  required
+                  maxlength="10"
+                  :disabled="busy"
+                  :spellcheck="false"
+                  autocomplete="off"
+                /><small id="player-name-help" class="field-help">{{ t('nameHint') }}</small></label
+              >
+              <label
+                ><span>{{ t('islandName') }}</span
+                ><input
+                  v-model="fields.island"
+                  :aria-label="t('islandName')"
+                  aria-describedby="island-name-help"
+                  required
+                  maxlength="10"
+                  :disabled="busy"
+                  :spellcheck="false"
+                  autocomplete="off"
+                /><small id="island-name-help" class="field-help">{{ t('islandNameHint') }}</small></label
+              >
+            </section>
+            <section class="player-card player-assets" aria-labelledby="player-assets-title">
+              <div class="form-section-title">
+                <Package :size="19" />
+                <h2 id="player-assets-title">{{ t('playerAssets') }}</h2>
+              </div>
+              <label v-for="field in balanceFields" :key="field"
+                ><span>{{ t(field) }}</span>
+                <div class="unit-input">
+                  <input
+                    v-model.number="fields[field]"
+                    type="number"
+                    required
+                    min="0"
+                    max="999999999"
+                    step="1"
+                    :disabled="busy"
+                  /><span>{{ t(field === 'wallet' || field === 'bank' ? 'currency' : 'milesUnit') }}</span>
+                </div></label
+              >
+              <label v-if="currentPlayer?.hotelTickets != null"
+                ><span>{{ t('hotelTickets') }}</span
+                ><input
+                  v-model.number="fields.hotelTickets"
                   type="number"
                   required
                   min="0"
-                  max="999999999"
+                  max="2147483647"
                   step="1"
                   :disabled="busy"
-                /><span>{{ t(field === 'wallet' || field === 'bank' ? 'currency' : 'milesUnit') }}</span>
-              </div></label
-            >
-            <label
-              ><span>{{ t('pocketCapacity') }}</span
-              ><input
-                v-model.number="fields.pocketCapacity"
-                type="number"
-                required
-                min="0"
-                :max="currentPlayer?.maxPocketCapacity ?? 40"
-                step="1"
-                :disabled="busy"
-            /></label>
-            <label
-              ><span>{{ t('storageCapacity') }}</span
-              ><input
-                v-model.number="fields.storageCapacity"
-                type="number"
-                required
-                min="0"
-                :max="currentPlayer?.maxStorageCapacity ?? 5000"
-                step="1"
-                :disabled="busy"
-            /></label>
-            <label v-if="currentPlayer?.hotelTickets != null"
-              ><span>{{ t('hotelTickets') }}</span
-              ><input
-                v-model.number="fields.hotelTickets"
-                type="number"
-                required
-                min="0"
-                max="2147483647"
-                step="1"
-                :disabled="busy"
-            /></label>
-            <label v-if="currentPlayer?.poki != null"
-              ><span>{{ t('poki') }}</span
-              ><input
-                v-model.number="fields.poki"
-                type="number"
-                required
-                min="0"
-                max="2147483647"
-                step="1"
-                :disabled="busy"
-            /></label>
-            <div class="form-actions">
+              /></label>
+              <label v-if="currentPlayer?.poki != null"
+                ><span>{{ t('poki') }}</span
+                ><input
+                  v-model.number="fields.poki"
+                  type="number"
+                  required
+                  min="0"
+                  max="2147483647"
+                  step="1"
+                  :disabled="busy"
+              /></label>
+            </section>
+            <section class="player-card player-capacity" aria-labelledby="player-capacity-title">
+              <div class="form-section-title">
+                <Package :size="19" />
+                <h2 id="player-capacity-title">{{ t('playerCapacity') }}</h2>
+              </div>
+              <label
+                ><span>{{ t('pocketCapacity') }}</span
+                ><input
+                  v-model.number="fields.pocketCapacity"
+                  type="number"
+                  required
+                  min="0"
+                  :max="currentPlayer?.maxPocketCapacity ?? 40"
+                  step="1"
+                  :disabled="busy"
+              /></label>
+              <label
+                ><span>{{ t('storageCapacity') }}</span
+                ><input
+                  v-model.number="fields.storageCapacity"
+                  type="number"
+                  required
+                  min="0"
+                  :max="currentPlayer?.maxStorageCapacity ?? 5000"
+                  step="1"
+                  :disabled="busy"
+              /></label>
+            </section>
+            <div class="form-actions player-actions">
+              <p class="player-apply-help">{{ t('playerApplyHint') }}</p>
               <button class="button primary" :disabled="busy">{{ t('apply') }}<Check :size="17" /></button
               ><button
                 type="button"
@@ -1082,7 +1091,7 @@ onUnmounted(() => {
               /></label>
               <InventoryGrid :data="inventory" :player="playerIndex" :container="container"
                 :scope="JSON.stringify([page, query, inventory?.page, state.session?.title])" :busy="busy"
-                :selected="selected" :clipboard="state.session?.clipboard ?? null" :choose="chooseSlot" :execute="worldCommand" />
+                :selected="selected" :clipboard="state.session?.clipboard ?? null" :choose="chooseSlot" :execute="worldCommand" @clear="clearInventorySelection" />
               <div v-if="inventory?.items.length === 0" class="empty-result">
                 {{ t('noResults') }}
               </div>
@@ -1128,7 +1137,7 @@ onUnmounted(() => {
                       step="1"
                       :disabled="busy || currentItem.maxQuantity === 1"
                   /></label>
-                  <p class="field-help">{{ t('quantityHint') }} ({{ currentItem.maxQuantity }})</p>
+                  <p class="field-help">{{ currentItem.maxQuantity === 1 ? t('itemNotStackable') : `${t('quantityHint')} (${currentItem.maxQuantity})` }}</p>
                   <button class="button primary inspector-apply" :disabled="busy">
                     {{ t('apply') }}<Check :size="17" />
                   </button>
@@ -1159,7 +1168,7 @@ onUnmounted(() => {
           </div>
         </section>
         <MapPage :clipboard="state.session?.clipboard ?? null" v-else-if="page === 'mapEditor'" ref="mapPage" :data="mapData" :busy="busy"
-          :execute="worldCommand" :navigate="navigateMap" :pick-item="() => showCatalog('map')" />
+          :loading="mapNavigating" :execute="worldCommand" :navigate="navigateMap" :pick-item="() => showCatalog('map')" />
         <DesignPage
           v-else-if="page === 'designs'"
           :data="designData"
@@ -1168,7 +1177,7 @@ onUnmounted(() => {
           :navigate="navigateDesigns"
         />
         <ConsolePage v-else-if="page === 'consoleTools'" :data="consoleData" :players="state.session.players" :busy="busy" :execute="consoleCommand" />
-        <AdvancedPage v-else-if="page === 'advancedEditor'" ref="advancedPage" :data="advancedData" :players="state.session.players" :residents="state.session.residents" :busy="busy" :navigate="navigateAdvanced" :execute="worldCommand" :pick-item="() => showCatalog('advanced')" />
+        <AdvancedPage v-else-if="page === 'advancedEditor'" ref="advancedPage" :data="advancedData" :players="state.session.players" :residents="state.session.residents" :busy="busy" :navigate="navigateAdvanced" :execute="worldCommand" :pick-item="() => showCatalog('advanced')" :item-only="advancedOrigin === 'inventory'" :back="() => go(advancedOrigin ?? 'overview')" />
         <MuseumPage v-else-if="page === 'museum'" ref="museumPage" :data="museumData" :busy="busy" :execute="worldCommand" :pick-item="() => showCatalog('museum')" />
         <HousingPage
           v-else-if="page === 'housing'"

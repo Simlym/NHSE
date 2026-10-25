@@ -109,8 +109,8 @@ public sealed class MapRenderer : IDisposable
     /// Updates the viewport items bitmap for the current layer and view position.
     /// </summary>
     /// <param name="transparency">Transparency of items.</param>
-    public Bitmap UpdateViewportItems(int transparency)
-        => UpdateViewportItems(Map.Mutator.View.X, Map.Mutator.View.Y, transparency);
+    public Bitmap UpdateViewportItems(int transparency, bool drawGrid = true)
+        => UpdateViewportItems(Map.Mutator.View.X, Map.Mutator.View.Y, transparency, drawGrid);
 
     /// <summary>
     /// Updates the viewport terrain bitmap.
@@ -119,10 +119,11 @@ public sealed class MapRenderer : IDisposable
     /// <param name="transparencyBuilding">Transparency for building shapes drawn on terrain.</param>
     /// <param name="transparencyTerrain">Transparency for terrain layer.</param>
     /// <param name="selectedBuildingIndex">Index of building to highlight, or -1 for none.</param>
+    /// <param name="drawBuildingNames">Whether building labels are drawn into the bitmap.</param>
     /// <returns></returns>
-    public Bitmap UpdateViewportTerrain(Font textFont, byte transparencyBuilding, byte transparencyTerrain, int selectedBuildingIndex = -1)
+    public Bitmap UpdateViewportTerrain(Font textFont, byte transparencyBuilding, byte transparencyTerrain, int selectedBuildingIndex = -1, bool drawBuildingNames = true, bool drawGrid = true)
     {
-        TerrainSprite.LoadViewport(ViewportTerrainImage, Map, textFont, ViewportTerrain1, ViewportTerrainX, selectedBuildingIndex, transparencyBuilding, transparencyTerrain);
+        TerrainSprite.LoadViewport(ViewportTerrainImage, Map, textFont, ViewportTerrain1, ViewportTerrainX, selectedBuildingIndex, transparencyBuilding, transparencyTerrain, drawBuildingNames, drawGrid);
         return ViewportTerrainImage;
     }
 
@@ -136,11 +137,11 @@ public sealed class MapRenderer : IDisposable
         return MapItemsReticleImage;
     }
 
-    private Bitmap UpdateViewportItems(int absX, int absY, int transparency)
+    private Bitmap UpdateViewportItems(int absX, int absY, int transparency, bool drawGrid)
     {
         var cfg = Map.Mutator.Manager.ConfigItems;
         var layer = Map.Mutator.CurrentLayer;
-        ItemLayerSprite.LoadViewport(ViewportItemsImage, layer, cfg, absX, absY, ViewportItems1, ViewportItemsX, ViewScale, transparency);
+        ItemLayerSprite.LoadViewport(ViewportItemsImage, layer, cfg, absX, absY, ViewportItems1, ViewportItemsX, ViewScale, transparency, drawGrid: drawGrid);
         return ViewportItemsImage;
     }
 }

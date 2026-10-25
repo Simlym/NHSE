@@ -4,6 +4,7 @@ import { t } from './i18n';
 import { housingLabel } from './housingLabels';
 import type { AdvancedData, AdvancedTarget, Player, Resident, ItemView } from './bridge';
 const props = defineProps<{ data: AdvancedData | null; players: Player[]; residents: Resident[]; busy: boolean;
+  itemOnly?: boolean; back: () => void;
   navigate: (target: Partial<AdvancedTarget>) => Promise<void>; execute: (name: string, payload?: Record<string, unknown>) => Promise<boolean>; pickItem: () => void }>();
 const kinds = ['flagsPlayer', 'flagsLand', 'flagsResident', 'resident', 'memory', 'wear', 'furniture', 'room', 'mailbox', 'item'];
 const kindNames = computed(() => t('advancedKinds').split('|'));
@@ -74,24 +75,28 @@ defineExpose({ applyPending, chooseItem });
 </script>
 <template>
   <section v-if="data" class="advanced-page">
+    <button class="button advanced-back" :disabled="busy" @click="back">← {{ t('back') }}</button>
     <p class="page-description">{{ t('advancedHint') }}</p>
-    <div class="advanced-target">
+    <div v-if="!itemOnly" class="advanced-target">
       <label>{{ t('advancedSection') }}<select :value="data.target.kind" :disabled="busy" @change="change($event, 'kind')"><option v-for="(kind, i) in kinds" :key="kind" :value="kind">{{ kindNames[i] }}</option></select></label>
       <label>{{ t('player') }}<select :value="data.target.player" :disabled="busy" @change="change($event, 'player')"><option v-for="player in players" :key="player.index" :value="player.index">{{ player.name }}</option></select></label>
       <label v-if="residentKinds.includes(data.target.kind)">{{ t('villagers') }}<select :value="data.target.resident" :disabled="busy" @change="change($event, 'resident')"><option v-for="resident in residents" :key="resident.index" :value="resident.index">{{ resident.index }} · {{ resident.name }}</option></select></label>
       <label v-if="data.target.kind === 'item'">{{ t('inventory') }}<select :value="data.target.container" :disabled="busy" @change="change($event, 'container')"><option v-for="container in ['pocket', 'storage', 'recycle']" :key="container" :value="container">{{ t(container as 'pocket' | 'storage' | 'recycle') }}</option></select></label>
     </div>
+    <details class="advanced-file-tools" :open="!itemOnly">
+    <summary>{{ t('advancedFileTools') }}</summary>
     <div class="form-actions">
       <button class="button" :disabled="busy" @click="file(true, false)">{{ t('advancedImport') }}</button><button class="button" :disabled="busy" @click="file(false, false)">{{ t('advancedExport') }}</button><button class="button" :disabled="busy" @click="file(false, true)">{{ t('advancedExportAll') }}</button>
       <button v-if="itemKinds.includes(data.target.kind)" class="button" :disabled="busy" @click="file(true, true)">{{ t('advancedImportAll') }}</button>
       <button v-if="data.target.kind === 'resident'" class="button" :disabled="busy" @click="execute('tool', { tool: 'residentDesigns', index: data.target.resident })">{{ t('advancedResidentDesigns') }}</button>
     </div>
     <p class="field-help">{{ t('advancedFileHint') }} · .{{ data.extension }} · {{ data.size }}</p>
+    </details>
     <div v-if="residentKinds.includes(data.target.kind)" class="form-actions">
       <button v-for="(operation, i) in ['friendship', 'moveOut', 'resetPhrase']" :key="operation" class="button" :disabled="busy" @click="ask('residentBatch', { operation }, t('advancedResidentActions').split('|')[i]!)">{{ t('advancedResidentActions').split('|')[i] }}</button>
     </div>
-    <div class="advanced-layout">
-      <section class="advanced-browser">
+    <div class="advanced-layout" :class="{ 'item-only': itemOnly }">
+      <section v-if="!itemOnly" class="advanced-browser">
         <label class="search-field"><span class="sr-only">{{ t('advancedSearch') }}</span><input v-model="query" type="search" :placeholder="t('advancedSearch')" :disabled="busy" /></label>
         <p role="status">{{ filtered.length }} · {{ t('page') }} {{ page + 1 }} / {{ pages }}</p>
         <label>{{ t('slot') }}<input type="number" min="0" :max="data.entries.length - 1" :value="data.target.index" :disabled="busy" @change="($event.target as HTMLInputElement).reportValidity() && navigate({ index: Number(($event.target as HTMLInputElement).value) })" /></label>
@@ -110,18 +115,26 @@ defineExpose({ applyPending, chooseItem });
         <p v-if="validation" role="alert">{{ validation }}</p><button class="button primary" :disabled="busy || !pending">{{ t('apply') }}</button>
       </form>
     </div>
-    <section v-if="itemKinds.includes(data.target.kind)" class="advanced-text-batch">
+    <details v-if="itemKinds.includes(data.target.kind)" class="advanced-text-batch" :open="!itemOnly">
+      <summary>{{ t('advancedTextBatch') }}</summary>
       <h2>{{ t('advancedTextBatch') }}</h2><p>{{ t('advancedTextHint') }}</p>
       <textarea v-model="text" rows="7" maxlength="32000" :aria-label="t('advancedTextBatch')" :disabled="busy" spellcheck="false" />
       <button class="button" :disabled="busy || !text.trim()" @click="ask('advancedTextBatch', { target: { ...data!.target }, text }, t('advancedTextBatch'))">{{ t('mapRunBatch') }}</button>
-    </section>
+    </details>
     <dialog v-if="confirmation" ref="dialog" class="modal" :aria-label="confirmation.title" @cancel.prevent="cancel"><h2>{{ confirmation.title }}</h2><p>{{ t('advancedConfirm') }}</p><p>{{ kindNames[kinds.indexOf(data.target.kind)] }} · {{ players.find(p => p.index === data!.target.player)?.name }} · {{ data.target.resident }} · #{{ data.target.index }}</p><div class="form-actions"><button class="button" @click="cancel">{{ t('cancel') }}</button><button class="button primary" @click="confirm">{{ t('apply') }}</button></div></dialog>
   </section>
 </template>
 <style scoped>
 .advanced-target, .form-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-block: 1rem; }
 .advanced-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.5rem; }
-.advanced-list { display: grid; gap: .4rem; margin-block: .75rem; }
+.advanced-layout.item-only { grid-template-columns: minmax(0, 1fr); max-width: 960px; }
+.advanced-back { margin-bottom: 1rem; }
+.advanced-file-tools { margin-bottom: 1rem; }
+summary { cursor: pointer; color: var(--green); }
+.advanced-browser, .advanced-fields { padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.advanced-list { display: grid; gap: .4rem; margin-block: .75rem; max-height: 480px; overflow-y: auto; padding: 3px; }
+.item-only .advanced-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.advanced-fields > h2, .advanced-fields > .search-field, .advanced-fields > button, .advanced-fields > [role=alert] { grid-column: 1 / -1; }
 .advanced-entry { text-align: start; padding: .6rem; overflow-wrap: anywhere; }
 .advanced-entry[aria-pressed=true] { outline: 2px solid var(--green); }
 .advanced-fields { display: grid; gap: .8rem; align-content: start; min-width: 0; }
@@ -130,5 +143,5 @@ small { font-size: .75rem; overflow-wrap: anywhere; opacity: .75; }
 input, select, textarea, .advanced-entry { box-sizing: border-box; max-width: 100%; min-width: 0; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: .5rem; }
 input, select, textarea { padding: .65rem; width: 100%; font: inherit; }
 .advanced-text-batch { margin-top: 2rem; }
-@media(max-width: 800px) { .advanced-layout { grid-template-columns: minmax(0, 1fr); } }
+@media(max-width: 800px) { .advanced-layout, .item-only .advanced-fields { grid-template-columns: minmax(0, 1fr); } }
 </style>

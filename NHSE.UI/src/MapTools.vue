@@ -80,7 +80,7 @@ async function active(value: boolean) {
     <label v-if="data.active !== null && data.active !== undefined" class="map-active">
       <input type="checkbox" :checked="data.active" :disabled="busy" @change="active(($event.target as HTMLInputElement).checked)" />{{ t('mapActive') }}
     </label>
-    <details v-if="data.target.mode === 'terrain' && data.fields.length" class="map-brush">
+    <details v-if="data.target.mode === 'terrain' && data.fields.length" class="map-brush" :open="brush.enabled">
       <summary>{{ t('mapBrush') }}</summary>
       <p>{{ t('mapBrushHint') }}</p>
       <label><input v-model="brush.enabled" type="checkbox" :disabled="busy" />{{ t('mapDragBrush') }}</label>

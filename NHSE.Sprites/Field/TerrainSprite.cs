@@ -105,9 +105,10 @@ public static class TerrainSprite
     /// The transparency level to apply when rendering terrain tile names.
     /// A value of 0xFF is fully opaque; lower values increase transparency.
     /// </param>
+    /// <param name="drawBuildingNames">Whether to draw building names over the terrain.</param>
     public static void LoadViewport(Bitmap img, MapEditor m, Font textFont,
         Span<int> scale1, Span<int> scaleX,
-        int selectedBuildingIndex, byte transparencyBuilding, byte transTerrain)
+        int selectedBuildingIndex, byte transparencyBuilding, byte transTerrain, bool drawBuildingNames = true, bool drawGrid = true)
     {
         // Convert from absolute to relative.
         var cfg = m.Mutator.Manager.ConfigTerrain;
@@ -115,7 +116,7 @@ public static class TerrainSprite
         int absY = m.Y / 2; // 32px => 16px basis
         var (relX, relY) = cfg.GetCoordinatesRelative(absX, absY);
 
-        SetViewTerrainPixels(m.Terrain, cfg, relX, relY, scale1, scaleX, Scale);
+        SetViewTerrainPixels(m.Terrain, cfg, relX, relY, scale1, scaleX, img.Width, img.Height);
 
         // Drawing building tiles currently uses the graphics API rather than writing pixels.
         img.SetBitmapData(scaleX);
@@ -127,8 +128,11 @@ public static class TerrainSprite
         img.GetBitmapData(scaleX);
 
         // Apply Grid
-        ItemLayerSprite.DrawGrid(scaleX, img.Width, img.Height, ColorGrid1, m.ViewScale); // minor
-        ItemLayerSprite.DrawGrid(scaleX, img.Width, img.Height, ColorGrid2, m.ViewScale * 2); // major
+        if (drawGrid)
+        {
+            ItemLayerSprite.DrawGrid(scaleX, img.Width, img.Height, ColorGrid1, m.ViewScale); // minor
+            ItemLayerSprite.DrawGrid(scaleX, img.Width, img.Height, ColorGrid2, m.ViewScale * 2); // major
+        }
 
         // Switch back to graphics mode
         img.SetBitmapData(scaleX);
@@ -138,7 +142,7 @@ public static class TerrainSprite
             gfx.DrawViewTerrainTileNames(m.Terrain, cfg, textFont, relX, relY, m.ViewScale * 2, transTerrain);
 
         // Draw Text of Building Names
-        if (transparencyBuilding != 0)
+        if (transparencyBuilding != 0 && drawBuildingNames)
             gfx.DrawViewBuildingNames(m, textFont, transparencyBuilding);
 
         // Done.
@@ -152,6 +156,8 @@ public static class TerrainSprite
 
         foreach (var b in m.Buildings.Buildings)
         {
+            if (b.BuildingType == BuildingType.None)
+                continue;
             var (x, y) = m.GetViewCoordinatesBuilding(b.X, b.Y);
             const int cellsAbove = -2; // Show label inside the building square, 2 cells inside.
             y -= (m.ViewScale * cellsAbove);
@@ -269,10 +275,19 @@ public static class TerrainSprite
         gfx.FillRectangle(bBrush, x, y, width * imgScale * 2, height * imgScale * 2);
     }
 
-    private static void SetViewTerrainPixels(LayerTerrain t, LayerPositionConfig cfg, int relX, int relY, Span<int> data, Span<int> scaleX, int imgScale)
+    private static void SetViewTerrainPixels(LayerTerrain t, LayerPositionConfig cfg, int relX, int relY, Span<int> data, Span<int> scaleX, int width, int height)
     {
         GetViewTerrain1(t, cfg, relX, relY, data);
-        ImageUtil.ScalePixelImage(data, scaleX, TilesPerViewport * TileScale * imgScale, TilesPerViewport * TileScale * imgScale, imgScale);
+        // Terrain sprites form a 256px source. Match the actual viewport, whose
+        // item tile scale can change independently of the terrain sprite size.
+        const int sourceWidth = TilesPerViewport * TileScale;
+        for (var y = 0; y < height; y++)
+        {
+            var sourceRow = y * sourceWidth / height * sourceWidth;
+            var destinationRow = y * width;
+            for (var x = 0; x < width; x++)
+                scaleX[destinationRow + x] = data[sourceRow + x * sourceWidth / width];
+        }
     }
 
     private static void GetViewTerrain1(LayerTerrain t, LayerPositionConfig cfg, int relX, int relY, Span<int> data)
@@ -345,6 +360,10 @@ public static class TerrainSprite
                 var tile = t.GetTile(actX, actY);
                 var centerX = (x * scale) + (scale / 2);
                 var name = TerrainTileColor.GetTileName(tile);
+                // Resizing the editor must not turn labels into overlapping ink.
+                var size = gfx.MeasureString(name, f);
+                if (size.Width > scale - 2 || size.Height > scale - 2)
+                    continue;
                 gfx.DrawString(name, f, pen, centerX, centerY, BuildingTextFormat);
             }
         }

@@ -9,13 +9,14 @@ namespace NHSE.WinForms;
 
 public sealed partial class WorkspaceForm
 {
-    private WorkspaceSession.MapData MapWorkspace(WorkspaceSession.MapTarget target)
+    private WorkspaceSession.MapData MapWorkspace(WorkspaceSession.MapTarget target, bool includeImages = true)
     {
         var session = RequireSession();
         var data = session.GetMapWorkspace(target);
+        if (!includeImages) return data;
         var editor = MapEditor.FromSaveFile(session.SaveFile.Main);
         editor.MapScale = 1;
-        editor.ViewScale = 8;
+        editor.ViewScale = 16;
         editor.Mutator.View.ItemLayerIndex = target.Layer;
         var acre = AcreCoordinate.Exterior[target.Acre];
         editor.Mutator.View.SetViewTo(acre.X * 32, acre.Y * 32);
@@ -29,8 +30,10 @@ public sealed partial class WorkspaceForm
         }
         return data with {
             Overview = Png(renderer.UpdateMapTerrain(building)),
-            Viewport = Png(renderer.UpdateViewportTerrain(Font, 180, 255, building)),
-            ItemImage = Png(renderer.UpdateViewportItems(unchecked((int)0xDDFFFFFF))),
+            // Tile model names overlap at workspace scale. The web UI supplies
+            // accessible building labels separately from the terrain bitmap.
+            Viewport = Png(renderer.UpdateViewportTerrain(Font, 180, 0, building, drawBuildingNames: false, drawGrid: false)),
+            ItemImage = Png(renderer.UpdateViewportItems(unchecked((int)0xDDFFFFFF), drawGrid: false)),
         };
     }
 }

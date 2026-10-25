@@ -670,7 +670,6 @@ h3 {
   color: var(--line-strong);
 }
 .top-actions,
-.workspace-controls,
 .save-actions {
   display: flex;
   align-items: center;
@@ -716,6 +715,11 @@ h3 {
   gap: 12px;
   align-items: center;
   padding: 14px 0 34px;
+}
+.workspace-content {
+  max-width: none;
+  padding-top: 24px;
+  padding-bottom: 24px;
 }
 .eyebrow {
   display: flex;
@@ -1144,7 +1148,7 @@ h3 {
   align-items: center;
   flex-wrap: wrap;
   gap: 15px;
-  margin-bottom: 24px;
+  margin-bottom: 14px;
 }
 .workspace-heading .eyebrow {
   margin-bottom: 6px;
@@ -1162,7 +1166,7 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin: -6px 0 28px;
+  margin: 0 0 16px;
 }
 .player-chip {
   display: flex;
@@ -1294,6 +1298,62 @@ h3 {
   padding: 28px;
   border: 1px solid var(--line);
   border-radius: 12px;
+}
+.player-page .balance-form {
+  max-width: 1120px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  align-items: start;
+}
+.player-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px 20px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.player-identity {
+  grid-column: 1 / -1;
+}
+.player-capacity {
+  grid-template-columns: minmax(0, 1fr);
+}
+.player-actions {
+  padding: 20px 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  gap: 16px;
+}
+.player-apply-help {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+@media (max-width: 1000px) {
+  .player-page .balance-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .player-capacity {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .player-card {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px;
+  }
+  .player-actions {
+    padding: 20px;
+  }
 }
 .balance-form label > span {
   display: block;
@@ -1568,24 +1628,6 @@ h3 {
 }
 .tools-page > h2 {
   margin-bottom: 8px;
-}
-.focus-nav {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 24px;
-}
-.focus-nav button {
-  border: 1px solid var(--line);
-  padding: 7px 14px;
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--muted);
-}
-.focus-nav button.active {
-  background: var(--green-soft);
-  color: var(--green);
-  border-color: var(--green);
 }
 .preview-note {
   background: var(--green-soft);
@@ -1949,8 +1991,7 @@ h3 {
   }
 }
 @media (min-width: 1500px) {
-  .home-content,
-  .workspace-content {
+  .home-content {
     padding-top: 55px;
   }
   .welcome {

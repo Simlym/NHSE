@@ -1,6 +1,31 @@
 import { test, expect } from '@playwright/test';
 import { mockHost } from './mock-host';
 
+test('inventory clears details repeatedly with Escape and blank clicks, and returns from item properties', async ({ page }) => {
+  await mockHost(page); await page.goto('/');
+  await page.getByRole('button', { name: '打开存档', exact: true }).click();
+  await page.locator('.sidebar nav').getByRole('button', { name: '背包与仓库', exact: true }).click();
+  const grid = page.locator('.inventory-selection-grid');
+  for (let i = 0; i < 2; i++) {
+    await grid.locator('button').first().click();
+    await page.getByRole('spinbutton', { name: '数量', exact: true }).focus();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.inspector-empty')).toBeVisible();
+    await expect(grid.locator('[aria-pressed=true]')).toHaveCount(0);
+  }
+  await grid.locator('button').first().click();
+  expect(await grid.evaluate(el => getComputedStyle(el).outlineColor)).not.toBe('rgb(0, 0, 0)');
+  await page.locator('.inventory-page > .page-description').click();
+  await expect(page.locator('.inspector-empty')).toBeVisible();
+  await grid.locator('button').first().click();
+  await page.getByRole('button', { name: '更多物品属性', exact: true }).click();
+  await expect(page.locator('.advanced-layout')).toHaveClass(/item-only/);
+  await expect(page.locator('.advanced-browser')).toHaveCount(0);
+  await page.getByRole('button', { name: '← 返回', exact: true }).click();
+  await expect(grid).toBeVisible();
+  await expect(page.locator('.inspector h3')).toHaveText('木材');
+});
+
 for (const width of [1180, 390]) {
   test(`inventory selection clipboard undo and locked slots at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });

@@ -129,9 +129,8 @@ test('ordinary slot selection, quantity changes, undo, saved state and locked sl
   await page.getByRole('button', { name: '应用修改', exact: true }).click();
   await page.keyboard.press('Control+s');
   await expect(page.locator('.statusbar')).toContainText('修改已保存');
-  await page.getByRole('button', { name: '专注模式', exact: true }).click();
-  await expect(page.locator('.sidebar')).toHaveCount(0);
-  await expect(page.locator('.focus-nav')).toBeVisible();
+  await expect(page.getByRole('button', { name: '专注模式', exact: true })).toHaveCount(0);
+  await expect(page.locator('.sidebar')).toBeVisible();
   await page.screenshot({ path: 'test-results/inventory-zhs.png', fullPage: true });
 });
 
@@ -177,7 +176,22 @@ test('player names and island names remain editable with avatar switching and un
   await page.getByRole('button', { name: '保存存档', exact: true }).click();
   await expect(page.locator('.player-chip').first()).toContainText('保存时应用');
   await expect(page.locator('.statusbar')).toContainText('修改已保存');
+  await expect(page.locator('.player-card')).toHaveCount(3);
+  await expect(page.locator('.player-assets')).toContainText('可用狸端里程');
+  await expect(page.locator('.player-capacity')).toContainText('仓库容量');
+  await expect(page.locator('.player-apply-help')).toContainText('写入存档文件');
+  await page.setViewportSize({ width: 1600, height: 1100 });
   await page.screenshot({ path: 'test-results/player-profile-zhs.png' });
+  for (const width of [1180, 800, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    for (const input of await page.locator('.player-card input').all()) {
+      const bounds = await input.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    }
+  }
 });
 
 test('catalog exposes all pages, category filters, item-ID search and a dense picture grid', async ({

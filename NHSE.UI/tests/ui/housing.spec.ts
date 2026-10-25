@@ -12,6 +12,24 @@ async function openHousing(page: import('@playwright/test').Page) {
   await expect(page.locator('.housing-tile')).toHaveCount(400);
 }
 
+test('room furniture footprints connect extension cells and keep adjacent furniture separate', async ({ page }) => {
+  await page.addInitScript(() => Object.assign(window, { nhseHousingFootprints: true }));
+  await openHousing(page);
+  const tiles = page.locator('.housing-tile');
+  await expect(page.locator('.housing-grid-ruler span')).toHaveCount(20);
+  await expect(page.locator('.room-row-number')).toHaveCount(20);
+  await expect(tiles.nth(21)).toHaveClass(/edge-left/);
+  await expect(tiles.nth(22)).not.toHaveClass(/edge-left|edge-right/);
+  await expect(tiles.nth(23)).toHaveClass(/edge-right/);
+  await expect(tiles.nth(24)).toHaveClass(/edge-left/);
+  await tiles.nth(42).click();
+  await expect(page.locator('.housing-tile-editor h3')).toHaveText('Furniture 1');
+  await expect(page.locator('.footprint-selected')).toHaveCount(6);
+  await expect(tiles.nth(24)).not.toHaveClass(/footprint-selected/);
+  await page.locator('.housing-room').evaluate(el => el.scrollIntoView({ block: 'start' }));
+  await page.screenshot({ path: 'test-results/housing-footprints.png' });
+});
+
 test('house fields and signed flags apply on navigation, survive language changes and undo', async ({
   page,
 }) => {

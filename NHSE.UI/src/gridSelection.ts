@@ -6,7 +6,7 @@ export function editableTarget(target: EventTarget | null) {
 }
 export function useGridSelection(options: {
   cells: () => GridPoint[]; scope: () => string; active: () => GridPoint;
-  busy: () => boolean; activate: (point: GridPoint) => Promise<void>;
+  busy: () => boolean; actionBusy?: () => boolean; activate: (point: GridPoint) => Promise<void>;
   action: (name: 'copyGrid' | 'pasteGrid' | 'delete' | 'rotate') => Promise<void>;
 }) {
   const selected: Ref<GridPoint[]> = ref([]);
@@ -17,21 +17,22 @@ export function useGridSelection(options: {
   let additive = false, toggle = false, last: GridPoint | null = null, skipClickUntil = 0;
   let queued: { name: 'copyGrid' | 'pasteGrid' | 'delete' | 'rotate'; scope: string }[] = [];
   let flushing = false;
+  const actionBusy = () => options.actionBusy?.() ?? options.busy();
   function enqueue(name: 'copyGrid' | 'pasteGrid' | 'delete' | 'rotate') {
     if (queued.length < 8) queued.push({ name, scope: options.scope() });
     void flush();
   }
   async function flush() {
-    if (flushing || options.busy()) return;
+    if (flushing || actionBusy()) return;
     flushing = true;
     try {
-      while (queued.length && !options.busy()) {
+      while (queued.length && !actionBusy()) {
         const next = queued.shift()!;
         if (next.scope === options.scope()) await options.action(next.name);
       }
     } finally { flushing = false; }
   }
-  watch(options.busy, busy => { if (!busy) void flush(); });
+  watch(actionBusy, busy => { if (!busy) void flush(); });
   const valid = (p: GridPoint) => options.cells().some(c => c.x === p.x && c.y === p.y);
   watch(options.scope, () => {
     queued = []; cancel(); anchor = null;

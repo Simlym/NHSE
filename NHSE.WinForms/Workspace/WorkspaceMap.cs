@@ -12,9 +12,11 @@ internal sealed partial class WorkspaceSession
 {
     internal sealed record MapTarget(string Mode, int Acre, int Layer, int X, int Y, int Building, int Marker);
     internal sealed record MapCell(int X, int Y, int RelativeX, int RelativeY, bool Valid, bool Extension, int RootX, int RootY, string Name);
+    internal sealed record MapBuildingPin(int Id, int Type, int X, int Y);
     internal sealed record MapData(MapTarget Target, int GridSize, int ItemWidth, int ItemHeight, int MarkerCount,
         HousingChoice[] Acres, HousingChoice[] Buildings, HousingChoice[] FieldObjects, HousingField[] Fields, MapCell[] Cells,
-        string? Overview = null, string? Viewport = null, string? ItemImage = null, bool? Active = null, MapParameter[]? Parameters = null);
+        string? Overview = null, string? Viewport = null, string? ItemImage = null, bool? Active = null, MapParameter[]? Parameters = null,
+        MapBuildingPin[]? BuildingPins = null);
     private static readonly string[] TerrainKeys = ["UnitModel", "Variation", "LandMakingAngle", "UnitModelRoad", "VariationRoad", "LandMakingAngleRoad", "Elevation"];
     private static readonly (string Key, int Offset, Type Type)[] BuildingKeys =
     [
@@ -99,7 +101,9 @@ internal sealed partial class WorkspaceSession
         var buildings = m.Buildings.Select((b, i) => new HousingChoice(i, $"{i + 1} · {b}")).ToArray();
         var acres = AcreCoordinate.Exterior.Select((a, i) => new HousingChoice(i, a.Name)).ToArray();
         var objects = FieldItemList.Items.Select(v => new HousingChoice(v.Key, GameInfo.Strings.InternalNameTranslation.TryGetValue(v.Value.Name, out var translated) ? translated : v.Value.Name)).ToArray();
-        return new(target, size, m.FieldItemAcreWidth * 32, 6 * 32, MapMarkerCount, acres, buildings, objects, fields.ToArray(), cells.ToArray(), Active: MapActive(target), Parameters: target.Mode == "items" ? MapParameters() : null);
+        var pins = m.Buildings.Select((b, i) => new MapBuildingPin(i, (int)b.BuildingType, b.X, b.Y))
+            .Where(b => b.Type != 0 && b.X < 288 && b.Y < 256).ToArray();
+        return new(target, size, m.FieldItemAcreWidth * 32, 6 * 32, MapMarkerCount, acres, buildings, objects, fields.ToArray(), cells.ToArray(), Active: MapActive(target), Parameters: target.Mode == "items" ? MapParameters() : null, BuildingPins: pins);
     }
     private static string MapItemName(Item tile)
     {

@@ -53,7 +53,7 @@ test('item clipboard is shared with rooms and layers, and clearing all room cell
   await map.getByRole('button', { name: '物品', exact: true }).click();
   await map.getByRole('button', { name: '选择物品', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: '木材', exact: true }).click();
-  await map.getByRole('button', { name: '应用修改', exact: true }).click();
+  await map.getByRole('button', { name: '应用替换', exact: true }).click();
   await map.locator('.map-grid').focus(); await page.keyboard.press('Control+c');
   await expect(map.getByText(/剪贴板：1 条/)).toBeVisible();
   await page.locator('.sidebar nav').getByRole('button', { name: '房屋与岛屿生活', exact: true }).click();

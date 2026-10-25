@@ -40,6 +40,13 @@ async function batch() { await ask('editMapParameters', { target: { ...props.dat
 <template>
   <section v-if="data.target.mode === 'items' && data.fields.length" class="map-advanced">
     <form ref="form" @submit.prevent>
+      <section class="map-replace">
+        <h3>{{ t('mapReplaceMatches') }}</h3>
+        <p>{{ t('mapParameterHint') }}</p>
+        <div class="advanced-row"><label>{{ t('mapScope') }}<select v-model="whole" :disabled="busy"><option :value="false">{{ t('mapScopeNames').split('|')[0] }}</option><option :value="true">{{ t('mapScopeNames').split('|')[1] }}</option></select></label>
+          <button type="button" :disabled="busy" @click="replace(false)">{{ t('mapReplaceMatches') }}</button><button type="button" :disabled="busy" @click="replace(true)">{{ t('mapRemoveMatches') }}</button>
+        </div>
+      </section>
       <details class="map-spawn"><summary>{{ t('mapSpawn') }}</summary>
         <p>{{ t('mapSpawnHint') }}</p>
         <div class="advanced-row">
@@ -55,9 +62,7 @@ async function batch() { await ask('editMapParameters', { target: { ...props.dat
       </details>
       <details class="map-parameters"><summary>{{ t('mapParameters') }}</summary>
         <p>{{ t('mapParameterHint') }}</p>
-        <div class="advanced-row"><label>{{ t('mapScope') }}<select v-model="whole" :disabled="busy"><option :value="false">{{ t('mapScopeNames').split('|')[0] }}</option><option :value="true">{{ t('mapScopeNames').split('|')[1] }}</option></select></label>
-          <button type="button" :disabled="busy" @click="replace(false)">{{ t('mapReplaceMatches') }}</button><button type="button" :disabled="busy" @click="replace(true)">{{ t('mapRemoveMatches') }}</button>
-        </div>
+        <div class="advanced-row"><label>{{ t('mapScope') }}<select v-model="whole" :disabled="busy"><option :value="false">{{ t('mapScopeNames').split('|')[0] }}</option><option :value="true">{{ t('mapScopeNames').split('|')[1] }}</option></select></label></div>
         <h3>{{ t('mapFilters') }}</h3>
         <div v-for="(rule, i) in filters" :key="i" class="advanced-row rule-row">
           <select v-model="rule.key" :aria-label="t('mapProperty')" :disabled="busy" @change="changeKey(rule)"><option v-for="p in parameters" :key="p.key" :value="p.key">{{ parameterName(p.key) }}</option></select>

@@ -242,6 +242,7 @@ export interface MapTarget {
   acre: number; layer: number; x: number; y: number; building: number; marker: number;
 }
 export interface MapData {
+  buildingPins?: { id: number; type: number; x: number; y: number }[];
   target: MapTarget; gridSize: number; itemWidth: number; itemHeight: number; markerCount: number;
   acres: { id: number; name: string }[]; buildings: { id: number; name: string }[];
   fieldObjects: { id: number; name: string }[]; fields: HousingField[];

@@ -62,7 +62,7 @@ public static class ItemLayerSprite
     /// <param name="transparency">Optional transparency override color.</param>
     /// <param name="gridlineColor">Color to use for gridlines.</param>
     public static void LoadViewport(Bitmap imgScaled, LayerItem layer, in LayerPositionConfig cfg, int absX, int absY,
-        Span<int> imgSingle, Span<int> imgUpscaled, int imgScale, int transparency = -1, int gridlineColor = 0)
+        Span<int> imgSingle, Span<int> imgUpscaled, int imgScale, int transparency = -1, int gridlineColor = 0, bool drawGrid = true)
     {
         // Update the 1px view-grid image pixel data.
         LoadViewport(layer, cfg, imgSingle, absX, absY);
@@ -81,7 +81,7 @@ public static class ItemLayerSprite
             ImageUtil.ClampAllTransparencyTo(imgUpscaled, transparency);
 
         // Apply gridlines to visually separate each cell.
-        DrawGrid(imgUpscaled, imgWidth, imgHeight, gridlineColor, imgScale);
+        if (drawGrid) DrawGrid(imgUpscaled, imgWidth, imgHeight, gridlineColor, imgScale);
 
         // Update the bitmap, final data.
         imgScaled.SetBitmapData(imgUpscaled);

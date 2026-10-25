@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 
-export async function mockHost(page: Page, picker = false) {
-  await page.addInitScript((picker) => {
+export async function mockHost(page: Page, picker = false, mapImages?: { overview: string; viewport: string; itemImage: string }) {
+  await page.addInitScript(({ picker, mapImages }) => {
     const messages: string[] = [];
     const listeners: ((event: { data: unknown }) => void)[] = [];
     let opened = false,
@@ -237,6 +237,11 @@ export async function mockHost(page: Page, picker = false) {
                 tiles: Array.from({ length: 400 }, (_, i) => {
                   const x = i % 20,
                     y = Math.floor(i / 20);
+                  if ((window as unknown as { nhseHousingFootprints?: boolean }).nhseHousingFootprints && y >= 1 && y <= 2 && x >= 1 && x <= 4) {
+                    const rootX = x <= 3 ? 1 : 4;
+                    return { x, y, rootX, rootY: 1, item: { itemId: 1000, systemParam: 0, additionalParam: 0, freeParam: 0 },
+                      empty: false, extension: x !== rootX || y !== 1, name: x === rootX && y === 1 ? `Furniture ${rootX}` : '', image: null };
+                  }
                   const item = housingRecords.tiles[tileKey(p, x, y)] ?? {
                     itemId: 65534,
                     systemParam: 0,
@@ -317,12 +322,13 @@ export async function mockHost(page: Page, picker = false) {
       const values = mapRecords[mapKey(target)] ?? {};
       return { target, gridSize, itemWidth: 288, itemHeight: 192, markerCount: 13824,
         acres: Array.from({ length: 72 }, (_, id) => ({ id, name: `Acre ${id}` })),
-        buildings: Array.from({ length: 46 }, (_, id) => ({ id, name: `Building ${id}` })),
+          buildings: Array.from({ length: 46 }, (_, id) => ({ id, name: `Building ${id}` })),
+          buildingPins: [{ id: 2, type: 21, x: 80, y: 64 }, { id: 5, type: 19, x: 120, y: 100 }],
         fieldObjects: [{ id: 60000, name: 'Tree' }],
         fields: names.map(name => ({ key: 'Map.' + name, value: values['Map.' + name] ?? 0, type: 'number', min: name === 'Bit' ? -128 : 0, max: 65535, options: name === 'UnitModel' ? [{ id: 0, name: 'Base' }, { id: 21, name: 'River8A' }, { id: 17, name: 'River5B' }, { id: 11, name: 'River3B' }, { id: 12, name: 'River3C' }, { id: 20, name: 'River7A' }, { id: 42, name: 'Cliff5B' }, { id: 33, name: 'Cliff3B' }, { id: 34, name: 'Cliff3C' }, { id: 45, name: 'Cliff7A' }] : null })),
         parameters: ['ItemId', 'SystemParam', 'AdditionalParam', 'FreeParam', 'Rotation', 'RawValue', 'IsDropped', 'ExtensionX', 'IsRoot'].map(key => ({ key, type: ['IsDropped', 'IsRoot'].includes(key) ? 'boolean' : 'number', min: key === 'FreeParam' ? '-2147483648' : '0', max: key === 'RawValue' ? '18446744073709551615' : '65535', writable: !['ExtensionX', 'IsRoot'].includes(key) })),
         cells: Array.from({ length: gridSize ** 2 }, (_, i) => ({ x: i % gridSize, y: Math.floor(i / gridSize), relativeX: i % gridSize, relativeY: Math.floor(i / gridSize), valid: true, extension: false, rootX: 0, rootY: 0, name: '' })),
-        overview: avatar, viewport: avatar, itemImage: null, active: mode === 'items' ? (mapFlags[mapKey(target)] ?? false) : null };
+        overview: mapImages?.overview ?? avatar, viewport: mapImages?.viewport ?? avatar, itemImage: mapImages?.itemImage ?? null, active: mode === 'items' ? (mapFlags[mapKey(target)] ?? false) : null };
     };
     type Snapshot = {
       advancedRecords: typeof advancedRecords;
@@ -750,7 +756,8 @@ export async function mockHost(page: Page, picker = false) {
             if (message.command === 'save') savedRevision = revision;
             if (message.command === 'closeSave') opened = false;
             if (message.command === 'map') {
-              data = mapData(p.target as Record<string, unknown>);
+              const map = mapData(p.target as Record<string, unknown>);
+              data = p.includeImages === false ? { ...map, overview: null, viewport: null, itemImage: null } : map;
             } else if (message.command === 'designs') {
               const entries = designRecords[String(p.kind)]!;
               data = {
@@ -887,5 +894,5 @@ export async function mockHost(page: Page, picker = false) {
         },
       },
     });
-  }, picker);
+  }, { picker, mapImages });
 }

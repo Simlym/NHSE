@@ -12,6 +12,19 @@ const props = defineProps<{
   execute: (command: string, payload: Record<string, unknown>) => Promise<boolean>;
 }>();
 const element = ref<HTMLElement | null>(null);
+const emit = defineEmits<{ clear: [] }>();
+function clear() { selection.clear(); emit('clear'); }
+function escape(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || document.querySelector('dialog[open], [aria-modal="true"]')) return;
+  event.preventDefault();
+  clear();
+}
+function outside(event: PointerEvent) {
+  const target = event.target;
+  if (!(target instanceof Element) || !target.closest('.workspace-content')) return;
+  if (target.closest('button, input, textarea, select, a, summary, .inspector, .grid-toolbar, dialog')) return;
+  clear();
+}
 const columns = ref(10);
 const items = computed(() => props.data?.items ?? []);
 const point = (index: number) => ({ x: index % columns.value, y: Math.floor(index / columns.value) });
@@ -34,19 +47,25 @@ async function action(name: 'copyGrid' | 'pasteGrid' | 'delete' | 'rotate') {
 }
 let observer: ResizeObserver | undefined;
 onMounted(() => {
+  window.addEventListener('keydown', escape);
+  window.addEventListener('pointerdown', outside);
   observer = new ResizeObserver(() => {
     if (element.value) columns.value = getComputedStyle(element.value).gridTemplateColumns.split(' ').length;
   });
   if (element.value) observer.observe(element.value);
 });
-onBeforeUnmount(() => observer?.disconnect());
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  window.removeEventListener('keydown', escape);
+  window.removeEventListener('pointerdown', outside);
+});
 </script>
 <template>
   <div ref="element" class="item-grid inventory-selection-grid" :class="{ 'pocket-grid': container === 'pocket' }"
     tabindex="0" role="group" :aria-label="t(container === 'pocket' ? 'pocket' : container === 'recycle' ? 'recycle' : 'storage')"
     :data-columns="columns" :data-rows="Math.ceil(items.length / columns)"
     @pointerdown="selection.down" @pointermove="selection.move" @pointerup="selection.up"
-    @pointercancel="selection.cancel" @lostpointercapture="selection.cancel" @keydown="selection.keydown">
+    @pointercancel="selection.cancel" @lostpointercapture="selection.cancel" @keydown="($event.key === 'Escape' ? (clear(), $event.preventDefault(), $event.stopPropagation()) : selection.keydown($event))">
     <button v-for="(item, index) in items" :key="item.index" tabindex="-1" class="item-slot"
       :class="{ selected: selected?.index === item.index, 'multi-selected': selection.keys.value.has(pointKey(point(index))), 'is-empty': item.empty, locked: !item.available }"
       :disabled="busy || !item.available"
@@ -59,9 +78,11 @@ onBeforeUnmount(() => observer?.disconnect());
     </button>
   </div>
   <GridToolbar :count="selection.selected.value.length" :clipboard="clipboard" kind="items"
-    :busy="busy || selection.dragging.value" :action="action" :clear="selection.clear" />
+    :busy="busy || selection.dragging.value" :action="action" :clear="clear" />
 </template>
 <style scoped>
 .inventory-selection-grid { touch-action: none; user-select: none; }
+.inventory-selection-grid:focus { outline: none; }
+.inventory-selection-grid:focus-visible { outline: 2px solid var(--green); outline-offset: 4px; }
 .item-slot.multi-selected { outline: 2px solid var(--green); outline-offset: -2px; background: var(--surface); }
 </style>

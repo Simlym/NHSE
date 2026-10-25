@@ -1056,6 +1056,7 @@ Check(museumSession.ExportMuseum().SequenceEqual(completedMuseum), "museum impor
 Check(museumSave.Players[0].Personal.Data.SequenceEqual(museumPersonalBefore) && museumSave.Players[1].Personal.Data.SequenceEqual(museumOtherBefore), "island museum edits never change personal files");
 museumSession.Save(); var museumReload = new HorizonSave(provider);
 Check(new WorkspaceSession(museumReload).ExportMuseum().SequenceEqual(completedMuseum) && !museumReload.GetInvalidHashes().Any(), "museum edits survive encrypted save/reload with valid hashes");
+CompletionChecks.Run(provider, originalSave);
 Console.WriteLine("All workspace integration checks passed.");
 if (args.Length == 2 && args[0] == "--fixture") provider.Export(args[1]);
 

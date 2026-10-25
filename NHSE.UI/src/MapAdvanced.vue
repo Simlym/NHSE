@@ -8,6 +8,7 @@ const props = defineProps<{
   execute: (command: string, payload?: Record<string, unknown>) => Promise<boolean>; validate: () => boolean;
 }>();
 const emit = defineEmits<{ applied: [] }>();
+const batchText = ref('');
 const whole = ref(false), source = ref('current'), arrangement = ref('square'), count = ref(8), recipeMin = ref(0), recipeMax = ref(65535);
 watch(source, value => { count.value = value === 'current' ? 8 : 1; });
 const form = ref<HTMLFormElement | null>(null), dialog = ref<HTMLDialogElement | null>(null);
@@ -75,6 +76,11 @@ async function batch() { await ask('editMapParameters', { target: { ...props.dat
         </div>
         <div class="advanced-row"><button type="button" :disabled="busy || changes.length >= 32" @click="changes.push({ key: 'FreeParam', operator: 'set', value: '0' })">{{ t('mapAddChange') }}</button><button type="button" :disabled="busy || !changes.length" @click="batch">{{ t('mapRunBatch') }}</button></div>
       </details>
+      <details class="map-text-batch"><summary>{{ t('advancedTextBatch') }}</summary><p>{{ t('advancedTextHint') }}</p>
+        <label>{{ t('mapScope') }}<select v-model="whole" :disabled="busy"><option :value="false">{{ t('mapScopeNames').split('|')[0] }}</option><option :value="true">{{ t('mapScopeNames').split('|')[1] }}</option></select></label>
+        <textarea v-model="batchText" rows="7" maxlength="32000" :aria-label="t('advancedTextBatch')" :disabled="busy" spellcheck="false" />
+        <button type="button" :disabled="busy || !batchText.trim()" @click="ask('mapTextBatch', { target: { ...data.target }, whole, text: batchText }, t('advancedTextBatch'), scope())">{{ t('mapRunBatch') }}</button>
+      </details>
     </form>
     <dialog v-if="confirmation" ref="dialog" class="modal" :aria-label="t('mapConfirmTitle')" @cancel.prevent="cancel"><h2>{{ confirmation.label }}</h2><p>{{ confirmation.detail }}</p><p>{{ t('mapParameterHint') }}</p><div class="form-actions"><button class="button" @click="cancel">{{ t('cancel') }}</button><button class="button primary" @click="confirm">{{ t('apply') }}</button></div></dialog>
   </section>
@@ -83,8 +89,9 @@ async function batch() { await ask('editMapParameters', { target: { ...props.dat
 .map-advanced, form { display: grid; gap: 1rem; min-width: 0; }
 .advanced-row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-block: .8rem; }
 label { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; min-width: 0; }
-select, input, button { box-sizing: border-box; max-width: 100%; padding: .5rem; color: inherit; background: var(--surface); border: 1px solid var(--line-strong); border-radius: .5rem; }
+select, input, button, textarea { box-sizing: border-box; max-width: 100%; padding: .5rem; color: inherit; background: var(--surface); border: 1px solid var(--line-strong); border-radius: .5rem; }
 input { width: 12rem; }
+textarea { width: 100%; font: inherit; }
 summary { cursor: pointer; font-weight: 600; }
 p { line-height: 1.5; }
 </style>

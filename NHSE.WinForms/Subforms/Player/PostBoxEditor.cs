@@ -360,7 +360,7 @@ public partial class PostBoxEditor : Form
         if (!PostBox.GetMailCheck(index) || PostBox.GetPostBoxSortIndex(index) == 0x00)
         {
             var nextSlot = PostBox.GetLatestUniqueId();
-            PostBox.SetPostBoxSortIndex(index, (byte)nextSlot);
+            PostBox.SetPostBoxSortIndex(index, (ushort)nextSlot);
             PostBox.SetLatestUniqueId(nextSlot + 1);
         }
     }
@@ -481,7 +481,7 @@ public partial class PostBoxEditor : Form
                 return;
             var d = File.ReadAllBytes(ofd.FileName);
             PostBox.SetIndividualLetter(index, d);
-            PostBox.SetPostBoxSortIndex(index, (byte)currentIndex);
+            PostBox.SetPostBoxSortIndex(index, currentIndex);
         }
         else
         {
@@ -491,7 +491,7 @@ public partial class PostBoxEditor : Form
                 return;
             var d = File.ReadAllBytes(ofd.FileName);
             PostBox.SetIndividualLetter(index, d);
-            PostBox.SetPostBoxSortIndex(index, (byte)currentUniqueId);
+            PostBox.SetPostBoxSortIndex(index, (ushort)currentUniqueId);
             PostBox.SetLatestUniqueId(Math.Min(currentUniqueId + 1, 299));
         }
         LoadMailItem();

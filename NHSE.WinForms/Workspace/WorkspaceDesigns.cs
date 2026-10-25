@@ -16,9 +16,10 @@ internal sealed partial class WorkspaceSession
         "patterns" or "proDesigns" => SaveFile.Main.Offsets.PatternCount,
         "flag" => 1,
         "tailor" => MainSaveOffsets.PatternTailorCount,
+        "residentDesigns" => MainSaveOffsets.VillagerCount,
         _ => throw new ArgumentException("invalidRequest"),
     };
-    public static bool IsProDesign(string kind) => kind is "proDesigns" or "tailor";
+    public static bool IsProDesign(string kind) => kind is "proDesigns" or "tailor" or "residentDesigns";
     public byte[] DesignBytes(string kind, int index)
     {
         if ((uint)index >= DesignCount(kind)) throw new ArgumentException("invalidRequest");
@@ -29,6 +30,7 @@ internal sealed partial class WorkspaceSession
             "proDesigns" => m.GetDesignPRO(index).Data.ToArray(),
             "flag" => m.FlagMyDesign.Data.ToArray(),
             "tailor" => m.GetDesignsTailor()[index].Data.ToArray(),
+            "residentDesigns" => m.GetVillager(index).Design.Data.ToArray(),
             _ => throw new ArgumentException("invalidRequest"),
         };
     }
@@ -45,6 +47,8 @@ internal sealed partial class WorkspaceSession
                 // A fixed, validated tailor slot; leave all other slots untouched.
                 copy.CopyTo(m.Data[(m.Offsets.PatternTailor + (index * DesignPatternPRO.SIZE))..]);
                 break;
+            case "residentDesigns":
+                var resident = m.GetVillager(index); resident.Design = new DesignPatternPRO(copy); PutResident(resident.Write(), index); break;
             default: throw new ArgumentException("invalidRequest");
         }
     }

@@ -9,8 +9,8 @@ const props = defineProps<{
   execute: (command: string, payload?: Record<string, unknown>) => Promise<boolean>;
   navigate: (kind: DesignKind, index: number) => Promise<void>;
 }>();
-const kinds = ['patterns', 'proDesigns', 'flag', 'tailor'] as const;
-const names = computed(() => t('designToolNames').split('|'));
+const kinds = ['patterns', 'proDesigns', 'flag', 'tailor', 'residentDesigns'] as const;
+const names = computed(() => [...t('designToolNames').split('|'), t('advancedResidentDesigns')]);
 const query = ref('');
 const useCurrentPlayer = ref(false);
 const sheet = ref(0);

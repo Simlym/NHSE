@@ -223,8 +223,18 @@ public class Item : ICopyableItem<Item>, IEquatable<Item>
     }
 
     public static Item[] GetArray(ReadOnlySpan<byte> data) => data.GetArray<Item>(SIZE);
-    public static byte[] SetArray(IReadOnlyList<Item> data) => data.SetArray(SIZE);
-    public static byte[] SetArray(ReadOnlySpan<Item> data) => data.SetArray(SIZE);
+    public static byte[] SetArray(IReadOnlyList<Item> data)
+    {
+        var result = new byte[data.Count * SIZE];
+        for (var i = 0; i < data.Count; i++) System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(result.AsSpan(i * SIZE), data[i].RawValue);
+        return result;
+    }
+    public static byte[] SetArray(ReadOnlySpan<Item> data)
+    {
+        var result = new byte[data.Length * SIZE];
+        for (var i = 0; i < data.Length; i++) System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(result.AsSpan(i * SIZE), data[i].RawValue);
+        return result;
+    }
 
     public ushort GetWrappedItemName() => WrappingType switch
     {

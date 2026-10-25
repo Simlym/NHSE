@@ -94,6 +94,34 @@ one undo step. Native `.nhm` import/export preserves the complete museum block;
 file size is checked before reading, export is read-only and cancelled dialogs or
 identical imports add no history. These changes only reach disk on Save.
 
+## Advanced editors and console tools
+
+Advanced editors now cover player/island/resident event flags, resident details,
+player memories and friendship, clothing/furniture stock, resident room surfaces,
+all 300 mail slots and detailed item parameters. Values use decimal strings for
+full 64-bit precision. Valid drafts apply before record changes, navigation and
+Save; unchanged fields preserve original bytes. Native file exchange includes
+flags, residents, memories, stock, individual mail and inventory collections.
+Resident professional designs also use the existing design workspace.
+
+Text batches operate on inventory collections or the selected map scope. The
+original filters, semicolon-separated groups, property references and random
+ranges are supported. Inventory batches skip locked slots; map batches validate
+footprints, collisions and bounds before committing. Each batch is one undo step.
+
+Console tools provide network/USB connection, bounded memory transfers, pocket
+reading/writing, inventory validation and optional repeating operations. Reading
+pockets changes the current save with undo; device writes happen immediately and
+cannot be reverted by save undo. Writes and repeating writes require explicit UI
+confirmation; repetition stops on errors, target changes and page exit. Local
+simulators test fragmented/short network responses and closed peers. No physical
+Switch was available, so actual network/USB device transfers remain untested.
+
+The final Windows UI acceptance pass was interrupted after the welcome page and
+native Open dialog checks. Remaining native file/PNG operations, map rendering,
+pointer/keyboard behavior and input methods still need acceptance testing. See
+`docs/UI-MIGRATION.md` for the current implementation and validation status.
+
 ## Custom designs
 
 The design workspace previews ordinary patterns, PRO patterns, the island flag

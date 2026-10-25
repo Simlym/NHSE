@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.IO;
 using LibUsbDotNet;
 using LibUsbDotNet.Main;
 using static System.Buffers.Binary.BinaryPrimitives;
@@ -94,10 +95,13 @@ public sealed class USBBot : IRAMReadWriter
             throw new Exception("USB writer is null, you may have disconnected the device during previous function");
 
         var sizeOfReturn = new byte[4];
-        reader.Read(sizeOfReturn, 5000, out _);
+        var status = reader.Read(sizeOfReturn, 5000, out var headerLength);
+        if (status != ErrorCode.None || headerLength != sizeof(uint)) throw new IOException("Incomplete USB response header.");
+        if (ReadUInt32LittleEndian(sizeOfReturn) != buffer.Length) throw new IOException("Unexpected USB response size.");
 
         //read stack
-        reader.Read(buffer, 5000, out var lenVal);
+        status = reader.Read(buffer, 5000, out var lenVal);
+        if (status != ErrorCode.None || lenVal != buffer.Length) throw new IOException("Incomplete USB response.");
         return lenVal;
     }
 
@@ -109,14 +113,14 @@ public sealed class USBBot : IRAMReadWriter
         uint pack = (uint)buffer.Length + 2;
         var lengthBytes = new byte[sizeof(uint)];
         WriteUInt32LittleEndian(lengthBytes, pack);
-        var ec = writer.Write(lengthBytes, 2000, out _);
-        if (ec != ErrorCode.None)
+        var ec = writer.Write(lengthBytes, 2000, out var headerLength);
+        if (ec != ErrorCode.None || headerLength != lengthBytes.Length)
         {
             Disconnect();
             throw new Exception(UsbDevice.LastErrorString);
         }
         ec = writer.Write(buffer, 2000, out var l);
-        if (ec != ErrorCode.None)
+        if (ec != ErrorCode.None || l != buffer.Length)
         {
             Disconnect();
             throw new Exception(UsbDevice.LastErrorString);

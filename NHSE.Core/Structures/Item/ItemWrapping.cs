@@ -32,7 +32,7 @@ public sealed class ItemWrappingExtended
     /// Includes cultural variants (Lucky Red Envelope, Bokjumeoni Pouch, Otoshidama Envelope).
     /// Can return a string for the skin name, or an index for UI ordering or selection use.
     /// </remarks>
-    // TODO: Build new string resource: "text_wrappers_xx.txt" and convert WrappingInfo.name to a key to lookup against it for translations.
+    // Names are resource keys resolved through GameStrings.GetMail and text_mail_xx.txt.
     public static readonly Dictionary<int, WrappingInfo> ItemWrappingSkin = new() // 
     {
         { 0x00, new("wrap00", 0) },
@@ -72,7 +72,7 @@ public sealed class ItemWrappingExtended
     /// Keys are hexadecimal identifiers representing different delivery boxes.
     /// Includes service-specific boxes (Nook Shopping Box, Hotel Box, Paradise Planning Box).
     /// </remarks>
-    // TODO: Build new string resource: "text_wrappers_xx.txt" and convert WrappingInfo.name to a key to lookup against it for translations.
+    // Names are resource keys resolved through GameStrings.GetMail and text_mail_xx.txt.
     public static readonly Dictionary<int, BoxInfo> ItemBoxSkin = new()
     {
         { 0x00, new("box00", 0) },

@@ -180,6 +180,8 @@ public sealed partial class WorkspaceForm : Form
                 if (Session is null && argument is not null)
                     OpenPath(argument);
                 return State();
+            case "consoleState": case "consoleConnect": case "consoleDisconnect": case "consoleRead": case "consoleWrite": case "consolePocketRead": case "consolePocketWrite":
+                return ConsoleCommand(command, p);
             case "language":
                 WorkspaceText.SetLanguage(Str(p, "language"));
                 return State();
@@ -336,6 +338,19 @@ public sealed partial class WorkspaceForm : Form
                 return State();
             case "housing": return RequireSession().GetHousing(Str(p, "kind"), Int(p, "player"), p.TryGetProperty("resident", out var houseResident) ? RequireSession().FindResidentHouse(houseResident.GetInt32()) : Int(p, "index"), Int(p, "room"), Int(p, "layer"), Sprite);
             case "museum": return RequireSession().GetMuseum();
+            case "advancedData":
+                return RequireSession().GetAdvanced(p.GetProperty("target").Deserialize<WorkspaceSession.AdvancedTarget>(Json) ?? throw new ArgumentException("invalidRequest"));
+            case "advancedTextBatch":
+                RequireSession().TextBatchAdvanced(p.GetProperty("target").Deserialize<WorkspaceSession.AdvancedTarget>(Json) ?? throw new ArgumentException("invalidRequest"), Str(p, "text")); return State();
+            case "residentBatch": RequireSession().ResidentBatch(Str(p, "operation")); return State();
+            case "mapTextBatch":
+                RequireSession().TextBatchMap(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), p.GetProperty("whole").GetBoolean(), Str(p, "text")); return State();
+            case "setAdvanced":
+                RequireSession().SetAdvanced(p.GetProperty("target").Deserialize<WorkspaceSession.AdvancedTarget>(Json) ?? throw new ArgumentException("invalidRequest"),
+                    p.GetProperty("values").Deserialize<Dictionary<string, string>>() ?? throw new ArgumentException("invalidRequest")); return State();
+            case "advancedImport":
+            case "advancedExport":
+                AdvancedFile(p.GetProperty("target").Deserialize<WorkspaceSession.AdvancedTarget>(Json) ?? throw new ArgumentException("invalidRequest"), command == "advancedImport", p.GetProperty("all").GetBoolean()); return State();
             case "setMuseumLevel": RequireSession().SetMuseumLevel(Int(p, "level")); return State();
             case "setMuseumEntry":
                 RequireSession().SetMuseumEntry(Int(p, "index"), Str(p, "date"), Int(p, "donor"),
@@ -508,6 +523,7 @@ public sealed partial class WorkspaceForm : Form
         try { if (!ConfirmLeave()) e.Cancel = true; }
         catch (Exception ex) { e.Cancel = true; MessageBox.Show(this, ex.Message, WorkspaceText.Get("operationFailed")); }
         Program.SaveSettings();
+        if (!e.Cancel) DisconnectConsole();
         base.OnFormClosing(e);
     }
 }

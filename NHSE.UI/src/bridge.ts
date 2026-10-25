@@ -28,6 +28,10 @@ export interface Session {
 }
 export interface MuseumEntry { index: number; name: string; date: string; player: number; item: RoomItem }
 export interface MuseumData { level: number; entries: MuseumEntry[] }
+export interface AdvancedTarget { kind: string; player: number; resident: number; index: number; container: string }
+export interface AdvancedField { key: string; type: 'number' | 'text' | 'boolean'; value: string; min: string; max: string; length: number }
+export interface AdvancedData { target: AdvancedTarget; entries: { index: number; name: string; available: boolean }[]; fields: AdvancedField[]; extension: string; size: number }
+export interface ConsoleState { connected: boolean; transport: 'network' | 'usb'; host: string; port: number; offset: string; data: string; state: State }
 export interface Resident extends VillagerEntry {
   index: number;
   catchphrase: string;
@@ -225,7 +229,7 @@ export interface HousingData {
 }
 export interface HousingTarget { kind: HousingKind; index: number; room: number; layer: number; resident?: number }
 
-export type DesignKind = 'patterns' | 'proDesigns' | 'flag' | 'tailor';
+export type DesignKind = 'patterns' | 'proDesigns' | 'flag' | 'tailor' | 'residentDesigns';
 export interface DesignData {
   kind: DesignKind;
   index: number;

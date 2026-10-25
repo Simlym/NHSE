@@ -133,6 +133,26 @@ export async function mockHost(page: Page, picker = false) {
         thresholds: [10, 100, 500, 2000, 5000, 0],
       })),
     }));
+    type AdvancedTarget = { kind: string; player: number; resident: number; index: number; container: string };
+    let advancedRecords: Record<string, Record<string, string>> = {};
+    const advancedKey = (target: AdvancedTarget) => `${target.kind}:${target.player}:${target.resident}:${target.container}:${target.index}`;
+    const advanced = (target: AdvancedTarget) => {
+      const kind = target.kind;
+      const count = kind === 'mailbox' ? 300 : kind === 'memory' ? 8 : kind === 'wear' ? 24 : kind === 'furniture' ? 32 : kind.startsWith('flags') ? 1024 : kind === 'item' ? 40 : 1;
+      const number = (key: string, value = '0', min = '0', max = '255') => ({ key, type: 'number', value, min, max, length: 0 });
+      const text = (key: string, value = '', length = 10) => ({ key, type: 'text', value, min: '0', max: '0', length });
+      const itemFields = [number('RawValue', '1000', '0', '18446744073709551615'), number('ItemId', '1000', '0', '65535'), number('SystemParam'), number('AdditionalParam'), number('FreeParam', '0', '-2147483648', '2147483647'), number('Count', '0', '0', '65535'), number('Rotation', '0', '0', '3'), number('U08', '0', '0', '4294967295')];
+      const fields = kind.startsWith('flags') ? [number('Value', '0', kind === 'flagsResident' ? '0' : '-32768', kind === 'flagsResident' ? '65535' : '32767')]
+        : kind === 'resident' ? [number('Species', '4'), number('BirthType'), number('DIYRecipeIndex', '0', '0', '65535'), text('CatchPhrase', '你好', 24)]
+        : kind === 'memory' ? [number('Friendship'), text('NickName'), text('Greeting.10', '', 22), number('Flag.255')]
+        : kind === 'room' ? [number('WallItem.UniqueID', '0', '0', '65535'), number('FloorDirection')]
+        : kind === 'mailbox' ? [number('ReadStatus'), number('SortIndex', '0', '0', '65535'), text('To', '', 47), text('Message', '', 239), text('Language', '', 5), ...itemFields]
+        : itemFields;
+      const stored = advancedRecords[advancedKey(target)] ?? {};
+      return { target, entries: Array.from({ length: count }, (_, index) => ({ index, name: `Entry ${index}`, available: kind !== 'item' || index < 30 })),
+        fields: fields.map(field => ({ ...field, value: stored[field.key] ?? field.value })), extension: kind === 'mailbox' ? 'nhpb' : kind.startsWith('flags') ? 'nhfl' : 'nhi', size: kind === 'mailbox' ? 968 : 8 };
+    };
+    let consoleState = { connected: false, transport: 'network', host: '127.0.0.1', port: 6000, offset: '00001000', data: '' };
     type HousingValue = number | boolean | string;
     let museumRecords = { level: 2, entries: Array.from({ length: 1024 }, (_, index) => ({ index,
       name: index === 0 ? '木材' : '', date: index === 0 ? '2024-02-29' : '', player: index === 0 ? 1 : 0,
@@ -251,14 +271,14 @@ export async function mockHost(page: Page, picker = false) {
       return btoa(String.fromCharCode(...bytes));
     }
     let designRecords = Object.fromEntries(
-      ['patterns', 'proDesigns', 'flag', 'tailor'].map((kind) => [
+        ['patterns', 'proDesigns', 'flag', 'tailor', 'residentDesigns'].map((kind) => [
         kind,
-        Array.from({ length: kind === 'flag' ? 1 : kind === 'tailor' ? 8 : 100 }, (_, index) => ({
+        Array.from({ length: kind === 'flag' ? 1 : kind === 'tailor' ? 8 : kind === 'residentDesigns' ? 10 : 100 }, (_, index) => ({
           name: `${kind} ${index + 1}`,
           player: 'Author',
           town: 'Origin',
           compatibility: kind === 'patterns' || kind === 'flag' ? 0xee00 : 0xee01,
-          sheets: Array.from({ length: kind === 'proDesigns' || kind === 'tailor' ? 4 : 1 }, (_, i) =>
+          sheets: Array.from({ length: ['proDesigns', 'tailor', 'residentDesigns'].includes(kind) ? 4 : 1 }, (_, i) =>
             designBitmap(i),
           ),
           palette: Array.from(
@@ -305,6 +325,7 @@ export async function mockHost(page: Page, picker = false) {
         overview: avatar, viewport: avatar, itemImage: null, active: mode === 'items' ? (mapFlags[mapKey(target)] ?? false) : null };
     };
     type Snapshot = {
+      advancedRecords: typeof advancedRecords;
       museumRecords: typeof museumRecords;
       inventoryRecords: typeof inventoryRecords;
       mapFlags: typeof mapFlags;
@@ -324,6 +345,7 @@ export async function mockHost(page: Page, picker = false) {
       redo: Snapshot[] = [];
     const capture = (): Snapshot =>
       structuredClone({
+        advancedRecords,
         museumRecords,
         inventoryRecords,
         players,
@@ -340,6 +362,7 @@ export async function mockHost(page: Page, picker = false) {
         mapFlags,
       });
     const restore = (value: Snapshot) => {
+      advancedRecords = value.advancedRecords;
       museumRecords = value.museumRecords;
       inventoryRecords = value.inventoryRecords;
       turnips = value.turnips;
@@ -400,6 +423,35 @@ export async function mockHost(page: Page, picker = false) {
             );
             const p = message.payload;
             let data: unknown;
+            if (['setAdvanced', 'advancedTextBatch', 'advancedImport', 'residentBatch'].includes(message.command)) {
+              const controls = window as unknown as { nhseAdvancedCancelNext?: boolean; nhseAdvancedErrorNext?: string };
+              if (controls.nhseAdvancedErrorNext) {
+                const error = controls.nhseAdvancedErrorNext; controls.nhseAdvancedErrorNext = undefined;
+                queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error } })));
+                return;
+              }
+              if (controls.nhseAdvancedCancelNext) controls.nhseAdvancedCancelNext = false;
+              else {
+                remember();
+                if (p.target) {
+                  const key = advancedKey(p.target as AdvancedTarget);
+                  advancedRecords[key] = { ...(advancedRecords[key] ?? {}), ...(message.command === 'setAdvanced' ? p.values as Record<string, string> : { Count: '7' }) };
+                }
+              }
+            }
+            if (message.command.startsWith('console')) {
+              const controls = window as unknown as { nhseConsoleErrorNext?: boolean };
+              if (controls.nhseConsoleErrorNext) {
+                controls.nhseConsoleErrorNext = false; consoleState.connected = false;
+                queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error: 'consoleConnectionError' } })));
+                return;
+              }
+              if (message.command === 'consoleConnect') Object.assign(consoleState, { transport: p.transport, connected: true });
+              if (message.command === 'consoleDisconnect') consoleState.connected = false;
+              if (message.command === 'consoleRead') consoleState.data = '01020304';
+              if (message.command === 'consoleWrite') consoleState.data = String(p.data);
+              if (message.command === 'consolePocketRead') { remember(); item.quantity = 21; }
+            }
             if (message.command === 'setMuseumLevel') { remember(); museumRecords.level = Number(p.level); }
             if (message.command === 'setMuseumEntry') {
               remember();
@@ -711,6 +763,8 @@ export async function mockHost(page: Page, picker = false) {
                 })),
                 selected: entries[Number(p.index)],
               };
+            } else if (message.command === 'advancedData') {
+              data = advanced(p.target as AdvancedTarget);
             } else if (message.command === 'museum') {
               const controls = window as unknown as { nhseMuseumRawDateNext?: boolean };
               if (controls.nhseMuseumRawDateNext) { museumRecords.entries[7]!.date = '65535-255-255'; controls.nhseMuseumRawDateNext = false; }
@@ -822,6 +876,7 @@ export async function mockHost(page: Page, picker = false) {
               };
             } else data = snapshot();
             if (mapAdvancedCount) data = { state: snapshot(), ...mapAdvancedCount };
+            if (message.command.startsWith('console')) data = { ...consoleState, state: snapshot() };
             const response = structuredClone({ id: message.id, ok: true, data });
             const delayControls = window as unknown as { nhseDelayMapNext?: number };
             if (message.command === 'map' && delayControls.nhseDelayMapNext) {

@@ -40,6 +40,8 @@ import IslandPage from './IslandPage.vue';
 import ProgressPage from './ProgressPage.vue';
 import HousingPage from './HousingPage.vue';
 import MuseumPage from './MuseumPage.vue';
+import AdvancedPage from './AdvancedPage.vue';
+import ConsolePage from './ConsolePage.vue';
 import DesignPage from './DesignPage.vue';
 import { editableTarget } from './gridSelection';
 import MapPage from './MapPage.vue';
@@ -54,6 +56,9 @@ import {
   type DesignKind,
   type HousingData,
   type MuseumData,
+  type AdvancedData,
+  type ConsoleState,
+  type AdvancedTarget,
   type HousingTarget,
   type HousingKind,
   type ProgressData,
@@ -80,7 +85,9 @@ type Page =
   | 'housing'
   | 'designs'
   | 'mapEditor'
-  | 'museum';
+  | 'museum'
+  | 'advancedEditor'
+  | 'consoleTools';
 const state = ref<State>({ language: 'en', recent: '', session: null, fullScreen: false });
 const page = ref<Page>('overview');
 const playerIndex = ref(0);
@@ -146,6 +153,10 @@ const playerForm = ref<HTMLFormElement | null>(null);
 const residentsPage = ref<InstanceType<typeof ResidentsPage> | null>(null);
 const designData = ref<DesignData | null>(null);
 const designTarget = ref<{ kind: DesignKind; index: number }>({ kind: 'patterns', index: 0 });
+const consoleData = ref<ConsoleState | null>(null);
+const advancedPage = ref<InstanceType<typeof AdvancedPage> | null>(null);
+const advancedData = ref<AdvancedData | null>(null);
+const advancedTarget = ref<AdvancedTarget>({ kind: 'flagsPlayer', player: 0, resident: 0, index: 0, container: 'pocket' });
 const museumPage = ref<InstanceType<typeof MuseumPage> | null>(null);
 const museumData = ref<MuseumData | null>(null);
 const housingPage = ref<InstanceType<typeof HousingPage> | null>(null);
@@ -154,7 +165,7 @@ const housingTarget = ref<HousingTarget>({ kind: 'playerHouses', index: 0, room:
 const mapData = ref<MapData | null>(null);
 const mapPage = ref<InstanceType<typeof MapPage> | null>(null);
 const mapTarget = ref<MapTarget>({ mode: 'terrain', acre: 10, layer: 0, x: 0, y: 0, building: 0, marker: 0 });
-let catalogTarget: 'inventory' | 'housing' | 'map' | 'museum' = 'inventory';
+let catalogTarget: 'inventory' | 'housing' | 'map' | 'museum' | 'advanced' = 'inventory';
 const progressPage = ref<InstanceType<typeof ProgressPage> | null>(null);
 const progressData = ref<ProgressData | null>(null);
 const progressSection = ref<ProgressSection>('recipes');
@@ -176,6 +187,8 @@ const nav = [
   { id: 'progress', icon: Check },
   { id: 'housing', icon: Map },
   { id: 'museum', icon: Leaf },
+  { id: 'advancedEditor', icon: SlidersHorizontal },
+  { id: 'consoleTools', icon: ShieldCheck },
   { id: 'designs', icon: Palette },
   { id: 'mapEditor', icon: Map },
   { id: 'villagers', icon: Users },
@@ -268,6 +281,31 @@ async function navigateDesigns(kind: DesignKind, index: number) {
     designTarget.value = { kind: data.kind, index: data.index };
   });
 }
+async function loadConsole() { consoleData.value = await request<ConsoleState>('consoleState'); }
+async function consoleCommand(name: string, payload: Record<string, unknown> = {}) {
+  const success = await run(async () => { const data = await request<ConsoleState>(name, payload); consoleData.value = data; accept(data.state); });
+  if (!success && consoleData.value) consoleData.value = { ...consoleData.value, connected: false };
+  return success;
+}
+async function loadAdvanced() {
+  if (state.value.session) advancedData.value = await request<AdvancedData>('advancedData', { target: { ...advancedTarget.value } });
+}
+async function navigateAdvanced(part: Partial<AdvancedTarget>) {
+  if (busy.value || !(await applyWorldDrafts())) return;
+  const target = { ...advancedTarget.value, ...part };
+  await run(async () => {
+    const data = await request<AdvancedData>('advancedData', { target });
+    advancedTarget.value = data.target; advancedData.value = data;
+  });
+}
+async function openAdvanced(part: Partial<AdvancedTarget>) {
+  if (busy.value || !(await applyWorldDrafts())) return false;
+  const target = { ...advancedTarget.value, ...part };
+  return await run(async () => {
+    const data = await request<AdvancedData>('advancedData', { target });
+    advancedTarget.value = data.target; advancedData.value = data; page.value = 'advancedEditor';
+  });
+}
 async function loadMuseum() {
   if (state.value.session) museumData.value = await request<MuseumData>('museum');
 }
@@ -352,6 +390,7 @@ async function command(
     if (page.value === 'mapEditor' && name !== 'copyGrid') await loadMap();
     if (page.value === 'designs') await loadDesigns();
     if (page.value === 'museum') await loadMuseum();
+    if (page.value === 'advancedEditor') await loadAdvanced();
     if (success) toast(success);
   });
 }
@@ -370,6 +409,8 @@ async function go(destination: Page) {
   if (destination === 'mapEditor') await run(loadMap);
   if (destination === 'designs') await run(loadDesigns);
   if (destination === 'museum') await run(loadMuseum);
+  if (destination === 'advancedEditor') await run(loadAdvanced);
+  if (destination === 'consoleTools') await run(loadConsole);
 }
 async function applyProfile() {
   if (!playerForm.value?.reportValidity()) return false;
@@ -387,6 +428,7 @@ async function save() {
   await command('save', {}, 'saveSuccess');
 }
 async function applyWorldDrafts() {
+  if (page.value === 'advancedEditor' && advancedPage.value && !(await advancedPage.value.applyPending())) return false;
   if (page.value === 'museum' && museumPage.value && !(await museumPage.value.applyPending())) return false;
   if (page.value === 'mapEditor' && mapPage.value && !(await mapPage.value.applyPending())) return false;
   if (page.value === 'housing' && housingPage.value && !(await housingPage.value.applyPending()))
@@ -399,6 +441,7 @@ async function applyWorldDrafts() {
   return true;
 }
 async function worldCommand(name: string, payload: Record<string, unknown> = {}) {
+  if (name === 'advanced') return await openAdvanced(payload as Partial<AdvancedTarget>);
   if (name === 'tool' && payload.tool === 'museum') { await go('museum'); return page.value === 'museum'; }
   if (name === 'copyGrid') return await command(name, payload, 'gridCopied');
   if (['spawnMap', 'editMapParameters', 'replaceMapMatches'].includes(name)) {
@@ -419,11 +462,11 @@ async function worldCommand(name: string, payload: Record<string, unknown> = {})
   if (name === 'tool' && payload.tool === 'terrain') { await go('mapEditor'); return page.value === 'mapEditor'; }
   if (name === 'nativeMap' && !(await applyWorldDrafts())) return false;
   if (
-    (name === 'tool' && ['patterns', 'proDesigns', 'flag', 'tailor'].includes(String(payload.tool))) ||
+    (name === 'tool' && ['patterns', 'proDesigns', 'flag', 'tailor', 'residentDesigns'].includes(String(payload.tool))) ||
     (name === 'legacy' && payload.section === 'designs')
   ) {
     if (busy.value || !(await applyWorldDrafts())) return false;
-    designTarget.value = { kind: (payload.tool as DesignKind) ?? 'patterns', index: 0 };
+    designTarget.value = { kind: (payload.tool as DesignKind) ?? 'patterns', index: Number(payload.index ?? 0) };
     page.value = 'designs';
     return await run(loadDesigns);
   }
@@ -451,7 +494,7 @@ async function worldCommand(name: string, payload: Record<string, unknown> = {})
   return await command(
     name,
     { player: playerIndex.value, ...payload },
-    ['legacy', 'tool', 'nativeMap', 'mapImport', 'mapExport', 'mapPng', 'designImport', 'designExport', 'designPng', 'housingImport', 'housingExport', 'museumImport', 'museumExport'].includes(name) ? undefined : 'applied',
+    ['legacy', 'tool', 'nativeMap', 'mapImport', 'mapExport', 'mapPng', 'designImport', 'designExport', 'designPng', 'housingImport', 'housingExport', 'museumImport', 'museumExport', 'advancedImport', 'advancedExport'].includes(name) ? undefined : 'applied',
   );
 }
 function chooseSlot(item: ItemView) {
@@ -484,7 +527,7 @@ async function searchCatalog(pageNumber = 0) {
     }
   });
 }
-async function showCatalog(target: 'inventory' | 'housing' | 'map' | 'museum' = 'inventory') {
+async function showCatalog(target: 'inventory' | 'housing' | 'map' | 'museum' | 'advanced' = 'inventory') {
   catalogTarget = target;
   catalogOpen.value = true;
   await searchCatalog(catalog.value?.page ?? 0);
@@ -500,6 +543,7 @@ function chooseClothingGroup(id: string) {
   void searchCatalog(0);
 }
 function chooseCatalog(item: ItemView) {
+  if (catalogTarget === 'advanced') { advancedPage.value?.chooseItem(item); catalogOpen.value = false; return; }
   if (catalogTarget === 'museum') { museumPage.value?.chooseItem(item); catalogOpen.value = false; return; }
   if (catalogTarget === 'map') {
     mapPage.value?.chooseItem(item);
@@ -531,6 +575,7 @@ async function applyItem() {
 }
 async function itemAction(action: string) {
   if (!selected.value) return;
+  if (action === 'detailItem') { await openAdvanced({ kind: 'item', player: playerIndex.value, index: selected.value.index, container: container.value }); return; }
   await command(
     action,
     { player: playerIndex.value, container: container.value, index: selected.value.index },
@@ -1122,6 +1167,8 @@ onUnmounted(() => {
           :execute="worldCommand"
           :navigate="navigateDesigns"
         />
+        <ConsolePage v-else-if="page === 'consoleTools'" :data="consoleData" :players="state.session.players" :busy="busy" :execute="consoleCommand" />
+        <AdvancedPage v-else-if="page === 'advancedEditor'" ref="advancedPage" :data="advancedData" :players="state.session.players" :residents="state.session.residents" :busy="busy" :navigate="navigateAdvanced" :execute="worldCommand" :pick-item="() => showCatalog('advanced')" />
         <MuseumPage v-else-if="page === 'museum'" ref="museumPage" :data="museumData" :busy="busy" :execute="worldCommand" :pick-item="() => showCatalog('museum')" />
         <HousingPage
           v-else-if="page === 'housing'"

@@ -136,7 +136,7 @@ public sealed class StringInstructionSet
         {
             var line = lines[start++];
             if (line.StartsWith(SetSeparatorChar))
-                return start;
+                return start - 1;
         }
         return start;
     }

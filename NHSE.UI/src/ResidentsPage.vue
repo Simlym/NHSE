@@ -65,7 +65,7 @@ async function pick(choice: { index: number; id?: string }) {
   target.value = choice.index;
 }
 async function advanced() {
-  if (await applyPending()) await props.execute('legacy', { section: 'villagers', resident: target.value });
+  if (await applyPending()) await props.execute('advanced', { kind: 'resident', resident: target.value, index: 0 });
 }
 defineExpose({ applyPending });
 </script>

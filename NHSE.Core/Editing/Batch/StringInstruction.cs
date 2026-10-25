@@ -77,7 +77,7 @@ public sealed record StringInstruction(string PropertyName, string PropertyValue
     /// <summary>
     /// Gets a <see cref="Random"/> value, based on the <see cref="RandomMinimum"/> and <see cref="RandomMaximum"/> values.
     /// </summary>
-    public int RandomValue => RandUtil.Rand.Next(RandomMinimum, RandomMaximum + 1);
+    public int RandomValue => (int)RandUtil.Rand.NextInt64(RandomMinimum, (long)RandomMaximum + 1);
 
     /// <summary>
     /// Checks if the input <see cref="str"/> is a valid "random range" specification.
@@ -95,13 +95,13 @@ public sealed record StringInstruction(string PropertyName, string PropertyValue
     /// <exception cref="ArgumentException">When the splitter is not present.</exception>
     public void SetRandomRange(ReadOnlySpan<char> str)
     {
+        if (str.StartsWith('$')) str = str[1..];
         var index = str.IndexOf(SplitRange);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(index);
 
         var min = str[..index];
         var max = str[(index + 1)..];
-        _ = int.TryParse(min, out RandomMinimum);
-        _ = int.TryParse(max, out RandomMaximum);
+        if (!int.TryParse(min, out RandomMinimum) || !int.TryParse(max, out RandomMaximum) || RandomMinimum > RandomMaximum) throw new ArgumentException("Invalid random range.");
 
         if (RandomMinimum == RandomMaximum)
         {

@@ -35,7 +35,7 @@ public sealed class PostBox : EncryptedFilePair
     public List<int> GetUsedPostBoxSlots()
     {
         var usedSlots = new List<int>();
-        for (int i = 0; i < MaxMailItems; i++)
+        for (int i = 0; i <= MaxMailItems; i++)
         {
             var readStatus = MailListWholeRegion[(MailLength * i) + Mail.ReadUnread];
             if (readStatus == 0x03 || readStatus == 0x04)
@@ -290,13 +290,13 @@ public sealed class PostBox : EncryptedFilePair
         WriteUInt16LittleEndian(Data.Slice(offset, 2), skinCode);
     }
 
-    public byte GetPostBoxSortIndex(int index)
+    public ushort GetPostBoxSortIndex(int index)
     {
-        return Data[Offsets.MailList + (MailLength * index) + Mail.PostBoxSortIndex];
+        return ReadUInt16LittleEndian(Data[(Offsets.MailList + (MailLength * index) + Mail.PostBoxSortIndex)..]);
     }
-    public void SetPostBoxSortIndex(int index, byte sortIndex)
+    public void SetPostBoxSortIndex(int index, ushort sortIndex)
     {
-        Data[Offsets.MailList + (MailLength * index) + Mail.PostBoxSortIndex] = sortIndex;
+        WriteUInt16LittleEndian(Data[(Offsets.MailList + (MailLength * index) + Mail.PostBoxSortIndex)..], sortIndex);
     }
 
     public string GetMailLanguageString(int index)
@@ -313,7 +313,7 @@ public sealed class PostBox : EncryptedFilePair
     public void SetMailLanguageString(int index, string languageString, bool player)
     {
         var langOffset = Offsets.MailList + (MailLength * index) + Mail.LanguageString;
-        if (player) { GetBytes(languageString, 5).CopyTo(Data[langOffset..]); }
+        if (player) { Encoding.ASCII.GetBytes(languageString.PadRight(5, '\0')[..5]).CopyTo(Data[langOffset..]); }
         else { Data.Slice(langOffset, 5).Clear(); }
     }
 

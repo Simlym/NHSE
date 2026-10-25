@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net.Sockets;
+using System.IO;
 using System.Threading;
 
 namespace NHSE.Injection;
@@ -19,9 +20,14 @@ public sealed class SysBot : IRAMReadWriter
         Port = port;
         lock (_sync)
         {
-            Connection = new Socket(SocketType.Stream, ProtocolType.Tcp);
-            Connection.Connect(IP, Port);
-            Connected = true;
+            Connected = false; Connection.Dispose();
+            Connection = new Socket(SocketType.Stream, ProtocolType.Tcp) { SendTimeout = 5000, ReceiveTimeout = 5000 };
+            try
+            {
+                if (!Connection.ConnectAsync(IP, Port).Wait(TimeSpan.FromSeconds(5))) throw new TimeoutException();
+                Connected = true;
+            }
+            catch { Connection.Dispose(); throw; }
         }
     }
 
@@ -29,20 +35,32 @@ public sealed class SysBot : IRAMReadWriter
     {
         lock (_sync)
         {
-            Connection.Disconnect(false);
+            Connection.Dispose();
             Connected = false;
         }
     }
 
     private int ReadInternal(byte[] buffer)
     {
-        int br = Connection.Receive(buffer, 0, 1, SocketFlags.None);
-        while (buffer[br - 1] != (byte)'\n')
-            br += Connection.Receive(buffer, br, 1, SocketFlags.None);
-        return br;
+        var count = 0;
+        while (count < buffer.Length)
+        {
+            if (Connection.Receive(buffer, count, 1, SocketFlags.None) == 0) throw new EndOfStreamException();
+            if (buffer[count++] == (byte)'\n') return count;
+        }
+        throw new IOException("Unexpected response length.");
     }
 
-    private int SendInternal(byte[] buffer) => Connection.Send(buffer);
+    private int SendInternal(byte[] buffer)
+    {
+        var sent = 0;
+        while (sent < buffer.Length)
+        {
+            var count = Connection.Send(buffer, sent, buffer.Length - sent, SocketFlags.None);
+            if (count == 0) throw new EndOfStreamException(); sent += count;
+        }
+        return sent;
+    }
 
     public int Read(byte[] buffer)
     {
@@ -60,7 +78,7 @@ public sealed class SysBot : IRAMReadWriter
             // give it time to push data back
             Thread.Sleep((length / 256) + 100);
             var buffer = new byte[(length * 2) + 1];
-            _ = ReadInternal(buffer);
+            if (ReadInternal(buffer) != buffer.Length) throw new IOException("Unexpected response length.");
             return Convert.FromHexString(buffer.AsSpan(0, buffer.Length - 1));
         }
     }

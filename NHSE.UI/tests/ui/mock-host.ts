@@ -266,15 +266,19 @@ export async function mockHost(page: Page, picker = false) {
       ]),
     );
     type GridPoint = { x: number; y: number };
-    type GridTarget = { kind: string; map?: Record<string, unknown>; house?: number; room?: number; layer?: number };
+    type GridTarget = { kind: string; map?: Record<string, unknown>; house?: number; room?: number; layer?: number; player?: number; container?: string; slots?: number[]; columns?: number };
+    let inventoryRecords: Record<string, Record<string, number>> = {};
+    const inventoryKey = (target: GridTarget, point: GridPoint) => `${target.container}:${target.player}:${target.slots![point.y * target.columns! + point.x]}`;
     let gridClipboard: { kind: string; count: number; width: number; height: number; entries: { x: number; y: number; values: Record<string, number> }[] } | null = null;
     const gridRead = (target: GridTarget, point: GridPoint): Record<string, number> => {
+      if (target.kind === 'inventory') return { ...(inventoryRecords[inventoryKey(target, point)] ?? { itemId: target.slots![point.y * target.columns! + point.x] === 0 ? item.itemId : 65534, systemParam: 0, additionalParam: 0, freeParam: 0 }) };
       if (target.kind === 'roomItems') return { ...(housingRecords.tiles[tileKey({ index: target.house, room: target.room, layer: target.layer }, point.x, point.y)] ?? { itemId: 65534, systemParam: 0, additionalParam: 0, freeParam: 0 }) };
       const values = mapRecords[mapKey({ ...target.map, x: point.x, y: point.y })] ?? {};
       if (target.kind === 'terrain') return { ...values };
       return { itemId: values['Map.ItemId'] ?? 65534, systemParam: values['Map.SystemParam'] ?? 0, additionalParam: values['Map.AdditionalParam'] ?? 0, freeParam: values['Map.FreeParam'] ?? 0 };
     };
     const gridWrite = (target: GridTarget, point: GridPoint, values: Record<string, number>) => {
+      if (target.kind === 'inventory') { inventoryRecords[inventoryKey(target, point)] = { ...values }; return; }
       if (target.kind === 'roomItems') housingRecords.tiles[tileKey({ index: target.house, room: target.room, layer: target.layer }, point.x, point.y)] = { itemId: values.itemId!, systemParam: values.systemParam!, additionalParam: values.additionalParam!, freeParam: values.freeParam! };
       else mapRecords[mapKey({ ...target.map, x: point.x, y: point.y })] = target.kind === 'terrain' ? { ...values } : { 'Map.ItemId': values.itemId!, 'Map.SystemParam': values.systemParam!, 'Map.AdditionalParam': values.additionalParam!, 'Map.FreeParam': values.freeParam! };
     };
@@ -298,6 +302,7 @@ export async function mockHost(page: Page, picker = false) {
         overview: avatar, viewport: avatar, itemImage: null, active: mode === 'items' ? (mapFlags[mapKey(target)] ?? false) : null };
     };
     type Snapshot = {
+      inventoryRecords: typeof inventoryRecords;
       mapFlags: typeof mapFlags;
       mapRecords: typeof mapRecords;
       designRecords: typeof designRecords;
@@ -315,6 +320,7 @@ export async function mockHost(page: Page, picker = false) {
       redo: Snapshot[] = [];
     const capture = (): Snapshot =>
       structuredClone({
+        inventoryRecords,
         players,
         item,
         revision,
@@ -329,6 +335,7 @@ export async function mockHost(page: Page, picker = false) {
         mapFlags,
       });
     const restore = (value: Snapshot) => {
+      inventoryRecords = value.inventoryRecords;
       turnips = value.turnips;
       recycleItem = value.recycleItem;
       progressRecords = value.progressRecords;
@@ -684,7 +691,11 @@ export async function mockHost(page: Page, picker = false) {
                       image: null,
                     },
               );
-              data = { page: 0, pages: 1, total: 40, used: 1, matched: 40, items };
+              for (const entry of items) {
+                const value = inventoryRecords[`${p.container}:${p.player}:${entry.index}`];
+                if (value) Object.assign(entry, { itemId: value.itemId, empty: value.itemId === 65534, name: value.itemId === 65534 ? '' : '木材', quantity: value.itemId === 65534 ? 0 : 1 });
+              }
+              data = { page: 0, pages: 1, total: 40, used: items.filter(i => !i.empty).length, matched: 40, items };
             } else if (message.command === 'catalog') {
               const query = String(p.query ?? '');
               const searched = catalog.filter(

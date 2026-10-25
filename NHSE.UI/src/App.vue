@@ -32,7 +32,6 @@ import {
   PanelLeftOpen,
   Palette,
   SunMoon,
-  LockKeyhole,
 } from '@lucide/vue';
 import { languages, language, setLanguage, t, hasText } from './i18n';
 import VillagerPicker from './VillagerPicker.vue';
@@ -43,6 +42,7 @@ import HousingPage from './HousingPage.vue';
 import DesignPage from './DesignPage.vue';
 import { editableTarget } from './gridSelection';
 import MapPage from './MapPage.vue';
+import InventoryGrid from './InventoryGrid.vue';
 import {
   listenState,
   native,
@@ -1021,39 +1021,9 @@ onUnmounted(() => {
                 ><Search :size="18" /><span class="sr-only">{{ t('searchInventory') }}</span
                 ><input v-model="query" type="search" :placeholder="t('searchInventory')" :disabled="busy"
               /></label>
-              <div
-                class="item-grid"
-                :class="{ 'pocket-grid': container === 'pocket' }"
-                :aria-label="
-                  t(container === 'pocket' ? 'pocket' : container === 'recycle' ? 'recycle' : 'storage')
-                "
-              >
-                <button
-                  v-for="item in inventory?.items ?? []"
-                  :key="item.index"
-                  class="item-slot"
-                  :class="{
-                    selected: selected?.index === item.index,
-                    'is-empty': item.empty,
-                    locked: !item.available,
-                  }"
-                  :disabled="busy || !item.available"
-                  :aria-label="`${t('slot')} ${item.index + 1}: ${!item.available ? t('locked') : item.empty ? t('empty') : item.name}`"
-                  :aria-pressed="selected?.index === item.index"
-                  @click="chooseSlot(item)"
-                >
-                  <span class="slot-index">{{ item.index + 1 }}</span
-                  ><LockKeyhole v-if="!item.available" :size="18" /><img
-                    v-else-if="item.image"
-                    :src="item.image"
-                    alt=""
-                  /><Plus v-else :size="17" /><span
-                    v-if="!item.empty && item.quantity > 1"
-                    class="item-count"
-                    >{{ item.quantity }}</span
-                  >
-                </button>
-              </div>
+              <InventoryGrid :data="inventory" :player="playerIndex" :container="container"
+                :scope="JSON.stringify([page, query, inventory?.page, state.session?.title])" :busy="busy"
+                :selected="selected" :clipboard="state.session?.clipboard ?? null" :choose="chooseSlot" :execute="worldCommand" />
               <div v-if="inventory?.items.length === 0" class="empty-result">
                 {{ t('noResults') }}
               </div>

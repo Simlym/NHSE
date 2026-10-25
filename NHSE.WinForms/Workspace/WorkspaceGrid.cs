@@ -7,7 +7,8 @@ namespace NHSE.WinForms;
 
 internal sealed partial class WorkspaceSession
 {
-    internal sealed record GridTarget(string Kind, MapTarget? Map = null, int House = 0, int Room = 0, int Layer = 0);
+    internal sealed record GridTarget(string Kind, MapTarget? Map = null, int House = 0, int Room = 0, int Layer = 0,
+        int Player = 0, string Container = "pocket", int[]? Slots = null, int Columns = 10);
     internal sealed record GridClipboardInfo(string Kind, int Count, int Width, int Height);
     private sealed record GridEntry(int X, int Y, byte[] Data);
     private sealed record GridClipboard(GridClipboardInfo Info, GridEntry[] Entries);
@@ -83,6 +84,7 @@ internal sealed partial class WorkspaceSession
     }
     public void CopyGrid(GridTarget target, MapPoint[] selection)
     {
+        if (target.Kind == "inventory") { CopyInventoryGrid(target, selection); return; }
         var terrain = target.Kind == "terrain" ? ReadTerrainGrid(target) : null;
         var items = terrain is null ? ReadItemGrid(target).Layer : null;
         var points = GridPoints(target, selection);
@@ -103,6 +105,7 @@ internal sealed partial class WorkspaceSession
     }
     public void PasteGrid(GridTarget target, MapPoint anchor, MapPoint[] selection, bool noOverwrite)
     {
+        if (target.Kind == "inventory") { ChangeInventoryGrid(target, selection, "paste", anchor); return; }
         var buffer = GridBuffer ?? throw new ArgumentException("gridNoClipboard");
         if (buffer.Info.Kind != (target.Kind == "terrain" ? "terrain" : "items")) throw new ArgumentException("gridTypeMismatch");
         var terrain = target.Kind == "terrain" ? ReadTerrainGrid(target) : null;
@@ -159,6 +162,7 @@ internal sealed partial class WorkspaceSession
     public void EditGrid(GridTarget target, MapPoint[] selection, string operation)
     {
         if (operation is not ("delete" or "rotate")) throw new ArgumentException("invalidRequest");
+        if (target.Kind == "inventory") { ChangeInventoryGrid(target, selection, operation, new(0, 0)); return; }
         if (target.Kind == "terrain")
         {
             var terrain = ReadTerrainGrid(target);
@@ -181,5 +185,74 @@ internal sealed partial class WorkspaceSession
             layer.SetExtensionTiles(item, point.X, point.Y); layer.GetTile(point.X, point.Y).CopyFrom(item);
         }
         grid.Save();
+    }
+
+    private int InventorySlot(GridTarget target, MapPoint point)
+    {
+        var items = GetItems(target.Player, target.Container);
+        if (target.Columns is < 1 or > 60 || target.Slots is not { Length: > 0 and <= 60 } slots
+            || slots.Distinct().Count() != slots.Length || slots.Any(i => (uint)i >= items.Length)
+            || point.X < 0 || point.X >= target.Columns || point.Y < 0 || point.Y >= 60)
+            throw new ArgumentException("invalidRequest");
+        var position = point.Y * target.Columns + point.X;
+        if (position >= slots.Length || !IsSlotAvailable(target.Player, target.Container, slots[position]))
+            throw new ArgumentException("invalidRequest");
+        return slots[position];
+    }
+    private MapPoint[] InventoryPoints(GridTarget target, MapPoint[] selection)
+    {
+        if (selection.Length is < 1 or > 60) throw new ArgumentException("invalidRequest");
+        var points = selection.Distinct().OrderBy(p => p.Y).ThenBy(p => p.X).ToArray();
+        foreach (var point in points) InventorySlot(target, point);
+        return points;
+    }
+    private void CopyInventoryGrid(GridTarget target, MapPoint[] selection)
+    {
+        var points = InventoryPoints(target, selection);
+        var items = GetItems(target.Player, target.Container);
+        var minX = points.Min(p => p.X); var minY = points.Min(p => p.Y);
+        var entries = points.Where(p => !items[InventorySlot(target, p)].IsNone)
+            .Select(p => new GridEntry(p.X - minX, p.Y - minY, Item.SetArray([items[InventorySlot(target, p)]]))).ToArray();
+        if (entries.Length == 0) throw new ArgumentException("gridEmptyCopy");
+        GridBuffer = new(new("items", entries.Length, points.Max(p => p.X) - minX + 1, points.Max(p => p.Y) - minY + 1), entries);
+    }
+    private void ChangeInventoryGrid(GridTarget target, MapPoint[] selection, string operation, MapPoint anchor)
+    {
+        var points = InventoryPoints(target, selection);
+        var before = GetItems(target.Player, target.Container).Select(i => i.RawValue).ToArray();
+        var after = before.ToArray();
+        if (operation == "paste")
+        {
+            var buffer = GridBuffer ?? throw new ArgumentException("gridNoClipboard");
+            if (buffer.Info.Kind != "items") throw new ArgumentException("gridTypeMismatch");
+            InventorySlot(target, anchor);
+            var entries = buffer.Entries.Length == 1 && points.Length > 1
+                ? points.Select(p => new GridEntry(p.X, p.Y, buffer.Entries[0].Data))
+                : buffer.Entries.Select(e => new GridEntry(anchor.X + e.X, anchor.Y + e.Y, e.Data));
+            foreach (var entry in entries)
+            {
+                var slot = InventorySlot(target, new(entry.X, entry.Y));
+                var item = Item.GetArray(entry.Data)[0];
+                if (item.IsExtension) throw new ArgumentException("mapInvalidItem");
+                after[slot] = item.RawValue;
+            }
+        }
+        else foreach (var point in points)
+        {
+            var slot = InventorySlot(target, point);
+            var item = new Item(after[slot]);
+            if (operation == "delete") item.Delete();
+            else if (!item.IsNone) item.Rotation = (item.Rotation + 1) & 3;
+            after[slot] = item.RawValue;
+        }
+        var changes = Enumerable.Range(0, before.Length).Where(i => before[i] != after[i]).ToArray();
+        if (changes.Length == 0) return;
+        void Apply(ulong[] data)
+        {
+            var current = GetItems(target.Player, target.Container);
+            foreach (var slot in changes) current[slot] = new Item(data[slot]);
+            PutItems(target.Player, target.Container, current);
+        }
+        Commit(() => Apply(before), () => Apply(after));
     }
 }

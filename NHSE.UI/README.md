@@ -141,6 +141,14 @@ game's zero-based count only for stackable items; non-stack item parameters are
 preserved. Detailed native editing remains available for recipes, flowers,
 variants, wrapping and other specialized properties.
 
+Pockets, storage and the recycle box support rectangle selection, Ctrl/Cmd toggles,
+Shift ranges, arrow navigation, and the shared copy/paste, delete and rotation
+shortcuts used by maps and rooms. Select-all includes only visible unlocked slots.
+Selections follow the actual responsive column count and reset on filtering,
+paging or changing players/containers. Each batch is one undo step; invalid or
+locked destinations reject the entire batch. Copies preserve raw item parameters
+and can be pasted between inventory, maps and rooms within the current save.
+
 The item catalog covers the same item IDs as the original inventory selector,
 excluding the empty/extension markers (empty slots use Remove). It is paginated
 at 96 items per page rather than truncating the results. Categories are grouped

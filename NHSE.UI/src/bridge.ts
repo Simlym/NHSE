@@ -246,5 +246,5 @@ export interface MapData {
 export interface MapParameter { key: string; type: 'boolean' | 'number'; min: string; max: string; writable: boolean }
 export interface MapEditRule { key: string; operator: string; value: string }
 export interface MapBrush { enabled: boolean; radius: number; randomVariation: boolean }
-export interface GridTarget { kind: 'terrain' | 'mapItems' | 'roomItems'; map?: MapTarget; house?: number; room?: number; layer?: number }
+export interface GridTarget { kind: 'terrain' | 'mapItems' | 'roomItems' | 'inventory'; map?: MapTarget; house?: number; room?: number; layer?: number; player?: number; container?: string; slots?: number[]; columns?: number }
 export interface GridClipboardInfo { kind: 'items' | 'terrain'; count: number; width: number; height: number }

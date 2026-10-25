@@ -371,5 +371,12 @@
   "gridTypeMismatch": "No se pueden mezclar portapapeles de terreno y objetos.",
   "gridRoomItem": "Los objetos exteriores no se pueden pegar en habitaciones.",
   "gridCopied": "Selección copiada al portapapeles del editor.",
-  "gridArea": "Cuadrícula editable"
+  "gridArea": "Cuadrícula editable",
+  "housingImportHouse": "Importar casa",
+  "housingExportHouse": "Exportar casa",
+  "housingImportRoom": "Importar habitación seleccionada",
+  "housingExportRoom": "Exportar habitación seleccionada",
+  "housingFileHint": "La importación sustituye la casa seleccionada o todas las capas de la habitación seleccionada. Conserva la asignación de la casa. Los cambios válidos se aplican primero; la importación se puede deshacer.",
+  "housingConvertConfirm": "La versión del archivo es diferente. ¿Convertir a este formato de guardado? Los campos no compatibles pueden perderse.",
+  "housingFileSize": "El tamaño del archivo no corresponde a una casa o habitación compatible."
 }

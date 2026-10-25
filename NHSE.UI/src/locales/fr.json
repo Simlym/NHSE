@@ -371,5 +371,12 @@
   "gridTypeMismatch": "Les presse-papiers de terrain et d’objets ne sont pas compatibles.",
   "gridRoomItem": "Les objets extérieurs ne peuvent pas être collés dans une pièce.",
   "gridCopied": "Sélection copiée dans le presse-papiers de l’éditeur.",
-  "gridArea": "Grille modifiable"
+  "gridArea": "Grille modifiable",
+  "housingImportHouse": "Importer la maison",
+  "housingExportHouse": "Exporter la maison",
+  "housingImportRoom": "Importer la pièce sélectionnée",
+  "housingExportRoom": "Exporter la pièce sélectionnée",
+  "housingFileHint": "L’import remplace la maison sélectionnée ou toutes les couches de la pièce sélectionnée. L’attribution de la maison est conservée. Les saisies valides sont appliquées avant ; l’import peut être annulé.",
+  "housingConvertConfirm": "La version du fichier est différente. Convertir vers ce format de sauvegarde ? Les champs non pris en charge peuvent être perdus.",
+  "housingFileSize": "La taille du fichier ne correspond pas à un format de maison ou de pièce compatible."
 }

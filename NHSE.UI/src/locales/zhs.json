@@ -371,5 +371,12 @@
   "gridTypeMismatch": "地形与物品剪贴板不能混用。",
   "gridRoomItem": "户外对象不能粘贴到房间中。",
   "gridCopied": "选区已复制到编辑器剪贴板。",
-  "gridArea": "编辑网格"
+  "gridArea": "编辑网格",
+  "housingImportHouse": "导入房屋",
+  "housingExportHouse": "导出房屋",
+  "housingImportRoom": "导入当前房间",
+  "housingExportRoom": "导出当前房间",
+  "housingFileHint": "导入会替换所选房屋或当前房间的全部图层，保留房屋归属。有效草稿会先应用，导入可撤销。",
+  "housingConvertConfirm": "文件版本与当前存档不同，是否转换？目标版本不支持的字段可能丢失。",
+  "housingFileSize": "文件大小不符合兼容的房屋或房间格式。"
 }

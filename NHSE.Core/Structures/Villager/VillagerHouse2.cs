@@ -28,7 +28,7 @@ public sealed class VillagerHouse2(Memory<byte> raw) : VillagerHouse1(raw)
     public VillagerHouse1 Downgrade()
     {
         var result = new byte[VillagerHouse1.SIZE];
-        Data.CopyTo(result);
+        Data[..VillagerHouse1.SIZE].CopyTo(result);
         return new VillagerHouse1(result);
     }
 

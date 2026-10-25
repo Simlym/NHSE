@@ -480,6 +480,61 @@ var oldRoomBefore = originalSave.Main.Data.ToArray();
 oldHousing.SetRoomItem(0, 0, 0, 2, 3, furniture, true, true, false);
 Check(originalSave.Main.GetPlayerHouse(0).GetRoom(0).GetItemLayers()[0].GetTile(3, 3).IsExtension, "original room format supports the same multi-tile placement rules");
 oldHousing.Undo(); Check(originalSave.Main.Data.SequenceEqual(oldRoomBefore), "original room placement undo preserves every byte");
+// House/room files: native byte preservation, both conversion directions and atomic undo.
+var residentV2File = Enumerable.Range(0, VillagerHouse2.SIZE).Select(i => (byte)(i * 37)).ToArray();
+Check(new VillagerHouse2(residentV2File).Downgrade().Write().SequenceEqual(residentV2File.AsSpan(0, VillagerHouse1.SIZE).ToArray()), "resident house downgrade copies only the supported legacy prefix");
+foreach (var fileSave in new[] { save, originalSave })
+{
+    var files = new WorkspaceSession(fileSave);
+    var filesBefore = fileSave.Main.Data.ToArray();
+    foreach (var kind in new[] { "playerHouses", "residentHouses" })
+    {
+        var native = files.ExportHousing(kind, 0, 0, false);
+        files.ImportHousing(kind, 0, 0, false, native);
+        Check(!files.IsDirty && fileSave.Main.Data.SequenceEqual(filesBefore), "unchanged house file keeps bytes and clean history: " + kind + native.Length);
+        var expected = native.ToArray(); expected[0] ^= 1; expected[^1] ^= 0x5A;
+        object source = kind == "playerHouses" ? fileSave.Main.Offsets.ReadPlayerHouse(expected.ToArray()) : fileSave.Main.Offsets.ReadVillagerHouse(expected.ToArray());
+        foreach (var key in new[] { "NPC1", "NPC2", "BuildPlayer" })
+        {
+            var prop = source.GetType().GetProperty(key);
+            if (prop is { CanWrite: true }) prop.SetValue(source, (sbyte)-7);
+        }
+        var imported = source is IPlayerHouse ph ? ph.Write() : ((IVillagerHouse)source).Write();
+        var inputBefore = imported.ToArray();
+        files.ImportHousing(kind, 0, 0, false, imported);
+        Check(files.ExportHousing(kind, 0, 0, false).SequenceEqual(expected) && imported.SequenceEqual(inputBefore), "house import preserves assignments, unknown bytes and caller buffer: " + kind + native.Length);
+        files.Undo(); Check(fileSave.Main.Data.SequenceEqual(filesBefore), "house file undo restores complete main bytes: " + kind);
+        files.Redo(); Check(files.ExportHousing(kind, 0, 0, false).SequenceEqual(expected), "house file redo restores complete import: " + kind); files.Undo();
+        var otherSize = kind == "playerHouses" ? (native.Length == PlayerHouse1.SIZE ? PlayerHouse2.SIZE : PlayerHouse1.SIZE)
+            : native.Length == VillagerHouse1.SIZE ? VillagerHouse2.SIZE : VillagerHouse1.SIZE;
+        var crossFile = kind == "playerHouses" ? PlayerHouseConverter.GetCompatible(expected, otherSize) : VillagerHouseConverter.GetCompatible(expected, otherSize).ToArray();
+        var converted = kind == "playerHouses" ? PlayerHouseConverter.GetCompatible(crossFile, native.Length) : VillagerHouseConverter.GetCompatible(crossFile, native.Length).ToArray();
+        files.ImportHousing(kind, 0, 0, false, crossFile);
+        Check(files.ExportHousing(kind, 0, 0, false).SequenceEqual(converted), "house file converts through existing core format converter: " + kind + native.Length); files.Undo();
+        ExpectInvalid(() => files.ImportHousing(kind, 0, 0, false, [1, 2, 3]));
+        ExpectInvalid(() => files.ImportHousing(kind, 999, 0, false, native));
+        Check(fileSave.Main.Data.SequenceEqual(filesBefore), "invalid house files reject without partial writes: " + kind);
+    }
+    foreach (var room in new[] { 0, 5 })
+    {
+        var native = files.ExportHousing("playerHouses", 0, room, true);
+        files.ImportHousing("playerHouses", 0, room, true, native);
+        Check(!files.IsDirty, "unchanged room file adds no history");
+        var edited = native.ToArray(); edited[0] ^= 1; edited[^1] ^= 0x5A;
+        files.ImportHousing("playerHouses", 0, room, true, edited);
+        Check(files.ExportHousing("playerHouses", 0, room, true).SequenceEqual(edited), "room import retains every layer and unknown byte: " + room + native.Length);
+        files.Undo(); Check(fileSave.Main.Data.SequenceEqual(filesBefore), "room file undo restores house and unrelated rooms");
+        var otherSize = native.Length == PlayerRoom1.SIZE ? PlayerRoom2.SIZE : PlayerRoom1.SIZE;
+        var crossFile = PlayerRoomConverter.GetCompatible(edited, otherSize);
+        files.ImportHousing("playerHouses", 0, room, true, crossFile);
+        Check(files.ExportHousing("playerHouses", 0, room, true).SequenceEqual(PlayerRoomConverter.GetCompatible(crossFile, native.Length)), "room file converts in both revision directions"); files.Undo();
+    }
+    ExpectInvalid(() => files.ImportHousing("playerHouses", 0, 6, true, new byte[PlayerRoom1.SIZE]));
+    ExpectInvalid(() => files.ImportHousing("residentHouses", 0, 0, true, new byte[PlayerRoom1.SIZE]));
+    ExpectInvalid(() => files.ExportHousing("campsite", 0, 0, false));
+    ExpectInvalid(() => files.ImportHousing("playerHouses", 0, 0, true, [0]));
+    Check(!WorkspaceSession.IsHousingFileSizeValid("playerHouses", false, long.MaxValue) && fileSave.Main.Data.SequenceEqual(filesBefore), "oversized files and invalid room targets leave all data intact");
+}
 // Batch 4: preview and file exchange preserve complete design bytes and ownership.
 var designs = new WorkspaceSession(save);
 var designsBefore = save.Main.Data.ToArray();
@@ -917,8 +972,19 @@ Check(gridSave.Main.RecycleBin[39].RawValue == gridRawItem.RawValue && gridSave.
 grid.CopyGrid(recycleGridTarget, [new(1, 0)]);
 grid.PasteGrid(gridRoomTarget, new(10, 10), [new(10, 10)], true);
 Check(gridSave.Main.GetPlayerHouse(0).GetRoom(0).GetItemLayers()[7].GetTile(10, 10).RawValue == gridRawItem.RawValue, "inventory clipboard also pastes into rooms");
+var savedHouseFile = grid.ExportHousing("playerHouses", 0, 0, false); savedHouseFile[0] ^= 1;
+grid.ImportHousing("playerHouses", 0, 0, false, savedHouseFile);
+var savedResidentHouseFile = grid.ExportHousing("residentHouses", 0, 0, false); savedResidentHouseFile[0] ^= 1;
+grid.ImportHousing("residentHouses", 0, 0, false, savedResidentHouseFile);
+var savedRoomFile = grid.ExportHousing("playerHouses", 0, 5, true); savedRoomFile[^1] ^= 0x5A;
+grid.ImportHousing("playerHouses", 0, 5, true, savedRoomFile);
+var savedHouseAfterRoom = grid.ExportHousing("playerHouses", 0, 0, false);
 grid.Save();
 var gridReload = new HorizonSave(provider);
+var housingFilesReload = new WorkspaceSession(gridReload);
+Check(housingFilesReload.ExportHousing("playerHouses", 0, 0, false).SequenceEqual(savedHouseAfterRoom)
+    && housingFilesReload.ExportHousing("playerHouses", 0, 5, true).SequenceEqual(savedRoomFile)
+    && housingFilesReload.ExportHousing("residentHouses", 0, 0, false).SequenceEqual(savedResidentHouseFile), "house and room file imports survive encrypted save/reload byte-for-byte");
 Check(gridReload.Main.RecycleBin[39].RawValue == gridRawItem.RawValue, "inventory grid edits survive encrypted save/reload");
 Check(gridReload.Main.GetPlayerHouse(0).GetRoom(0).GetItemLayers()[7].GetTile(8, 8).RawValue == gridRawItem.RawValue && !gridReload.GetInvalidHashes().Any(), "clipboard edits survive encrypted save/reload with valid hashes");
 Console.WriteLine("All workspace integration checks passed.");

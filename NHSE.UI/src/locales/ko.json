@@ -371,5 +371,12 @@
   "gridTypeMismatch": "지형과 아이템 클립보드는 혼용할 수 없습니다.",
   "gridRoomItem": "야외 오브젝트는 방에 붙여넣을 수 없습니다.",
   "gridCopied": "선택 영역을 편집기 클립보드에 복사했습니다.",
-  "gridArea": "편집 격자"
+  "gridArea": "편집 격자",
+  "housingImportHouse": "집 가져오기",
+  "housingExportHouse": "집 내보내기",
+  "housingImportRoom": "선택한 방 가져오기",
+  "housingExportRoom": "선택한 방 내보내기",
+  "housingFileHint": "가져오기는 선택한 집 또는 선택한 방의 모든 레이어를 교체합니다. 집 배정은 유지됩니다. 유효한 편집 내용을 먼저 적용하며 가져오기는 실행 취소할 수 있습니다.",
+  "housingConvertConfirm": "파일 버전이 다릅니다. 이 저장 형식으로 변환할까요? 대상 버전이 지원하지 않는 필드는 손실될 수 있습니다.",
+  "housingFileSize": "호환되는 집 또는 방 파일 크기가 아닙니다."
 }

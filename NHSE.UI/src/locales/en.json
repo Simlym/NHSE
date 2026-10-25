@@ -371,5 +371,12 @@
   "gridTypeMismatch": "Terrain and object clipboards cannot be mixed.",
   "gridRoomItem": "Field objects cannot be pasted into a room.",
   "gridCopied": "Selection copied to the editor clipboard.",
-  "gridArea": "Editable grid"
+  "gridArea": "Editable grid",
+  "housingImportHouse": "Import house",
+  "housingExportHouse": "Export house",
+  "housingImportRoom": "Import selected room",
+  "housingExportRoom": "Export selected room",
+  "housingFileHint": "Import replaces the selected house or the entire selected room, including every layer. House assignments are kept. Valid drafts apply first; imports can be undone.",
+  "housingConvertConfirm": "This file uses a different save version. Convert it to this save format? Fields unavailable in the target version may be lost.",
+  "housingFileSize": "This file is not a compatible house or room file."
 }

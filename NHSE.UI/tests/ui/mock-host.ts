@@ -549,6 +549,20 @@ export async function mockHost(page: Page, picker = false) {
                 freeParam: p.delete ? 0 : Number(p.freeParam),
               };
             }
+            if (message.command === 'housingImport') {
+              const controls = window as unknown as { nhseHousingCancelNext?: boolean; nhseHousingErrorNext?: string };
+              if (controls.nhseHousingErrorNext) {
+                const error = controls.nhseHousingErrorNext; controls.nhseHousingErrorNext = undefined;
+                queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error } })));
+                return;
+              }
+              if (controls.nhseHousingCancelNext) controls.nhseHousingCancelNext = false;
+              else {
+                remember();
+                if (!p.roomOnly) housingRecords.houses[String(p.kind)]![Number(p.index)]!.HouseLevel = 9;
+                else for (let layer = 0; layer < 8; layer++) housingRecords.tiles[tileKey({ ...p, layer }, 0, 0)] = { itemId: 1000, systemParam: 128, additionalParam: 9, freeParam: -1 };
+              }
+            }
             if (message.command === 'designImport') {
               const controls = window as unknown as {
                 nhseDesignCancelNext?: boolean;

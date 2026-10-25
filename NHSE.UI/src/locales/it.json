@@ -371,5 +371,12 @@
   "gridTypeMismatch": "Gli appunti di terreno e oggetti non sono compatibili.",
   "gridRoomItem": "Gli oggetti esterni non si possono incollare nelle stanze.",
   "gridCopied": "Selezione copiata negli appunti dell’editor.",
-  "gridArea": "Griglia modificabile"
+  "gridArea": "Griglia modificabile",
+  "housingImportHouse": "Importa casa",
+  "housingExportHouse": "Esporta casa",
+  "housingImportRoom": "Importa stanza selezionata",
+  "housingExportRoom": "Esporta stanza selezionata",
+  "housingFileHint": "L’importazione sostituisce la casa selezionata o tutti i livelli della stanza selezionata. Mantiene le assegnazioni della casa. Le modifiche valide vengono applicate prima; l’importazione può essere annullata.",
+  "housingConvertConfirm": "La versione del file è diversa. Convertire in questo formato di salvataggio? I campi non supportati potrebbero andare persi.",
+  "housingFileSize": "La dimensione del file non corrisponde a una casa o stanza compatibile."
 }

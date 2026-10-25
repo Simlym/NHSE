@@ -54,6 +54,54 @@ internal sealed partial class WorkspaceSession
     {
         if (!before.SequenceEqual(after)) Commit(() => WriteHouse(kind, index, before), () => WriteHouse(kind, index, after));
     }
+    public byte[] ExportHousing(string kind, int index, int room, bool roomOnly)
+    {
+        var house = ReadHouse(kind, index);
+        if (!roomOnly) return HouseBytes(house);
+        if (house is not IPlayerHouse player || (uint)room >= 6) throw new ArgumentException("invalidRequest");
+        return player.GetRoom(room).Write();
+    }
+    public string HousingFileExtension(string kind, int index, int room, bool roomOnly)
+    {
+        ExportHousing(kind, index, room, roomOnly);
+        var house = ReadHouse(kind, index);
+        return roomOnly ? ((IPlayerHouse)house).GetRoom(room).Extension
+            : house is IPlayerHouse player ? player.Extension : ((IVillagerHouse)house).Extension;
+    }
+    public static bool IsHousingFileSizeValid(string kind, bool roomOnly, long size) => size <= int.MaxValue && size >= 0 && (roomOnly
+        ? kind == "playerHouses" && PlayerRoomConverter.IsRoom((int)size)
+        : kind == "playerHouses" ? PlayerHouseConverter.IsHouse((int)size)
+        : kind == "residentHouses" && VillagerHouseConverter.IsHouse((int)size));
+
+    public void ImportHousing(string kind, int index, int room, bool roomOnly, byte[] bytes)
+    {
+        var before = HouseBytes(ReadHouse(kind, index));
+        if (!IsHousingFileSizeValid(kind, roomOnly, bytes.Length)) throw new ArgumentException("housingFileSize");
+        object next;
+        if (roomOnly)
+        {
+            if ((uint)room >= 6) throw new ArgumentException("invalidRequest");
+            var house = (IPlayerHouse)CloneHouse(kind, before);
+            var data = PlayerRoomConverter.GetCompatible(bytes.ToArray(), SaveFile.Main.Offsets.PlayerRoomSize);
+            house.SetRoom(room, SaveFile.Main.Offsets.ReadPlayerRoom(data));
+            next = house;
+        }
+        else
+        {
+            var data = kind == "playerHouses"
+                ? PlayerHouseConverter.GetCompatible(bytes.ToArray(), before.Length)
+                : VillagerHouseConverter.GetCompatible(bytes.ToArray(), before.Length).ToArray();
+            next = CloneHouse(kind, data);
+            var current = CloneHouse(kind, before);
+            // Keep the destination's resident/player assignment when replacing its house.
+            foreach (var key in new[] { "NPC1", "NPC2", "BuildPlayer" })
+            {
+                var prop = next.GetType().GetProperty(key);
+                if (prop is { CanWrite: true }) prop.SetValue(next, prop.GetValue(current));
+            }
+        }
+        CommitHouse(kind, index, before, HouseBytes(next));
+    }
     private static PropertyInfo Property(object house, string key) => house.GetType().GetProperty(key, BindingFlags.Public | BindingFlags.Instance) ?? throw new ArgumentException("invalidRequest");
     private static (long Min, long Max) Limits(Type type)
     {

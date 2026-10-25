@@ -371,5 +371,12 @@
   "gridTypeMismatch": "Gelände- und Objektzwischenablage sind nicht kombinierbar.",
   "gridRoomItem": "Außenobjekte können nicht in Räume eingefügt werden.",
   "gridCopied": "Auswahl in die Editor-Zwischenablage kopiert.",
-  "gridArea": "Bearbeitbares Raster"
+  "gridArea": "Bearbeitbares Raster",
+  "housingImportHouse": "Haus importieren",
+  "housingExportHouse": "Haus exportieren",
+  "housingImportRoom": "Gewählten Raum importieren",
+  "housingExportRoom": "Gewählten Raum exportieren",
+  "housingFileHint": "Der Import ersetzt das gewählte Haus oder alle Ebenen des gewählten Raums. Hauszuordnungen bleiben erhalten. Gültige Eingaben werden zuerst angewendet; der Import kann rückgängig gemacht werden.",
+  "housingConvertConfirm": "Die Dateiversion ist anders. In dieses Speicherformat konvertieren? Nicht unterstützte Felder können verloren gehen.",
+  "housingFileSize": "Die Dateigröße entspricht keinem kompatiblen Haus- oder Raumformat."
 }

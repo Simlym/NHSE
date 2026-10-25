@@ -67,8 +67,16 @@ identities, preserves the actual saved visit date and uses the empty visitor
 sentinel when clearing occupancy. Fruit forms distinguish the selected player's
 profile from island fruit. Changing native island fruit updates its five flags;
 flower-only changes preserve unrelated fruit data. All pages share save/undo/redo
-and retain drafts through language changes. House and room import/export remains
-available in the original editor as part of the later import/export migration.
+and retain drafts through language changes.
+
+House and room file import/export is available directly from the housing page.
+It supports both revisions of player houses (`.nhph` / `.nhph2`), resident houses
+(`.nhvh` / `.nhvh2`) and complete rooms (`.nhpr` / `.nhpr2`). Imports preserve
+destination house assignments; room imports replace only the selected room,
+including all eight layers and room metadata. Valid drafts apply first. File
+sizes are checked before reading, and cross-version conversions require native
+confirmation because newer fields may be lost on downgrade. Import is one undo
+step; exports and cancelled dialogs add no history. Identical imports are no-ops.
 
 ## Custom designs
 

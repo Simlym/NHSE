@@ -438,7 +438,7 @@ async function worldCommand(name: string, payload: Record<string, unknown> = {})
   return await command(
     name,
     { player: playerIndex.value, ...payload },
-    ['legacy', 'tool', 'nativeMap', 'mapImport', 'mapExport', 'mapPng', 'designImport', 'designExport', 'designPng'].includes(name) ? undefined : 'applied',
+    ['legacy', 'tool', 'nativeMap', 'mapImport', 'mapExport', 'mapPng', 'designImport', 'designExport', 'designPng', 'housingImport', 'housingExport'].includes(name) ? undefined : 'applied',
   );
 }
 function chooseSlot(item: ItemView) {

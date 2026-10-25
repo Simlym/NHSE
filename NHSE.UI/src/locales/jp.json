@@ -371,5 +371,12 @@
   "gridTypeMismatch": "地形と物品のクリップボードは混在できません。",
   "gridRoomItem": "屋外オブジェクトは部屋に貼り付けできません。",
   "gridCopied": "エディターのクリップボードにコピーしました。",
-  "gridArea": "編集グリッド"
+  "gridArea": "編集グリッド",
+  "housingImportHouse": "家をインポート",
+  "housingExportHouse": "家をエクスポート",
+  "housingImportRoom": "選択中の部屋をインポート",
+  "housingExportRoom": "選択中の部屋をエクスポート",
+  "housingFileHint": "インポートは選択中の家、または部屋の全レイヤーを置き換えます。家の割り当ては維持されます。有効な編集中の内容は先に適用され、インポートは元に戻せます。",
+  "housingConvertConfirm": "ファイルのバージョンが異なります。このセーブ形式に変換しますか？変換先で未対応の項目は失われる場合があります。",
+  "housingFileSize": "互換性のある家または部屋のファイルサイズではありません。"
 }

@@ -378,5 +378,22 @@
   "housingExportRoom": "Esporta stanza selezionata",
   "housingFileHint": "L’importazione sostituisce la casa selezionata o tutti i livelli della stanza selezionata. Mantiene le assegnazioni della casa. Le modifiche valide vengono applicate prima; l’importazione può essere annullata.",
   "housingConvertConfirm": "La versione del file è diversa. Convertire in questo formato di salvataggio? I campi non supportati potrebbero andare persi.",
-  "housingFileSize": "La dimensione del file non corrisponde a una casa o stanza compatibile."
+  "housingFileSize": "La dimensione del file non corrisponde a una casa o stanza compatibile.",
+  "museum": "Museo",
+  "museumHint": "Modifica tutte le 1.024 donazioni dell’isola. Le modifiche sono annullabili e scritte solo al salvataggio.",
+  "museumLevel": "Livello museo (valore grezzo)",
+  "museumGiveAll": "Aggiungi donazioni mancanti",
+  "museumSort": "Ordina per data",
+  "museumImport": "Importa museo",
+  "museumExport": "Esporta museo",
+  "museumSearch": "Cerca registri, oggetti, date o donatori",
+  "museumEntries": "Registri delle donazioni",
+  "museumDate": "Data della donazione",
+  "museumDateHint": "Lascia vuoto per nessuna data. Data salvata:",
+  "museumDonor": "Indice donatore (0–255)",
+  "museumClearEntry": "Svuota registro",
+  "museumBatchHint": "Riguarda tutto il museo, anche fuori dalla ricerca. Importare sostituisce tutti i registri. L’aggiunta usa opere autentiche e gli elenchi originali delle specie, il donatore 0 e il giorno successivo all’ultima donazione. Ogni operazione è annullabile.",
+  "museumFileSize": "Il file del museo deve contenere esattamente 13.316 byte.",
+  "museumDateInvalid": "Inserisci una data valida. Ordinare e aggiungere richiedono date salvate valide e una data successiva disponibile.",
+  "museumCapacity": "Non ci sono abbastanza registri di donazione vuoti."
 }

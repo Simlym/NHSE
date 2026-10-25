@@ -378,5 +378,22 @@
   "housingExportRoom": "Gewählten Raum exportieren",
   "housingFileHint": "Der Import ersetzt das gewählte Haus oder alle Ebenen des gewählten Raums. Hauszuordnungen bleiben erhalten. Gültige Eingaben werden zuerst angewendet; der Import kann rückgängig gemacht werden.",
   "housingConvertConfirm": "Die Dateiversion ist anders. In dieses Speicherformat konvertieren? Nicht unterstützte Felder können verloren gehen.",
-  "housingFileSize": "Die Dateigröße entspricht keinem kompatiblen Haus- oder Raumformat."
+  "housingFileSize": "Die Dateigröße entspricht keinem kompatiblen Haus- oder Raumformat.",
+  "museum": "Museum",
+  "museumHint": "Alle 1.024 Spenden des Inselmuseums bearbeiten. Änderungen sind rückgängig machbar und werden erst beim Speichern geschrieben.",
+  "museumLevel": "Museumsstufe (Rohwert)",
+  "museumGiveAll": "Fehlende Spenden ergänzen",
+  "museumSort": "Nach Datum sortieren",
+  "museumImport": "Museum importieren",
+  "museumExport": "Museum exportieren",
+  "museumSearch": "Einträge, Objekte, Daten oder Spender suchen",
+  "museumEntries": "Spendeneinträge",
+  "museumDate": "Spendendatum",
+  "museumDateHint": "Leer für kein Datum. Gespeichertes Datum:",
+  "museumDonor": "Spenderindex (0–255)",
+  "museumClearEntry": "Eintrag leeren",
+  "museumBatchHint": "Gilt für das ganze Inselmuseum, auch außerhalb der Suche. Import ersetzt alle Einträge. Ergänzen nutzt echte Kunst und die ursprünglichen Artenlisten, Spender 0 und den nächsten Spendentag. Jede Aktion ist rückgängig machbar.",
+  "museumFileSize": "Die Museumsdatei muss genau 13.316 Bytes groß sein.",
+  "museumDateInvalid": "Gültiges Spendendatum eingeben. Sortieren und Ergänzen erfordern gültige gespeicherte Daten und Platz für den nächsten Tag.",
+  "museumCapacity": "Nicht genügend leere Spendeneinträge."
 }

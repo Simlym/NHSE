@@ -378,5 +378,22 @@
   "housingExportRoom": "Exporter la pièce sélectionnée",
   "housingFileHint": "L’import remplace la maison sélectionnée ou toutes les couches de la pièce sélectionnée. L’attribution de la maison est conservée. Les saisies valides sont appliquées avant ; l’import peut être annulé.",
   "housingConvertConfirm": "La version du fichier est différente. Convertir vers ce format de sauvegarde ? Les champs non pris en charge peuvent être perdus.",
-  "housingFileSize": "La taille du fichier ne correspond pas à un format de maison ou de pièce compatible."
+  "housingFileSize": "La taille du fichier ne correspond pas à un format de maison ou de pièce compatible.",
+  "museum": "Musée",
+  "museumHint": "Modifiez les 1 024 dons de l’île. Les changements sont annulables et écrits uniquement lors de l’enregistrement.",
+  "museumLevel": "Niveau du musée (valeur brute)",
+  "museumGiveAll": "Ajouter les dons manquants",
+  "museumSort": "Trier par date",
+  "museumImport": "Importer le musée",
+  "museumExport": "Exporter le musée",
+  "museumSearch": "Rechercher des entrées, objets, dates ou donateurs",
+  "museumEntries": "Registres des dons",
+  "museumDate": "Date du don",
+  "museumDateHint": "Laisser vide pour aucune date. Date enregistrée :",
+  "museumDonor": "Indice du donateur (0–255)",
+  "museumClearEntry": "Vider l’entrée",
+  "museumBatchHint": "Concerne tout le musée, y compris hors recherche. L’import remplace toutes les entrées. L’ajout utilise l’art authentique et les listes d’espèces d’origine, le donateur 0 et le jour suivant le dernier don. Chaque action est annulable.",
+  "museumFileSize": "Le fichier du musée doit faire exactement 13 316 octets.",
+  "museumDateInvalid": "Saisissez une date valide. Le tri et l’ajout exigent des dates enregistrées valides et une date suivante disponible.",
+  "museumCapacity": "Il manque des entrées de don vides."
 }

@@ -378,5 +378,22 @@
   "housingExportRoom": "导出当前房间",
   "housingFileHint": "导入会替换所选房屋或当前房间的全部图层，保留房屋归属。有效草稿会先应用，导入可撤销。",
   "housingConvertConfirm": "文件版本与当前存档不同，是否转换？目标版本不支持的字段可能丢失。",
-  "housingFileSize": "文件大小不符合兼容的房屋或房间格式。"
+  "housingFileSize": "文件大小不符合兼容的房屋或房间格式。",
+  "museum": "博物馆",
+  "museumHint": "编辑全岛共 1,024 条捐赠记录。修改可撤销，仅在保存时写入存档。",
+  "museumLevel": "博物馆等级原始值",
+  "museumGiveAll": "补齐缺失捐赠",
+  "museumSort": "按日期排序",
+  "museumImport": "导入博物馆",
+  "museumExport": "导出博物馆",
+  "museumSearch": "搜索记录、物品、日期或捐赠者",
+  "museumEntries": "捐赠记录",
+  "museumDate": "捐赠日期",
+  "museumDateHint": "留空表示未设置。存储日期：",
+  "museumDonor": "捐赠者索引（0–255）",
+  "museumClearEntry": "清空记录",
+  "museumBatchHint": "操作作用于全岛博物馆，包含搜索结果以外的记录。导入替换全部记录；补齐使用艺术品真品及原有物种列表，捐赠者为 0，日期从最后捐赠日期的下一天开始。每次操作均可撤销。",
+  "museumFileSize": "博物馆文件必须恰好为 13,316 字节。",
+  "museumDateInvalid": "请输入有效的捐赠日期。排序和补齐要求已有日期有效，且能容纳下一次捐赠日期。",
+  "museumCapacity": "空捐赠记录不足，无法补齐。"
 }

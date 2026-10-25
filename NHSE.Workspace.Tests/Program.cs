@@ -987,6 +987,75 @@ Check(housingFilesReload.ExportHousing("playerHouses", 0, 0, false).SequenceEqua
     && housingFilesReload.ExportHousing("residentHouses", 0, 0, false).SequenceEqual(savedResidentHouseFile), "house and room file imports survive encrypted save/reload byte-for-byte");
 Check(gridReload.Main.RecycleBin[39].RawValue == gridRawItem.RawValue, "inventory grid edits survive encrypted save/reload");
 Check(gridReload.Main.GetPlayerHouse(0).GetRoom(0).GetItemLayers()[7].GetTile(8, 8).RawValue == gridRawItem.RawValue && !gridReload.GetInvalidHashes().Any(), "clipboard edits survive encrypted save/reload with valid hashes");
+// Museum records are island-wide and retain raw dates, item parameters and donor bytes.
+var museumSave = new HorizonSave(provider);
+var museumFixture = new Museum(new byte[Museum.SIZE]) { MuseumLevel = int.MinValue };
+museumFixture.SetItems(Enumerable.Range(0, Museum.EntryCount).Select(_ => new Item(Item.NONE)).ToArray());
+var museumDates = museumFixture.GetDates();
+museumDates[7] = new GSaveDate { Year = ushort.MaxValue, Month = 255, Day = 255 }; museumFixture.SetDates(museumDates);
+museumSave.Main.Museum = museumFixture;
+var museumSession = new WorkspaceSession(museumSave);
+var museumBefore = museumSave.Main.Data.ToArray();
+var museumPersonalBefore = museumSave.Players[0].Personal.Data.ToArray();
+var museumOtherBefore = museumSave.Players[1].Personal.Data.ToArray();
+var museumData = museumSession.GetMuseum();
+Check(museumData.Entries.Length == 1024 && museumData.Level == int.MinValue && museumData.Entries[7].Date == "65535-255-255", "museum exposes every record, signed level and unusual raw dates without normalization");
+museumSession.SetMuseumEntry(7, museumData.Entries[7].Date, 0, museumData.Entries[7].Item);
+museumSession.ImportMuseum(museumSession.ExportMuseum());
+Check(!museumSession.IsDirty && museumSave.Main.Data.SequenceEqual(museumBefore), "unchanged museum forms and files preserve bytes and clean history");
+museumSession.SetMuseumEntry(1023, "2024-02-29", 255, WorkspaceSession.RoomItem.From(item));
+var museumEdited = museumSession.ExportMuseum();
+Check(museumSave.Main.Museum.GetItems()[1023].RawValue == item.RawValue && museumSave.Main.Museum.GetPlayers()[1023] == 255
+    && museumSession.GetMuseum().Entries[1023].Date == "2024-02-29", "museum final record retains all item parameters, leap date and full donor range");
+museumSession.Undo(); Check(museumSave.Main.Data.SequenceEqual(museumBefore), "museum entry undo restores every main byte");
+museumSession.Redo(); Check(museumSession.ExportMuseum().SequenceEqual(museumEdited), "museum entry redo restores the exact record");
+ExpectInvalid(() => museumSession.SetMuseumEntry(1024, "", 0, WorkspaceSession.RoomItem.From(item)));
+ExpectInvalid(() => museumSession.SetMuseumEntry(0, "2025-02-29", 0, WorkspaceSession.RoomItem.From(item)));
+ExpectInvalid(() => museumSession.SetMuseumEntry(0, "0001-01-01", 0, WorkspaceSession.RoomItem.From(item)));
+ExpectInvalid(() => museumSession.SetMuseumEntry(0, "", 256, WorkspaceSession.RoomItem.From(item)));
+ExpectInvalid(() => museumSession.SetMuseumEntry(0, "", -1, WorkspaceSession.RoomItem.From(item)));
+ExpectInvalid(() => museumSession.SetMuseumEntry(0, "", 0, new(65536, 0, 0, 0)));
+ExpectInvalid(() => museumSession.ImportMuseum(new byte[Museum.SIZE + 1]));
+ExpectInvalid(() => museumSession.MuseumBatch("sort"));
+Check(museumSession.ExportMuseum().SequenceEqual(museumEdited), "invalid museum indexes, dates, fields, files and batches reject atomically");
+museumSession.SetMuseumEntry(7, "", 0, new(Item.NONE, 0, 0, 0));
+museumSession.SetMuseumLevel(int.MaxValue);
+Check(museumSession.GetMuseum().Level == int.MaxValue, "museum level supports full signed integer range"); museumSession.Undo();
+museumSession.SetMuseumEntry(0, "2026-03-03", 2, WorkspaceSession.RoomItem.From(item));
+museumSession.SetMuseumEntry(1, "2026-01-01", 3, WorkspaceSession.RoomItem.From(nextFurniture));
+var museumUnsorted = museumSession.ExportMuseum();
+museumSession.MuseumBatch("sort");
+var museumSorted = museumSave.Main.Museum;
+Check(museumSorted.GetPlayers()[0] == 255 && museumSorted.GetItems()[0].RawValue == item.RawValue
+    && museumSorted.GetPlayers()[1] == 3 && museumSorted.GetItems()[1].RawValue == nextFurniture.RawValue
+    && museumSorted.GetDates()[1023].IsEmpty, "museum sort keeps items dates and donors together and moves empty dates last");
+museumSession.Undo(); Check(museumSession.ExportMuseum().SequenceEqual(museumUnsorted), "museum sort is a single byte-exact undo step");
+museumSession.MuseumBatch("giveAll");
+var completedMuseum = museumSession.ExportMuseum();
+var donationItems = museumSave.Main.Museum.GetItems();
+var donationIds = donationItems.Where(i => !i.IsNone).Select(i => i.ItemId).ToHashSet();
+Check(GameLists.Fish.ToArray().All(donationIds.Contains) && GameLists.Bugs.ToArray().All(donationIds.Contains)
+    && GameLists.Fossils.ToArray().All(donationIds.Contains) && GameLists.Dive.ToArray().All(donationIds.Contains)
+    && GameLists.Art.ToArray().Where(id => !GameInfo.GetStrings("en").itemlist[id].Contains('(')).All(donationIds.Contains), "museum completion includes every native species and genuine art");
+Check(donationItems[0].RawValue == item.RawValue && museumSave.Main.Museum.GetPlayers()[0] == 2, "museum completion preserves existing donation bytes and donors");
+museumSession.Undo(); Check(museumSession.ExportMuseum().SequenceEqual(museumUnsorted), "museum completion is one byte-exact undo step");
+museumSession.Redo(); Check(museumSession.ExportMuseum().SequenceEqual(completedMuseum), "museum completion redo retains the original randomized order");
+museumSession.MuseumBatch("giveAll");
+museumSession.Undo(); Check(museumSession.ExportMuseum().SequenceEqual(museumUnsorted), "already complete museum adds no undo step");
+var fullMuseum = new Museum(new byte[Museum.SIZE]);
+fullMuseum.SetItems(Enumerable.Range(0, Museum.EntryCount).Select(_ => new Item(0)).ToArray());
+museumSession.ImportMuseum(fullMuseum.Data.ToArray()); var fullBefore = museumSession.ExportMuseum();
+ExpectInvalid(() => museumSession.MuseumBatch("giveAll"));
+Check(museumSession.ExportMuseum().SequenceEqual(fullBefore), "full museum completion refuses without partial additions"); museumSession.Undo();
+var maxDateMuseum = new Museum(museumSession.ExportMuseum()); var maxDates = maxDateMuseum.GetDates();
+maxDates[0] = DateTime.MaxValue; maxDateMuseum.SetDates(maxDates); museumSession.ImportMuseum(maxDateMuseum.Data.ToArray());
+var maxDateBefore = museumSession.ExportMuseum(); ExpectInvalid(() => museumSession.MuseumBatch("giveAll"));
+Check(museumSession.ExportMuseum().SequenceEqual(maxDateBefore), "museum next-date overflow rejects atomically"); museumSession.Undo();
+var importedMuseumFile = completedMuseum.ToArray(); museumSession.ImportMuseum(importedMuseumFile); importedMuseumFile[0] ^= 0xFF;
+Check(museumSession.ExportMuseum().SequenceEqual(completedMuseum), "museum import isolates caller buffers");
+Check(museumSave.Players[0].Personal.Data.SequenceEqual(museumPersonalBefore) && museumSave.Players[1].Personal.Data.SequenceEqual(museumOtherBefore), "island museum edits never change personal files");
+museumSession.Save(); var museumReload = new HorizonSave(provider);
+Check(new WorkspaceSession(museumReload).ExportMuseum().SequenceEqual(completedMuseum) && !museumReload.GetInvalidHashes().Any(), "museum edits survive encrypted save/reload with valid hashes");
 Console.WriteLine("All workspace integration checks passed.");
 if (args.Length == 2 && args[0] == "--fixture") provider.Export(args[1]);
 

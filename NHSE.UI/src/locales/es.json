@@ -378,5 +378,22 @@
   "housingExportRoom": "Exportar habitación seleccionada",
   "housingFileHint": "La importación sustituye la casa seleccionada o todas las capas de la habitación seleccionada. Conserva la asignación de la casa. Los cambios válidos se aplican primero; la importación se puede deshacer.",
   "housingConvertConfirm": "La versión del archivo es diferente. ¿Convertir a este formato de guardado? Los campos no compatibles pueden perderse.",
-  "housingFileSize": "El tamaño del archivo no corresponde a una casa o habitación compatible."
+  "housingFileSize": "El tamaño del archivo no corresponde a una casa o habitación compatible.",
+  "museum": "Museo",
+  "museumHint": "Edita las 1.024 donaciones de la isla. Los cambios se pueden deshacer y solo se escriben al guardar.",
+  "museumLevel": "Nivel del museo (valor bruto)",
+  "museumGiveAll": "Añadir donaciones que faltan",
+  "museumSort": "Ordenar por fecha",
+  "museumImport": "Importar museo",
+  "museumExport": "Exportar museo",
+  "museumSearch": "Buscar registros, objetos, fechas o donantes",
+  "museumEntries": "Registros de donación",
+  "museumDate": "Fecha de donación",
+  "museumDateHint": "Vacío indica sin fecha. Fecha guardada:",
+  "museumDonor": "Índice del donante (0–255)",
+  "museumClearEntry": "Vaciar registro",
+  "museumBatchHint": "Afecta a todo el museo, incluidos registros fuera de la búsqueda. Importar sustituye todos los registros. Añadir usa arte auténtico y las listas originales de especies, el donante 0 y el siguiente día de donación. Cada operación se puede deshacer.",
+  "museumFileSize": "El archivo del museo debe tener exactamente 13.316 bytes.",
+  "museumDateInvalid": "Introduce una fecha válida. Ordenar y añadir requieren fechas guardadas válidas y espacio para la siguiente fecha.",
+  "museumCapacity": "No hay suficientes registros de donación vacíos."
 }

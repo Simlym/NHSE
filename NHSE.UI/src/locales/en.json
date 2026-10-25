@@ -378,5 +378,22 @@
   "housingExportRoom": "Export selected room",
   "housingFileHint": "Import replaces the selected house or the entire selected room, including every layer. House assignments are kept. Valid drafts apply first; imports can be undone.",
   "housingConvertConfirm": "This file uses a different save version. Convert it to this save format? Fields unavailable in the target version may be lost.",
-  "housingFileSize": "This file is not a compatible house or room file."
+  "housingFileSize": "This file is not a compatible house or room file.",
+  "museum": "Museum",
+  "museumHint": "Edit all 1,024 island donation records. Changes join shared undo and are written only on Save.",
+  "museumLevel": "Raw museum level",
+  "museumGiveAll": "Add missing donations",
+  "museumSort": "Sort by date",
+  "museumImport": "Import museum",
+  "museumExport": "Export museum",
+  "museumSearch": "Search records, items, dates or donors",
+  "museumEntries": "Donation records",
+  "museumDate": "Donation date",
+  "museumDateHint": "Leave blank for an unset date. Stored date:",
+  "museumDonor": "Donor index (0–255)",
+  "museumClearEntry": "Clear record",
+  "museumBatchHint": "This affects the whole island museum, including records outside the current search. Import replaces all records. Adding missing donations uses genuine art and the original species lists, donor 0 and the next donation date. Each operation can be undone.",
+  "museumFileSize": "The museum file must be exactly 13,316 bytes.",
+  "museumDateInvalid": "Enter a valid donation date. Sorting and adding donations require valid stored dates and room for the next date.",
+  "museumCapacity": "There are not enough empty donation records."
 }

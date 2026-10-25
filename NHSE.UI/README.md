@@ -78,6 +78,22 @@ sizes are checked before reading, and cross-version conversions require native
 confirmation because newer fields may be lost on downgrade. Import is one undo
 step; exports and cancelled dialogs add no history. Identical imports are no-ops.
 
+## Museum
+
+The Museum navigation entry and island shortcut open a Vue editor for all 1,024
+island-wide donation records. Search and paging reach every slot. Dates, raw donor
+indices, all item parameters and the signed museum level are editable; the shared
+item gallery supplies replacements. Valid drafts apply on record changes,
+navigation and Save, and survive language changes. Unedited unusual raw dates are
+preserved; changing a date requires a valid calendar value.
+
+Confirmed whole-museum actions add missing genuine donations using the original
+species lists, or sort records by date while keeping items and donors together.
+Completion checks capacity and date overflow before committing. Each batch is
+one undo step. Native `.nhm` import/export preserves the complete museum block;
+file size is checked before reading, export is read-only and cancelled dialogs or
+identical imports add no history. These changes only reach disk on Save.
+
 ## Custom designs
 
 The design workspace previews ordinary patterns, PRO patterns, the island flag

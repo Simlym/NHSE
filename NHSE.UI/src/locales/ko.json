@@ -378,5 +378,22 @@
   "housingExportRoom": "선택한 방 내보내기",
   "housingFileHint": "가져오기는 선택한 집 또는 선택한 방의 모든 레이어를 교체합니다. 집 배정은 유지됩니다. 유효한 편집 내용을 먼저 적용하며 가져오기는 실행 취소할 수 있습니다.",
   "housingConvertConfirm": "파일 버전이 다릅니다. 이 저장 형식으로 변환할까요? 대상 버전이 지원하지 않는 필드는 손실될 수 있습니다.",
-  "housingFileSize": "호환되는 집 또는 방 파일 크기가 아닙니다."
+  "housingFileSize": "호환되는 집 또는 방 파일 크기가 아닙니다.",
+  "museum": "박물관",
+  "museumHint": "섬 전체의 기증 기록 1,024개를 편집합니다. 변경은 실행 취소할 수 있으며 저장할 때만 기록됩니다.",
+  "museumLevel": "박물관 레벨 원시 값",
+  "museumGiveAll": "누락된 기증 추가",
+  "museumSort": "날짜순 정렬",
+  "museumImport": "박물관 가져오기",
+  "museumExport": "박물관 내보내기",
+  "museumSearch": "기록, 아이템, 날짜 또는 기증자 검색",
+  "museumEntries": "기증 기록",
+  "museumDate": "기증 날짜",
+  "museumDateHint": "미설정은 빈칸으로 둡니다. 저장된 날짜:",
+  "museumDonor": "기증자 인덱스 (0–255)",
+  "museumClearEntry": "기록 비우기",
+  "museumBatchHint": "검색 결과 밖을 포함한 섬 전체 박물관에 적용됩니다. 가져오기는 모든 기록을 교체합니다. 추가는 진품 미술품과 기존 종 목록, 기증자 0, 마지막 기증일 다음 날을 사용합니다. 각 작업은 실행 취소할 수 있습니다.",
+  "museumFileSize": "박물관 파일은 정확히 13,316바이트여야 합니다.",
+  "museumDateInvalid": "유효한 기증 날짜를 입력하세요. 정렬과 추가에는 유효한 저장 날짜와 다음 날짜를 설정할 여유가 필요합니다.",
+  "museumCapacity": "빈 기증 기록이 부족합니다."
 }

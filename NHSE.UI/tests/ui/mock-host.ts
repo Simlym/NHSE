@@ -134,6 +134,9 @@ export async function mockHost(page: Page, picker = false) {
       })),
     }));
     type HousingValue = number | boolean | string;
+    let museumRecords = { level: 2, entries: Array.from({ length: 1024 }, (_, index) => ({ index,
+      name: index === 0 ? '木材' : '', date: index === 0 ? '2024-02-29' : '', player: index === 0 ? 1 : 0,
+      item: { itemId: index === 0 ? 1000 : 65534, systemParam: 0, additionalParam: 0, freeParam: 0 } })) };
     type HousingValues = Record<string, HousingValue>;
     let housingRecords = {
       houses: Object.fromEntries(
@@ -302,6 +305,7 @@ export async function mockHost(page: Page, picker = false) {
         overview: avatar, viewport: avatar, itemImage: null, active: mode === 'items' ? (mapFlags[mapKey(target)] ?? false) : null };
     };
     type Snapshot = {
+      museumRecords: typeof museumRecords;
       inventoryRecords: typeof inventoryRecords;
       mapFlags: typeof mapFlags;
       mapRecords: typeof mapRecords;
@@ -320,6 +324,7 @@ export async function mockHost(page: Page, picker = false) {
       redo: Snapshot[] = [];
     const capture = (): Snapshot =>
       structuredClone({
+        museumRecords,
         inventoryRecords,
         players,
         item,
@@ -335,6 +340,7 @@ export async function mockHost(page: Page, picker = false) {
         mapFlags,
       });
     const restore = (value: Snapshot) => {
+      museumRecords = value.museumRecords;
       inventoryRecords = value.inventoryRecords;
       turnips = value.turnips;
       recycleItem = value.recycleItem;
@@ -394,6 +400,30 @@ export async function mockHost(page: Page, picker = false) {
             );
             const p = message.payload;
             let data: unknown;
+            if (message.command === 'setMuseumLevel') { remember(); museumRecords.level = Number(p.level); }
+            if (message.command === 'setMuseumEntry') {
+              remember();
+              const entry = museumRecords.entries[Number(p.index)]!;
+              entry.item = { ...(p.item as typeof entry.item) }; entry.date = String(p.date); entry.player = Number(p.donor);
+              entry.name = entry.item.itemId === 65534 ? '' : '木材';
+            }
+            if (['museumBatch', 'museumImport'].includes(message.command)) {
+              const controls = window as unknown as { nhseMuseumCancelNext?: boolean; nhseMuseumErrorNext?: string };
+              if (controls.nhseMuseumErrorNext) {
+                const error = controls.nhseMuseumErrorNext; controls.nhseMuseumErrorNext = undefined;
+                queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error } })));
+                return;
+              }
+              if (controls.nhseMuseumCancelNext) controls.nhseMuseumCancelNext = false;
+              else {
+                remember();
+                if (message.command === 'museumImport') museumRecords.level = 9;
+                else if (p.action === 'sort') {
+                  museumRecords.entries.sort((a, b) => Number(!a.date) - Number(!b.date) || a.date.localeCompare(b.date));
+                  museumRecords.entries.forEach((entry, index) => { entry.index = index; });
+                } else for (const entry of museumRecords.entries.slice(1, 5)) Object.assign(entry, { name: '木材', date: '2024-03-01', player: 0, item: { itemId: 1000, systemParam: 0, additionalParam: 0, freeParam: 0 } });
+              }
+            }
             if (['copyGrid', 'pasteGrid', 'editGrid'].includes(message.command)) {
               const target = p.target as GridTarget, selection = p.selection as GridPoint[];
               const fail = (error: string) => { queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error } }))); };
@@ -681,6 +711,10 @@ export async function mockHost(page: Page, picker = false) {
                 })),
                 selected: entries[Number(p.index)],
               };
+            } else if (message.command === 'museum') {
+              const controls = window as unknown as { nhseMuseumRawDateNext?: boolean };
+              if (controls.nhseMuseumRawDateNext) { museumRecords.entries[7]!.date = '65535-255-255'; controls.nhseMuseumRawDateNext = false; }
+              data = museumRecords;
             } else if (message.command === 'housing') {
               data = housing(p);
             } else if (message.command === 'progress') {

@@ -26,6 +26,8 @@ export interface Session {
   islandSettings: IslandSettings;
   turnips: TurnipSettings;
 }
+export interface MuseumEntry { index: number; name: string; date: string; player: number; item: RoomItem }
+export interface MuseumData { level: number; entries: MuseumEntry[] }
 export interface Resident extends VillagerEntry {
   index: number;
   catchphrase: string;

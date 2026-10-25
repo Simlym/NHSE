@@ -335,6 +335,15 @@ public sealed partial class WorkspaceForm : Form
                 ExportDesignPng(Str(p, "kind"), Int(p, "index"), Int(p, "sheet"), p.GetProperty("palette").GetBoolean());
                 return State();
             case "housing": return RequireSession().GetHousing(Str(p, "kind"), Int(p, "player"), p.TryGetProperty("resident", out var houseResident) ? RequireSession().FindResidentHouse(houseResident.GetInt32()) : Int(p, "index"), Int(p, "room"), Int(p, "layer"), Sprite);
+            case "museum": return RequireSession().GetMuseum();
+            case "setMuseumLevel": RequireSession().SetMuseumLevel(Int(p, "level")); return State();
+            case "setMuseumEntry":
+                RequireSession().SetMuseumEntry(Int(p, "index"), Str(p, "date"), Int(p, "donor"),
+                    p.GetProperty("item").Deserialize<WorkspaceSession.RoomItem>(Json) ?? throw new ArgumentException("invalidRequest"));
+                return State();
+            case "museumBatch": RequireSession().MuseumBatch(Str(p, "action")); return State();
+            case "museumImport":
+            case "museumExport": MuseumFile(command == "museumImport"); return State();
             case "housingImport":
             case "housingExport":
                 HousingFile(Str(p, "kind"), Int(p, "index"), Int(p, "room"), p.GetProperty("roomOnly").GetBoolean(), command == "housingImport");

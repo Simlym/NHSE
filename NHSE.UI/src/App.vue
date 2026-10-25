@@ -39,6 +39,7 @@ import ResidentsPage from './ResidentsPage.vue';
 import IslandPage from './IslandPage.vue';
 import ProgressPage from './ProgressPage.vue';
 import HousingPage from './HousingPage.vue';
+import MuseumPage from './MuseumPage.vue';
 import DesignPage from './DesignPage.vue';
 import { editableTarget } from './gridSelection';
 import MapPage from './MapPage.vue';
@@ -52,6 +53,7 @@ import {
   type DesignData,
   type DesignKind,
   type HousingData,
+  type MuseumData,
   type HousingTarget,
   type HousingKind,
   type ProgressData,
@@ -77,7 +79,8 @@ type Page =
   | 'progress'
   | 'housing'
   | 'designs'
-  | 'mapEditor';
+  | 'mapEditor'
+  | 'museum';
 const state = ref<State>({ language: 'en', recent: '', session: null, fullScreen: false });
 const page = ref<Page>('overview');
 const playerIndex = ref(0);
@@ -143,13 +146,15 @@ const playerForm = ref<HTMLFormElement | null>(null);
 const residentsPage = ref<InstanceType<typeof ResidentsPage> | null>(null);
 const designData = ref<DesignData | null>(null);
 const designTarget = ref<{ kind: DesignKind; index: number }>({ kind: 'patterns', index: 0 });
+const museumPage = ref<InstanceType<typeof MuseumPage> | null>(null);
+const museumData = ref<MuseumData | null>(null);
 const housingPage = ref<InstanceType<typeof HousingPage> | null>(null);
 const housingData = ref<HousingData | null>(null);
 const housingTarget = ref<HousingTarget>({ kind: 'playerHouses', index: 0, room: 0, layer: 0 });
 const mapData = ref<MapData | null>(null);
 const mapPage = ref<InstanceType<typeof MapPage> | null>(null);
 const mapTarget = ref<MapTarget>({ mode: 'terrain', acre: 10, layer: 0, x: 0, y: 0, building: 0, marker: 0 });
-let catalogTarget: 'inventory' | 'housing' | 'map' = 'inventory';
+let catalogTarget: 'inventory' | 'housing' | 'map' | 'museum' = 'inventory';
 const progressPage = ref<InstanceType<typeof ProgressPage> | null>(null);
 const progressData = ref<ProgressData | null>(null);
 const progressSection = ref<ProgressSection>('recipes');
@@ -170,6 +175,7 @@ const nav = [
   { id: 'inventory', icon: Package },
   { id: 'progress', icon: Check },
   { id: 'housing', icon: Map },
+  { id: 'museum', icon: Leaf },
   { id: 'designs', icon: Palette },
   { id: 'mapEditor', icon: Map },
   { id: 'villagers', icon: Users },
@@ -262,6 +268,9 @@ async function navigateDesigns(kind: DesignKind, index: number) {
     designTarget.value = { kind: data.kind, index: data.index };
   });
 }
+async function loadMuseum() {
+  if (state.value.session) museumData.value = await request<MuseumData>('museum');
+}
 async function loadHousing() {
   if (!state.value.session) return;
   const data = await request<HousingData>('housing', { player: playerIndex.value, ...housingTarget.value });
@@ -342,6 +351,7 @@ async function command(
     if (page.value === 'housing' && name !== 'copyGrid') await loadHousing();
     if (page.value === 'mapEditor' && name !== 'copyGrid') await loadMap();
     if (page.value === 'designs') await loadDesigns();
+    if (page.value === 'museum') await loadMuseum();
     if (success) toast(success);
   });
 }
@@ -359,6 +369,7 @@ async function go(destination: Page) {
   if (destination === 'housing') await run(loadHousing);
   if (destination === 'mapEditor') await run(loadMap);
   if (destination === 'designs') await run(loadDesigns);
+  if (destination === 'museum') await run(loadMuseum);
 }
 async function applyProfile() {
   if (!playerForm.value?.reportValidity()) return false;
@@ -376,6 +387,7 @@ async function save() {
   await command('save', {}, 'saveSuccess');
 }
 async function applyWorldDrafts() {
+  if (page.value === 'museum' && museumPage.value && !(await museumPage.value.applyPending())) return false;
   if (page.value === 'mapEditor' && mapPage.value && !(await mapPage.value.applyPending())) return false;
   if (page.value === 'housing' && housingPage.value && !(await housingPage.value.applyPending()))
     return false;
@@ -387,6 +399,7 @@ async function applyWorldDrafts() {
   return true;
 }
 async function worldCommand(name: string, payload: Record<string, unknown> = {}) {
+  if (name === 'tool' && payload.tool === 'museum') { await go('museum'); return page.value === 'museum'; }
   if (name === 'copyGrid') return await command(name, payload, 'gridCopied');
   if (['spawnMap', 'editMapParameters', 'replaceMapMatches'].includes(name)) {
     let applied = false;
@@ -438,7 +451,7 @@ async function worldCommand(name: string, payload: Record<string, unknown> = {})
   return await command(
     name,
     { player: playerIndex.value, ...payload },
-    ['legacy', 'tool', 'nativeMap', 'mapImport', 'mapExport', 'mapPng', 'designImport', 'designExport', 'designPng', 'housingImport', 'housingExport'].includes(name) ? undefined : 'applied',
+    ['legacy', 'tool', 'nativeMap', 'mapImport', 'mapExport', 'mapPng', 'designImport', 'designExport', 'designPng', 'housingImport', 'housingExport', 'museumImport', 'museumExport'].includes(name) ? undefined : 'applied',
   );
 }
 function chooseSlot(item: ItemView) {
@@ -471,7 +484,7 @@ async function searchCatalog(pageNumber = 0) {
     }
   });
 }
-async function showCatalog(target: 'inventory' | 'housing' | 'map' = 'inventory') {
+async function showCatalog(target: 'inventory' | 'housing' | 'map' | 'museum' = 'inventory') {
   catalogTarget = target;
   catalogOpen.value = true;
   await searchCatalog(catalog.value?.page ?? 0);
@@ -487,6 +500,7 @@ function chooseClothingGroup(id: string) {
   void searchCatalog(0);
 }
 function chooseCatalog(item: ItemView) {
+  if (catalogTarget === 'museum') { museumPage.value?.chooseItem(item); catalogOpen.value = false; return; }
   if (catalogTarget === 'map') {
     mapPage.value?.chooseItem(item);
     catalogOpen.value = false;
@@ -1108,6 +1122,7 @@ onUnmounted(() => {
           :execute="worldCommand"
           :navigate="navigateDesigns"
         />
+        <MuseumPage v-else-if="page === 'museum'" ref="museumPage" :data="museumData" :busy="busy" :execute="worldCommand" :pick-item="() => showCatalog('museum')" />
         <HousingPage
           v-else-if="page === 'housing'"
           ref="housingPage"

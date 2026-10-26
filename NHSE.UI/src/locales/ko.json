@@ -580,5 +580,21 @@
   "imagesBusy": "이미지 다운로드 진행 중",
   "imagesInvalidPackage": "이미지 묶음이 불완전하거나 지원하는 PNG가 없습니다. 기존 라이브러리는 유지됩니다.",
   "imagesTooLarge": "이미지 묶음이 지원 크기를 넘었습니다.",
-  "imagesDownloadFailed": "다운로드나 설치에 실패했습니다. 연결과 폴더 접근 권한을 확인한 후 다시 시도하세요."
+  "imagesDownloadFailed": "다운로드나 설치에 실패했습니다. 연결과 폴더 접근 권한을 확인한 후 다시 시도하세요.",
+  "navPlayerGroup": "플레이어와 수집",
+  "navIslandGroup": "섬과 생활",
+  "navToolsGroup": "도구와 고급 편집",
+  "advancedGroupNames": "편지 내용|첨부 아이템|보낸 사람|받는 사람|날짜와 상태|원시 매개변수|주민 정보|DIY 활동|관계와 기억|인사말|이벤트 플래그|아이템 설정|물주기 기록|방 설정",
+  "advancedSenderOverlapHint": "플레이어, 주민, NPC의 발신자 필드는 저장 공간을 공유합니다. 원하는 발신자 유형의 필드만 수정하세요.",
+  "advancedMailPreview": "편지 미리보기",
+  "advancedNoFields": "일치하는 필드가 없습니다.",
+  "advancedDraftPending": "적용 대기 중인 변경 사항",
+  "mapPastePreview": "붙여넣기 미리보기",
+  "mapPasteChecking": "배치 확인 중…",
+  "mapPasteImpact": "배치 예정 {0}개 · 변경 {1}칸 · 교체 {2}개",
+  "mapPasteUnchanged": "대상 데이터가 이미 같습니다. 변경할 필요가 없습니다.",
+  "mapPasteOutside": "변경될 {0}칸이 현재 구역 화면 밖에 있습니다.",
+  "mapPastePreviewHint": "황색은 기존 점유 영역 제거를 포함한 실제 변경 칸입니다. 대상 위치나 겹침 보호를 변경하면 갱신됩니다. 격자에서 Enter로 확인하고 Esc로 취소하세요.",
+  "mapPasteDraftHint": "미리보기는 적용된 데이터를 사용합니다. 오른쪽의 미적용 변경 사항은 제외되며 붙여넣기 후 초기화됩니다.",
+  "mapPasteConfirm": "붙여넣기 확인"
 }

@@ -580,5 +580,21 @@
   "imagesBusy": "Téléchargement d’images en cours",
   "imagesInvalidPackage": "Le paquet est incomplet ou ne contient pas de PNG compatibles. La bibliothèque existante est conservée.",
   "imagesTooLarge": "Le paquet dépasse la taille prise en charge.",
-  "imagesDownloadFailed": "Le téléchargement ou l’installation a échoué. Vérifiez la connexion et l’accès au dossier puis réessayez."
+  "imagesDownloadFailed": "Le téléchargement ou l’installation a échoué. Vérifiez la connexion et l’accès au dossier puis réessayez.",
+  "navPlayerGroup": "Joueur et collection",
+  "navIslandGroup": "Île et vie",
+  "navToolsGroup": "Outils et avancé",
+  "advancedGroupNames": "Contenu du courrier|Pièce jointe|Expéditeur|Destinataire|Date et état|Paramètres bruts|Profil du résident|Activité de bricolage|Relations|Salutations|Indicateurs événementiels|Paramètres de l’objet|Historique d’arrosage|Paramètres de la pièce",
+  "advancedSenderOverlapHint": "Les champs d’expéditeur du joueur, des résidents et des PNJ partagent le même stockage. Modifiez uniquement ceux du type d’expéditeur souhaité.",
+  "advancedMailPreview": "Aperçu du courrier",
+  "advancedNoFields": "Aucun champ correspondant.",
+  "advancedDraftPending": "Modifications en attente",
+  "mapPastePreview": "Aperçu du collage",
+  "mapPasteChecking": "Vérification du placement…",
+  "mapPasteImpact": "Prévu : {0} entrées · {1} cases modifiées · {2} objets remplacés",
+  "mapPasteUnchanged": "La destination contient déjà les mêmes données. Aucune modification nécessaire.",
+  "mapPasteOutside": "{0} cases modifiées sont hors du secteur affiché.",
+  "mapPastePreviewHint": "L’ambre indique les changements réels, y compris les emplacements libérés. Changez la destination ou la protection contre le chevauchement pour actualiser. Dans la grille, Entrée confirme et Échap annule.",
+  "mapPasteDraftHint": "L’aperçu utilise les données appliquées. Les modifications non appliquées de l’inspecteur sont exclues et seront réinitialisées après le collage.",
+  "mapPasteConfirm": "Confirmer le collage"
 }

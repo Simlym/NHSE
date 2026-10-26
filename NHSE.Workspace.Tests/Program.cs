@@ -1162,6 +1162,7 @@ oldCatalogue.Redo(); oldCatalogue.Redo(); oldCatalogue.Save();
 var oldCatalogueReload = new HorizonSave(originalProvider);
 Check(oldCatalogueReload.Players[0].Personal.ProfileTimestamp.ToString() == "2024-12-31" && !oldCatalogueReload.GetInvalidHashes().Any(),
     "original catalogue and profile edits survive encrypted reload with valid hashes");
+GridPreviewChecks.Run(provider);
 IslandRecordsChecks.Run(provider, originalProvider);
 UtilityChecks.Run(provider, originalProvider);
 ImageLibraryChecks.Run();

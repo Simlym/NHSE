@@ -580,5 +580,21 @@
   "imagesBusy": "圖片下載進行中",
   "imagesInvalidPackage": "圖片包不完整或沒有支援的 PNG 圖片。現有圖片庫已保留。",
   "imagesTooLarge": "圖片包超過支援的大小。",
-  "imagesDownloadFailed": "下載或安裝失敗，請檢查網路和目錄存取權限後重試。"
+  "imagesDownloadFailed": "下載或安裝失敗，請檢查網路和目錄存取權限後重試。",
+  "navPlayerGroup": "玩家與收集",
+  "navIslandGroup": "島嶼與生活",
+  "navToolsGroup": "工具與進階",
+  "advancedGroupNames": "信件內容|附件物品|寄件方|收件方|日期與狀態|原始參數|居民資料|DIY 活動|關係與記憶|問候語|事件標記|物品設定|澆水記錄|房間設定",
+  "advancedSenderOverlapHint": "玩家、居民與 NPC 的寄件欄位共用儲存位置，請只修改所需寄件類型對應的欄位。",
+  "advancedMailPreview": "信件預覽",
+  "advancedNoFields": "沒有符合的欄位。",
+  "advancedDraftPending": "草稿待套用",
+  "mapPastePreview": "貼上預覽",
+  "mapPasteChecking": "正在檢查放置位置…",
+  "mapPasteImpact": "計畫放置 {0} 筆 · 變更 {1} 格 · 替換 {2} 個原有物品",
+  "mapPasteUnchanged": "目標資料已相同，無需修改。",
+  "mapPasteOutside": "另有 {0} 個變更格位於目前區域視圖之外。",
+  "mapPastePreviewHint": "琥珀色標記實際變更格，包括清理的原有占地。可選擇新位置或調整重疊保護以更新預覽；在網格中按 Enter 確認，Esc 取消。",
+  "mapPasteDraftHint": "預覽基於已套用資料，不包含右側未套用的草稿；貼上後會重設這些草稿。",
+  "mapPasteConfirm": "確認貼上"
 }

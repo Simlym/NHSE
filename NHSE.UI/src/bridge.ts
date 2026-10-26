@@ -269,6 +269,10 @@ export interface MapEditRule { key: string; operator: string; value: string }
 export interface MapBrush { enabled: boolean; radius: number; randomVariation: boolean }
 export interface GridTarget { kind: 'terrain' | 'mapItems' | 'roomItems' | 'inventory'; map?: MapTarget; house?: number; room?: number; layer?: number; player?: number; container?: string; slots?: number[]; columns?: number }
 export interface GridClipboardInfo { kind: 'items' | 'terrain'; count: number; width: number; height: number }
+export interface GridPastePreview {
+  valid: boolean; error?: string | null; placements: number; changedCells: number; replacedItems: number;
+  cells: { x: number; y: number }[];
+}
 
 export type IslandRecordSection = 'bulletin' | 'visitors';
 export interface IslandRecordField {

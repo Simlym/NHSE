@@ -180,7 +180,14 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
         : kind === 'resident' ? [number('Species', '4'), number('BirthType'), number('DIYRecipeIndex', '0', '0', '65535'), text('CatchPhrase', '你好', 24)]
         : kind === 'memory' ? [number('Friendship'), text('NickName'), text('Greeting.10', '', 22), number('Flag.255')]
         : kind === 'room' ? [number('WallItem.UniqueID', '0', '0', '65535'), number('FloorDirection')]
-        : kind === 'mailbox' ? [number('ReadStatus'), number('SortIndex', '0', '0', '65535'), text('To', '', 47), text('Message', '', 239), text('Language', '', 5), ...itemFields]
+        : kind === 'mailbox' ? [number('ReadStatus'), number('Favourite'),
+          number('SenderIslandID', '4294967295', '0', '4294967295'), text('SenderIslandName', '故乡', 9), number('SenderSpecies'), number('SenderVariant'),
+          number('NPCIslandID', '0', '0', '4294967295'), text('NPCIslandName', '', 9), number('SenderID', '0', '0', '4294967295'), text('SenderName', '', 9), number('SenderType'),
+          number('ReceiverIslandID', '0', '0', '4294967295'), text('ReceiverIslandName', '', 9), number('ReceiverPlayerID', '0', '0', '4294967295'), text('ReceiverPlayerName', '', 9),
+          number('Year', '65535', '0', '65535'), number('Month', '255'), number('Day', '255'),
+          number('ItemId', '1000', '0', '65535'), number('SystemParam'), number('AdditionalParam'), number('FreeParam', '0', '-2147483648', '2147483647'),
+          number('MailType01'), number('MailType02'), text('To', '', 47), text('Message', '', 239), text('From', '', 47), number('Stationery', '0', '0', '65535'),
+          number('SortIndex', '0', '0', '65535'), text('Language', '', 5)]
         : itemFields;
       const stored = advancedRecords[advancedKey(target)] ?? {};
       return { target, entries: Array.from({ length: count }, (_, index) => ({ index, name: `Entry ${index}`, available: kind !== 'item' || index < 30 })),
@@ -524,6 +531,26 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
                   museumRecords.entries.forEach((entry, index) => { entry.index = index; });
                 } else for (const entry of museumRecords.entries.slice(1, 5)) Object.assign(entry, { name: '木材', date: '2024-03-01', player: 0, item: { itemId: 1000, systemParam: 0, additionalParam: 0, freeParam: 0 } });
               }
+            }
+            if (message.command === 'previewGridPaste') {
+              const target = p.target as GridTarget, selection = p.selection as GridPoint[], anchor = p.anchor as GridPoint;
+              const controls = window as unknown as { nhsePreviewNext?: { valid: boolean; error?: string; placements: number; changedCells: number; replacedItems: number; cells: GridPoint[] }; nhseDelayPreviewNext?: number };
+              let preview = controls.nhsePreviewNext;
+              controls.nhsePreviewNext = undefined;
+              if (!preview) {
+                const entries = !gridClipboard ? [] : gridClipboard.entries.length === 1 && selection.length > 1 ? selection.map(point => ({ ...point, values: gridClipboard!.entries[0]!.values })) : gridClipboard.entries.map(e => ({ x: e.x + anchor.x, y: e.y + anchor.y, values: e.values }));
+                const error = !gridClipboard ? 'gridNoClipboard' : gridClipboard.kind !== (target.kind === 'terrain' ? 'terrain' : 'items') ? 'gridTypeMismatch' : entries.some(e => e.x < 0 || e.y < 0 || e.x >= (target.kind === 'terrain' ? 16 : 32) || e.y >= (target.kind === 'terrain' ? 16 : 32)) ? 'roomPlacementBlocked' : undefined;
+                const cells = error ? [] : entries.filter(e => {
+                  const before = gridRead(target, e);
+                  return [...new Set([...Object.keys(before), ...Object.keys(e.values)])].some(key => (before[key] ?? 0) !== (e.values[key] ?? 0));
+                }).map(({ x, y }) => ({ x, y }));
+                preview = { valid: !error, error, placements: error ? 0 : entries.length, changedCells: cells.length, replacedItems: 0, cells };
+              }
+              const response = structuredClone({ id: message.id, ok: true, data: preview });
+              const delay = controls.nhseDelayPreviewNext ?? 0; controls.nhseDelayPreviewNext = undefined;
+              if (delay) setTimeout(() => listeners.forEach(fn => fn({ data: response })), delay);
+              else queueMicrotask(() => listeners.forEach(fn => fn({ data: response })));
+              return;
             }
             if (['copyGrid', 'pasteGrid', 'editGrid'].includes(message.command)) {
               const target = p.target as GridTarget, selection = p.selection as GridPoint[];

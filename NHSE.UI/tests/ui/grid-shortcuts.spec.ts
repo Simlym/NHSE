@@ -24,6 +24,7 @@ test('terrain rectangle copy/paste, additive selection, keyboard navigation and 
   expect((await payloads(page, 'copyGrid'))[0]).toMatchObject({ selection: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }] });
   await page.evaluate(() => Object.assign(window, { nhseDelayMapNext: 150 }));
   await grid.getByRole('button', { name: '4, 4', exact: true }).click(); await page.keyboard.press('Control+v');
+  await map.getByRole('button', { name: '确认粘贴', exact: false }).click();
   await expect(map.getByRole('spinbutton', { name: '高度', exact: true })).toHaveValue('2');
   expect((await payloads(page, 'pasteGrid'))[0]).toMatchObject({ anchor: { x: 4, y: 4 }, noOverwrite: true });
   await page.keyboard.press('Control+z');

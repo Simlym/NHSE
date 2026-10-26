@@ -580,5 +580,21 @@
   "imagesBusy": "Image download in progress",
   "imagesInvalidPackage": "The image package is incomplete or has no supported PNG images. The existing library is preserved.",
   "imagesTooLarge": "The image package exceeds the supported size.",
-  "imagesDownloadFailed": "Download or installation failed. Check the connection and directory access, then retry."
+  "imagesDownloadFailed": "Download or installation failed. Check the connection and directory access, then retry.",
+  "navPlayerGroup": "Player & collection",
+  "navIslandGroup": "Island & life",
+  "navToolsGroup": "Tools & advanced",
+  "advancedGroupNames": "Mail content|Attachment|Sender|Recipient|Date and status|Raw parameters|Resident profile|DIY activity|Relationships|Greetings|Event flags|Item settings|Watering|Room settings",
+  "advancedSenderOverlapHint": "Player, villager and NPC sender fields share storage. Edit only the fields for the intended sender type.",
+  "advancedMailPreview": "Letter preview",
+  "advancedNoFields": "No matching fields.",
+  "advancedDraftPending": "Draft changes pending",
+  "mapPastePreview": "Paste preview",
+  "mapPasteChecking": "Checking placement…",
+  "mapPasteImpact": "Planned: {0} entries · {1} changed cells · {2} replaced objects",
+  "mapPasteUnchanged": "The destination already matches. No changes needed.",
+  "mapPasteOutside": "{0} changed cells are outside the current acre view.",
+  "mapPastePreviewHint": "Amber cells show actual changes, including cleared footprints. Select another destination or adjust overlap protection to update the preview. Enter in the grid confirms; Esc cancels.",
+  "mapPasteDraftHint": "The preview uses applied data. Unapplied inspector changes are excluded and will be reset after pasting.",
+  "mapPasteConfirm": "Confirm paste"
 }

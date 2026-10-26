@@ -580,5 +580,21 @@
   "imagesBusy": "图片下载进行中",
   "imagesInvalidPackage": "图片包不完整或没有支持的 PNG 图片。现有图片库已保留。",
   "imagesTooLarge": "图片包超过支持的大小。",
-  "imagesDownloadFailed": "下载或安装失败，请检查网络和目录访问权限后重试。"
+  "imagesDownloadFailed": "下载或安装失败，请检查网络和目录访问权限后重试。",
+  "navPlayerGroup": "玩家与收集",
+  "navIslandGroup": "岛屿与生活",
+  "navToolsGroup": "工具与高级",
+  "advancedGroupNames": "信件内容|附件物品|寄件方|收件方|日期与状态|原始参数|居民资料|DIY 活动|关系与记忆|问候语|事件标记|物品设置|浇水记录|房间设置",
+  "advancedSenderOverlapHint": "玩家、居民与 NPC 的寄件字段共用存储位置，请只修改所需寄件类型对应的字段。",
+  "advancedMailPreview": "信件预览",
+  "advancedNoFields": "没有匹配的字段。",
+  "advancedDraftPending": "草稿待应用",
+  "mapPastePreview": "粘贴预览",
+  "mapPasteChecking": "正在检查放置位置…",
+  "mapPasteImpact": "计划放置 {0} 条 · 改动 {1} 格 · 替换 {2} 个原有物品",
+  "mapPasteUnchanged": "目标数据已相同，无需修改。",
+  "mapPasteOutside": "另有 {0} 个改动格位于当前分区视图之外。",
+  "mapPastePreviewHint": "琥珀色标记实际改动格，包括清理的原有占地。可选择新位置或调整重叠保护以更新预览；在网格中按 Enter 确认，Esc 取消。",
+  "mapPasteDraftHint": "预览基于已应用数据，不包含右侧未应用的草稿；粘贴后会重置这些草稿。",
+  "mapPasteConfirm": "确认粘贴"
 }

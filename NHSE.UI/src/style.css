@@ -575,7 +575,23 @@ h3 {
 }
 .sidebar nav {
   display: grid;
-  gap: 7px;
+  gap: 14px;
+}
+.nav-group {
+  position: relative;
+  display: grid;
+  gap: 3px;
+}
+.nav-group-label {
+  margin: 0 14px 3px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: .5px;
+}
+.sidebar nav button svg {
+  flex-shrink: 0;
 }
 .sidebar nav button {
   display: flex;
@@ -2132,8 +2148,9 @@ h3 {
     position: static;
     width: 100%;
     height: auto;
-    flex-basis: auto;
+    flex: 0 0 auto;
     padding: 12px 16px;
+    overflow: hidden;
   }
   .brand {
     margin: 0 0 12px;
@@ -2151,13 +2168,35 @@ h3 {
   }
   .sidebar nav {
     display: flex;
-    flex-wrap: wrap;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 3px;
+    scroll-padding-inline: 3px;
+  }
+  .nav-group {
+    display: flex;
+    flex: 0 0 auto;
     gap: 4px;
+    align-items: center;
+  }
+  .nav-group + .nav-group {
+    border-left: 1px solid var(--line);
+    padding-left: 8px;
+  }
+  .nav-group-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .sidebar nav button {
+    flex: 0 0 auto;
     width: auto;
     gap: 6px;
     padding: 9px;
+    white-space: nowrap;
   }
   .sidebar nav button svg {
     width: 16px;

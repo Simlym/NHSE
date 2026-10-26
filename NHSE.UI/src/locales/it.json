@@ -580,5 +580,21 @@
   "imagesBusy": "Download immagini in corso",
   "imagesInvalidPackage": "Il pacchetto è incompleto o non contiene PNG supportati. La libreria attuale è conservata.",
   "imagesTooLarge": "Il pacchetto supera le dimensioni supportate.",
-  "imagesDownloadFailed": "Download o installazione non riusciti. Controlla connessione e accesso alla cartella, poi riprova."
+  "imagesDownloadFailed": "Download o installazione non riusciti. Controlla connessione e accesso alla cartella, poi riprova.",
+  "navPlayerGroup": "Giocatore e collezione",
+  "navIslandGroup": "Isola e vita",
+  "navToolsGroup": "Strumenti e avanzate",
+  "advancedGroupNames": "Contenuto della lettera|Allegato|Mittente|Destinatario|Data e stato|Parametri grezzi|Profilo abitante|Attività fai da te|Relazioni|Saluti|Indicatori evento|Impostazioni oggetto|Registro annaffiature|Impostazioni stanza",
+  "advancedSenderOverlapHint": "I campi del mittente per giocatori, abitanti e PNG condividono la memoria. Modifica solo i campi del tipo di mittente desiderato.",
+  "advancedMailPreview": "Anteprima lettera",
+  "advancedNoFields": "Nessun campo corrispondente.",
+  "advancedDraftPending": "Modifiche in attesa",
+  "mapPastePreview": "Anteprima incolla",
+  "mapPasteChecking": "Verifica del posizionamento…",
+  "mapPasteImpact": "Previsti: {0} elementi · {1} celle modificate · {2} oggetti sostituiti",
+  "mapPasteUnchanged": "La destinazione contiene già gli stessi dati. Nessuna modifica necessaria.",
+  "mapPasteOutside": "{0} celle modificate sono fuori dal settore visibile.",
+  "mapPastePreviewHint": "Il colore ambra indica le modifiche effettive, incluse le aree liberate. Cambia destinazione o protezione dalle sovrapposizioni per aggiornare. Nella griglia, Invio conferma ed Esc annulla.",
+  "mapPasteDraftHint": "L’anteprima usa i dati applicati. Le modifiche non applicate nell’ispettore sono escluse e saranno ripristinate dopo aver incollato.",
+  "mapPasteConfirm": "Conferma incolla"
 }

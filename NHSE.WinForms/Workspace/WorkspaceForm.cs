@@ -289,11 +289,14 @@ public sealed partial class WorkspaceForm : Form
                     p.GetProperty("whole").GetBoolean(), p.GetProperty("interiorOnly").GetBoolean(), p.GetProperty("values").Deserialize<Dictionary<string, JsonElement>>() ?? throw new ArgumentException("invalidRequest"));
                 return State();
             case "copyGrid":
+            case "previewGridPaste":
             case "pasteGrid":
             case "editGrid":
             {
                 var gridTarget = p.GetProperty("target").Deserialize<WorkspaceSession.GridTarget>(Json) ?? throw new ArgumentException("invalidRequest");
                 var points = p.GetProperty("selection").Deserialize<WorkspaceSession.MapPoint[]>(Json) ?? throw new ArgumentException("invalidRequest");
+                if (command == "previewGridPaste") return RequireSession().PreviewGridPaste(gridTarget,
+                    p.GetProperty("anchor").Deserialize<WorkspaceSession.MapPoint>(Json) ?? throw new ArgumentException("invalidRequest"), points, p.GetProperty("noOverwrite").GetBoolean());
                 if (command == "copyGrid") RequireSession().CopyGrid(gridTarget, points);
                 else if (command == "pasteGrid") RequireSession().PasteGrid(gridTarget, p.GetProperty("anchor").Deserialize<WorkspaceSession.MapPoint>(Json) ?? throw new ArgumentException("invalidRequest"), points, p.GetProperty("noOverwrite").GetBoolean());
                 else RequireSession().EditGrid(gridTarget, points, Str(p, "operation"));

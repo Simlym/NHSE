@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, shallowRef, watch } from 'vue';
 import { t } from './i18n';
 import { housingLabel } from './housingLabels';
+import AdvancedFieldInput from './AdvancedFieldInput.vue';
 import type { AdvancedData, AdvancedTarget, Player, Resident, ItemView } from './bridge';
 const props = defineProps<{ data: AdvancedData | null; players: Player[]; residents: Resident[]; busy: boolean;
   itemOnly?: boolean; back: () => void;
@@ -40,17 +41,61 @@ function label(key: string): string {
   return housingLabel(key);
 }
 const visibleFields = computed(() => props.data?.fields.filter(f => `${f.key} ${label(f.key)}`.toLocaleLowerCase().includes(fieldQuery.value.trim().toLocaleLowerCase())) ?? []);
+// Group presentation only; every field still uses the host's original key, value and limits.
+const groupNames = computed(() => t('advancedGroupNames').split('|'));
+const sections = computed(() => {
+  const kind = props.data?.target.kind;
+  const groups: { id: number; keys?: string[]; prefix?: string; open?: boolean }[] = kind === 'mailbox' ? [
+    { id: 0, keys: ['To', 'Message', 'From', 'Stationery', 'Language'] },
+    { id: 1, keys: ['ItemId', 'SystemParam', 'AdditionalParam', 'FreeParam'] },
+    { id: 4, keys: ['Year', 'Month', 'Day', 'ReadStatus', 'Favourite'] },
+    { id: 2, keys: ['SenderType', 'SenderIslandID', 'SenderIslandName', 'SenderSpecies', 'SenderVariant', 'NPCIslandID', 'NPCIslandName', 'SenderID', 'SenderName'], open: false },
+    { id: 3, keys: ['ReceiverIslandID', 'ReceiverIslandName', 'ReceiverPlayerID', 'ReceiverPlayerName'], open: false },
+  ] : kind === 'resident' ? [
+    { id: 6, keys: ['Species', 'Variant', 'Personality', 'CatchPhrase', 'BirthType', 'InducementType', 'MoveType', 'MovingOut'] },
+    { id: 7, keys: ['DIYRecipeIndex', 'DIYEndHour', 'DIYEndMinute', 'DIYEndSecond'] },
+  ] : kind === 'memory' ? [
+    { id: 8, keys: ['TownID', 'TownName', 'PlayerID', 'PlayerName', 'Friendship', 'NickName'] },
+    { id: 9, prefix: 'Greeting.' }, { id: 10, prefix: 'Flag.' },
+  ] : itemKinds.includes(kind ?? '') ? [
+    { id: 11, keys: ['ItemId', 'Count', 'UseCount', 'Rotation', 'BodyType', 'PatternSource', 'PatternChoice', 'IsBuried', 'IsDropped', 'IsWrapped', 'WrappingType', 'WrappingPaper', 'WrappingShowItem', 'Wrapping80'] },
+    { id: 12, keys: ['DaysWatered', 'IsWatered', 'IsWateredGold', 'Genes'], prefix: 'WateredVisitor.' },
+  ] : [];
+  const used = new Set<string>();
+  const mapped = groups.map(group => {
+    const fields = visibleFields.value.filter(f => group.keys?.includes(f.key) || (group.prefix && f.key.startsWith(group.prefix)));
+    fields.forEach(f => used.add(f.key));
+    return { ...group, fields };
+  });
+  const rest = visibleFields.value.filter(f => !used.has(f.key));
+  if (rest.length) mapped.push({ id: kind?.startsWith('flags') ? 10 : kind === 'room' ? 13 : 5, fields: rest, open: kind !== 'mailbox' });
+  return mapped.filter(group => group.fields.length);
+});
 const validation = ref('');
-async function applyPending() {
-  if (!props.data || !pending.value) return true;
-  if (!form.value?.reportValidity()) return false;
-  for (const field of props.data.fields) {
-    const value = fields.value[field.key]!; if (value === field.value) continue;
+async function revealField(key: string) {
+  // Searching or collapsing a section must never hide an invalid draft on navigation.
+  fieldQuery.value = '';
+  await nextTick();
+  const input = form.value?.querySelector<HTMLElement>(`[data-field-key="${CSS.escape(key)}"] input, [data-field-key="${CSS.escape(key)}"] textarea, [data-field-key="${CSS.escape(key)}"] select`);
+  const section = input?.closest('details'); if (section) section.open = true;
+  await nextTick(); input?.focus();
+}
+async function reportValidity() {
+  // Native form validation skips controls removed by field search; validate the full draft first.
+  for (const field of props.data?.fields ?? []) {
+    const value = fields.value[field.key]!;
     if (field.type === 'number') {
       try { const n = BigInt(value); if (!/^-?[0-9]+$/.test(value) || n < BigInt(field.min) || n > BigInt(field.max)) throw new Error(); }
-      catch { validation.value = `${label(field.key)}: ${field.min} … ${field.max}`; return false; }
+      catch { validation.value = `${label(field.key)}: ${field.min} … ${field.max}`; await revealField(field.key); return false; }
+    } else if (field.type === 'text' && value.length > field.length) {
+      validation.value = `${label(field.key)}: ${value.length} / ${field.length}`; await revealField(field.key); return false;
     }
   }
+  return true;
+}
+async function applyPending() {
+  if (!props.data || !pending.value) return true;
+  if (!(await reportValidity())) return false;
   validation.value = '';
   return await props.execute('setAdvanced', { target: { ...props.data.target }, values: { ...fields.value } });
 }
@@ -116,15 +161,23 @@ defineExpose({ applyPending, chooseItem });
         <div class="advanced-list"><button v-for="entry in visible" :key="entry.index" class="advanced-entry" :aria-pressed="entry.index === data.target.index" :disabled="busy || !entry.available" @click="navigate({ index: entry.index })">#{{ entry.index }} · {{ entry.name || t('empty') }}</button></div>
         <div class="form-actions"><button class="button" :disabled="busy || !page" @click="page--">{{ t('previous') }}</button><button class="button" :disabled="busy || page >= pages - 1" @click="page++">{{ t('next') }}</button></div>
       </section>
-      <form ref="form" class="advanced-fields" @submit.prevent="applyPending">
+      <form ref="form" class="advanced-fields" novalidate @submit.prevent="applyPending">
         <h2>{{ kindNames[kinds.indexOf(data.target.kind)] }} · #{{ data.target.index }}</h2>
         <label class="search-field"><span class="sr-only">{{ t('advancedSearchFields') }}</span><input v-model="fieldQuery" type="search" :placeholder="t('advancedSearchFields')" :disabled="busy" /></label>
-        <button v-if="itemKinds.includes(data.target.kind) || data.target.kind === 'mailbox'" class="button" type="button" :disabled="busy" @click="pickItem">{{ t('mapPickItem') }}</button>
-        <label v-for="field in visibleFields" :key="field.key" class="advanced-field">{{ label(field.key) }}<small>{{ field.key }}<template v-if="field.type === 'number'"> · {{ field.min }} … {{ field.max }}</template></small>
-          <select v-if="field.type === 'boolean'" v-model="fields[field.key]" :disabled="busy"><option value="False">{{ t('mapBooleanNames').split('|')[0] }}</option><option value="True">{{ t('mapBooleanNames').split('|')[1] }}</option></select>
-          <textarea v-else-if="field.key === 'Message'" v-model="fields[field.key]" :maxlength="field.length" rows="6" :disabled="busy" />
-          <input v-else v-model="fields[field.key]" type="text" :inputmode="field.type === 'number' ? 'numeric' : 'text'" :pattern="field.type === 'number' ? '-?[0-9]+' : undefined" :required="field.type === 'number'" :maxlength="field.type === 'text' ? field.length : undefined" :disabled="busy" />
-        </label>
+        <p v-if="pending" class="draft-status" role="status">{{ t('advancedDraftPending') }}</p>
+        <p v-if="!sections.length" class="field-help" role="status">{{ t('advancedNoFields') }}</p>
+        <details v-for="section in sections" :key="`${data.target.kind}:${section.id}`" class="advanced-section" :data-group="section.id" :open="!!fieldQuery.trim() || section.open !== false">
+          <summary>{{ groupNames[section.id] }} <span>{{ section.fields.length }}</span></summary>
+          <div class="advanced-section-fields">
+            <p v-if="data.target.kind === 'mailbox' && section.id === 2" class="field-help section-help">{{ t('advancedSenderOverlapHint') }}</p>
+            <button v-if="(data.target.kind === 'mailbox' && section.id === 1) || (itemKinds.includes(data.target.kind) && section.id === 11)" class="button section-action" type="button" :disabled="busy" @click="pickItem">{{ t('mapPickItem') }}</button>
+            <AdvancedFieldInput v-for="field in section.fields" :key="field.key" :field="field" :label="label(field.key)" :model-value="fields[field.key]!" :busy="busy" @update:model-value="fields[field.key] = $event" />
+          </div>
+        </details>
+        <details v-if="data.target.kind === 'mailbox' && !fieldQuery.trim()" class="mail-preview">
+          <summary>{{ t('advancedMailPreview') }}</summary>
+          <article><p>{{ fields.To }}</p><p class="letter-body">{{ fields.Message }}</p><p>{{ fields.From }}</p></article>
+        </details>
         <p v-if="validation" role="alert">{{ validation }}</p><button class="button primary" :disabled="busy || !pending">{{ t('apply') }}</button>
       </form>
     </div>
@@ -147,7 +200,7 @@ summary { cursor: pointer; color: var(--green); }
 .advanced-browser, .advanced-fields { padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
 .advanced-list { display: grid; gap: .4rem; margin-block: .75rem; max-height: 480px; overflow-y: auto; padding: 3px; }
 .item-only .advanced-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.advanced-fields > h2, .advanced-fields > .search-field, .advanced-fields > button, .advanced-fields > [role=alert] { grid-column: 1 / -1; }
+.advanced-fields > h2, .advanced-fields > .search-field, .advanced-fields > button, .advanced-fields > [role=alert], .advanced-fields > .draft-status, .advanced-fields > .advanced-section, .advanced-fields > .mail-preview { grid-column: 1 / -1; }
 .advanced-entry { text-align: start; padding: .6rem; overflow-wrap: anywhere; }
 .advanced-entry[aria-pressed=true] { outline: 2px solid var(--green); }
 .advanced-fields { display: grid; gap: .8rem; align-content: start; min-width: 0; }
@@ -156,5 +209,17 @@ small { font-size: .75rem; overflow-wrap: anywhere; opacity: .75; }
 input, select, textarea, .advanced-entry { box-sizing: border-box; max-width: 100%; min-width: 0; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: .5rem; }
 input, select, textarea { padding: .65rem; width: 100%; font: inherit; }
 .advanced-text-batch { margin-top: 2rem; }
+.advanced-section { min-width: 0; border: 1px solid var(--line); border-radius: 8px; }
+.advanced-section > summary { padding: .8rem; font-weight: 600; }
+.advanced-section > summary span { font-weight: 400; font-size: .8rem; color: var(--muted); margin-inline-start: .5rem; }
+.advanced-section-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; padding: 0 .8rem .8rem; }
+.section-help, .section-action { grid-column: 1 / -1; }
+.section-action { justify-self: start; }
+.section-help { margin: 0; }
+.draft-status { margin: 0; color: var(--green); font-size: .85rem; }
+.mail-preview article { margin-top: .5rem; padding: 1rem; border: 1px dashed var(--line); border-radius: .5rem; overflow-wrap: anywhere; }
+.mail-preview article p { white-space: pre-wrap; }
+.letter-body { min-height: 4rem; }
+@media(max-width: 1100px) { .advanced-section-fields { grid-template-columns: minmax(0, 1fr); } }
 @media(max-width: 800px) { .advanced-layout, .item-only .advanced-fields { grid-template-columns: minmax(0, 1fr); } }
 </style>

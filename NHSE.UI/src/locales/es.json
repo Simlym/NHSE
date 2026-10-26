@@ -580,5 +580,21 @@
   "imagesBusy": "Descarga de imágenes en curso",
   "imagesInvalidPackage": "El paquete está incompleto o no contiene PNG compatibles. La biblioteca actual se conserva.",
   "imagesTooLarge": "El paquete supera el tamaño admitido.",
-  "imagesDownloadFailed": "La descarga o instalación ha fallado. Comprueba la conexión y el acceso a la carpeta y vuelve a intentarlo."
+  "imagesDownloadFailed": "La descarga o instalación ha fallado. Comprueba la conexión y el acceso a la carpeta y vuelve a intentarlo.",
+  "navPlayerGroup": "Jugador y colección",
+  "navIslandGroup": "Isla y vida",
+  "navToolsGroup": "Herramientas y avanzado",
+  "advancedGroupNames": "Contenido de la carta|Adjunto|Remitente|Destinatario|Fecha y estado|Parámetros sin procesar|Perfil del vecino|Actividad de bricolaje|Relaciones|Saludos|Indicadores de eventos|Ajustes del objeto|Registro de riego|Ajustes de la habitación",
+  "advancedSenderOverlapHint": "Los campos de remitente de jugador, vecino y PNJ comparten almacenamiento. Edita solo los del tipo de remitente deseado.",
+  "advancedMailPreview": "Vista previa de la carta",
+  "advancedNoFields": "No hay campos coincidentes.",
+  "advancedDraftPending": "Cambios pendientes de aplicar",
+  "mapPastePreview": "Vista previa de pegado",
+  "mapPasteChecking": "Comprobando la colocación…",
+  "mapPasteImpact": "Previsto: {0} entradas · {1} celdas modificadas · {2} objetos reemplazados",
+  "mapPasteUnchanged": "El destino ya contiene los mismos datos. No hay cambios necesarios.",
+  "mapPasteOutside": "{0} celdas modificadas quedan fuera del sector visible.",
+  "mapPastePreviewHint": "El color ámbar indica cambios reales, incluidas las áreas despejadas. Cambia el destino o la protección contra solapamientos para actualizar. En la cuadrícula, Enter confirma y Esc cancela.",
+  "mapPasteDraftHint": "La vista previa usa datos aplicados. Los cambios sin aplicar del inspector se excluyen y se restablecerán al pegar.",
+  "mapPasteConfirm": "Confirmar pegado"
 }

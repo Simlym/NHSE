@@ -43,7 +43,7 @@ test('mail slot 299, Unicode text and sort indexes survive player switches and u
   await open(page);
   await page.getByRole('combobox', { name: '编辑类别', exact: true }).selectOption('mailbox');
   const slot = page.getByRole('spinbutton', { name: '格子', exact: true }); await slot.fill('299'); await slot.press('Tab');
-  await field(page, 'Message').fill('Hello\n您好😀'); await field(page, 'SortIndex').fill('299'); await field(page, 'Language').fill('en-GB');
+  await field(page, 'Message').fill('Hello\n您好😀'); await page.locator('.advanced-section[data-group="5"] > summary').click(); await field(page, 'SortIndex').fill('299'); await field(page, 'Language').fill('en-GB');
   await page.locator('.advanced-fields').getByRole('button', { name: '应用修改', exact: true }).click();
   expect((await messages(page, 'setAdvanced')).at(-1)).toMatchObject({ target: { kind: 'mailbox', index: 299 }, values: { Message: 'Hello\n您好😀', SortIndex: '299', Language: 'en-GB' } });
   await page.getByRole('combobox', { name: '玩家资料', exact: true }).selectOption('1');

@@ -12,6 +12,9 @@ import {
   Download,
   Globe2,
   HelpCircle,
+  House,
+  Landmark,
+  Wrench,
   LayoutDashboard,
   Leaf,
   Map,
@@ -201,21 +204,32 @@ const profilePending = computed(
     ),
 );
 const balanceFields = ['wallet', 'bank', 'miles', 'earnedMiles'] as const;
-const nav = [
-  { id: 'overview', icon: LayoutDashboard },
-  { id: 'player', icon: UserRound },
-  { id: 'inventory', icon: Package },
-  { id: 'progress', icon: Check },
-  { id: 'housing', icon: Map },
-  { id: 'museum', icon: Leaf },
-  { id: 'advancedEditor', icon: SlidersHorizontal },
-  { id: 'consoleTools', icon: ShieldCheck },
-  { id: 'designs', icon: Palette },
-  { id: 'mapEditor', icon: Map },
-  { id: 'villagers', icon: Users },
-  { id: 'island', icon: Leaf },
-  { id: 'tools', icon: Map },
+const navGroups = [
+  { id: 'overview', label: null, items: [{ id: 'overview', icon: LayoutDashboard }] },
+  { id: 'players', label: 'navPlayerGroup', items: [
+    { id: 'player', icon: UserRound },
+    { id: 'inventory', icon: Package },
+    { id: 'progress', icon: Check },
+    { id: 'designs', icon: Palette },
+  ] },
+  { id: 'island', label: 'navIslandGroup', items: [
+    { id: 'mapEditor', icon: Map },
+    { id: 'housing', icon: House },
+    { id: 'villagers', icon: Users },
+    { id: 'island', icon: Leaf },
+    { id: 'museum', icon: Landmark },
+  ] },
+  { id: 'tools', label: 'navToolsGroup', items: [
+    { id: 'tools', icon: Wrench },
+    { id: 'advancedEditor', icon: SlidersHorizontal },
+    { id: 'consoleTools', icon: ShieldCheck },
+  ] },
 ] as const;
+// Also reveal the active entry when a page opens from an overview card or a contextual link.
+watch(navigationPage, async () => {
+  await nextTick();
+  document.querySelector('.sidebar nav [aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+});
 let inventoryToken = 0,
   catalogToken = 0;
 let queryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -799,18 +813,22 @@ onUnmounted(() => {
       </div>
       <div class="sidebar-label">{{ t('workspace') }}</div>
       <nav :aria-label="t('workspace')">
-        <template v-if="state.session"
-          ><button
-            v-for="item in nav"
-            :key="item.id"
-            :class="{ active: navigationPage === item.id }"
-            :aria-current="navigationPage === item.id ? 'page' : undefined"
-            :disabled="busy"
-            @click="go(item.id)"
-          >
-            <component :is="item.icon" :size="19" />{{ t(item.id)
-            }}<span v-if="navigationPage === item.id" class="nav-dot"></span></button
-        ></template>
+        <template v-if="state.session">
+          <div v-for="group in navGroups" :key="group.id" class="nav-group" :role="group.label ? 'group' : undefined" :aria-labelledby="group.label ? `nav-${group.id}-label` : undefined">
+            <h2 v-if="group.label" :id="`nav-${group.id}-label`" class="nav-group-label">{{ t(group.label) }}</h2>
+            <button
+              v-for="item in group.items"
+              :key="item.id"
+              :class="{ active: navigationPage === item.id }"
+              :aria-current="navigationPage === item.id ? 'page' : undefined"
+              :disabled="busy"
+              @click="go(item.id)"
+            >
+              <component :is="item.icon" :size="19" />{{ t(item.id) }}
+              <span v-if="navigationPage === item.id" class="nav-dot"></span>
+            </button>
+          </div>
+        </template>
         <button v-else class="active" aria-current="page">
           <LayoutDashboard :size="19" />{{ t('home') }}<span class="nav-dot"></span>
         </button>

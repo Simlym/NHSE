@@ -580,5 +580,21 @@
   "imagesBusy": "Bilddownload läuft",
   "imagesInvalidPackage": "Das Paket ist unvollständig oder enthält keine unterstützten PNG-Bilder. Vorhandene Bilder bleiben erhalten.",
   "imagesTooLarge": "Das Bildpaket überschreitet die unterstützte Größe.",
-  "imagesDownloadFailed": "Download oder Installation fehlgeschlagen. Verbindung und Ordnerzugriff prüfen und erneut versuchen."
+  "imagesDownloadFailed": "Download oder Installation fehlgeschlagen. Verbindung und Ordnerzugriff prüfen und erneut versuchen.",
+  "navPlayerGroup": "Spieler und Sammlung",
+  "navIslandGroup": "Insel und Leben",
+  "navToolsGroup": "Werkzeuge und Erweitert",
+  "advancedGroupNames": "Briefinhalt|Anhang|Absender|Empfänger|Datum und Status|Rohparameter|Bewohnerprofil|Bastelaktivität|Beziehungen|Begrüßungen|Ereignisflags|Gegenstandseinstellungen|Gießprotokoll|Zimmereinstellungen",
+  "advancedSenderOverlapHint": "Absenderfelder für Spieler, Bewohner und NPCs teilen denselben Speicher. Bearbeite nur die Felder des gewünschten Absendertyps.",
+  "advancedMailPreview": "Briefvorschau",
+  "advancedNoFields": "Keine passenden Felder.",
+  "advancedDraftPending": "Entwurf noch nicht angewendet",
+  "mapPastePreview": "Einfügevorschau",
+  "mapPasteChecking": "Platzierung wird geprüft…",
+  "mapPasteImpact": "Geplant: {0} Einträge · {1} geänderte Felder · {2} ersetzte Objekte",
+  "mapPasteUnchanged": "Das Ziel enthält bereits dieselben Daten. Keine Änderungen nötig.",
+  "mapPasteOutside": "{0} geänderte Felder liegen außerhalb des angezeigten Abschnitts.",
+  "mapPastePreviewHint": "Orange markiert tatsächliche Änderungen einschließlich gelöschter Stellflächen. Wähle ein anderes Ziel oder ändere den Überlappungsschutz. Im Raster bestätigt Enter; Esc bricht ab.",
+  "mapPasteDraftHint": "Die Vorschau verwendet angewendete Daten. Nicht angewendete Änderungen im Inspektor sind ausgeschlossen und werden nach dem Einfügen zurückgesetzt.",
+  "mapPasteConfirm": "Einfügen bestätigen"
 }

@@ -2,11 +2,12 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { MousePointer2, Hand, Paintbrush, ZoomIn, ZoomOut, Maximize, Grid2X2, Layers, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Compass, SlidersHorizontal, Package, Building2, Mountain, Flag, Search } from '@lucide/vue';
 import { t } from './i18n';
-import type { MapData, MapTarget, ItemView, MapBrush, GridClipboardInfo, GridTarget } from './bridge';
+import { request, type MapData, type MapTarget, type ItemView, type MapBrush, type GridClipboardInfo, type GridTarget, type GridPastePreview } from './bridge';
 import HousingFields from './HousingFields.vue';
 import MapTools from './MapTools.vue';
 import MapAdvanced from './MapAdvanced.vue';
 import GridToolbar from './GridToolbar.vue';
+import MapPastePreview from './MapPastePreview.vue';
 import { useGridSelection, pointKey, editableTarget } from './gridSelection';
 import { buildingTypeName } from './mapBuildingLabels';
 const props = defineProps<{
@@ -113,6 +114,7 @@ function canvasClick(event: MouseEvent) {
 function canvasKeyboard(event: KeyboardEvent) {
   if (editableTarget(event.target) || document.querySelector('dialog[open]')) return;
   if (event.key === 'Escape' && panPointer) { event.preventDefault(); event.stopPropagation(); cancelPan(); return; }
+  if (event.key === 'Escape' && pasteOpen.value) { event.preventDefault(); event.stopPropagation(); closePastePreview(); return; }
   if (event.code === 'Space' && (canvasHovered.value || canvasScroll.value?.contains(event.target as Node))) {
     event.preventDefault(); if (!strokeMeta.value && !gridSelection.dragging.value) spaceHeld.value = true; return;
   }
@@ -170,6 +172,7 @@ const advancedFields = computed(() => { const data = props.data; return data?.fi
 const brush = ref<MapBrush>({ enabled: false, radius: 1, randomVariation: false });
 function setTool(tool: 'select' | 'brush' | 'pan') {
   cancelPan();
+  if (tool !== 'select') closePastePreview(false);
   handTool.value = tool === 'pan';
   if (tool !== 'pan') brush.value.enabled = tool === 'brush';
 }
@@ -189,15 +192,67 @@ const gridSelection = useGridSelection({
   actionBusy: () => props.busy,
   activate: point => props.navigate(point), action: gridAction,
 });
-async function gridAction(name: 'copyGrid' | 'pasteGrid' | 'delete' | 'rotate') {
-  if (!props.data || props.busy || !gridSelection.selected.value.length || strokeMeta.value) return;
+function gridPayload() {
+  if (!props.data || !gridSelection.selected.value.length) return null;
   const target: GridTarget = { kind: props.data.target.mode === 'terrain' ? 'terrain' : 'mapItems', map: { ...props.data.target } };
   const selection = gridSelection.selected.value.map(p => ({ ...p }));
   const anchor = selection.length > 1 ? { x: Math.min(...selection.map(p => p.x)), y: Math.min(...selection.map(p => p.y)) } : { x: props.data.target.x, y: props.data.target.y };
-  const success = await props.execute(name === 'delete' || name === 'rotate' ? 'editGrid' : name, { target, selection, anchor, noOverwrite: noOverwrite.value, operation: name });
+  return { target, selection, anchor, noOverwrite: noOverwrite.value };
+}
+const pasteOpen = ref(false), pasteLoading = ref(false), pastePreview = shallowRef<GridPastePreview | null>(null);
+let pasteToken = 0, pasteTimer: ReturnType<typeof setTimeout> | undefined, pasteNeedsReveal = false;
+const pasteKeys = computed(() => new Set(pasteLoading.value ? [] : pastePreview.value?.cells.map(pointKey) ?? []));
+const pasteOutside = computed(() => pastePreview.value?.cells.filter(p => p.x < 0 || p.y < 0 || p.x >= (props.data?.gridSize ?? 0) || p.y >= (props.data?.gridSize ?? 0)).length ?? 0);
+function focusGrid() { canvasScroll.value?.querySelector<HTMLElement>('.map-grid')?.focus({ preventScroll: true }); }
+async function revealPastePreview() {
+  await nextTick();
+  canvasScroll.value?.parentElement?.querySelector('.map-paste-preview')?.scrollIntoView({ block: 'nearest' });
+}
+function closePastePreview(focus = true) {
+  ++pasteToken; clearTimeout(pasteTimer); pasteNeedsReveal = false; pasteOpen.value = false; pasteLoading.value = false; pastePreview.value = null;
+  if (focus) focusGrid();
+}
+function refreshPastePreview() {
+  // Keep the previous result's geometry while checking. Collapsing it during pointerdown resizes the grid beneath the gesture.
+  const token = ++pasteToken; clearTimeout(pasteTimer);
+  const payload = gridPayload();
+  if (!pasteOpen.value) return;
+  if (!payload || !props.clipboard || !['terrain', 'items'].includes(props.data?.target.mode ?? '')) { closePastePreview(false); return; }
+  pasteLoading.value = true;
+  if (props.busy || gridSelection.dragging.value) return;
+  pasteTimer = setTimeout(async () => {
+    try {
+      const result = await request<GridPastePreview>('previewGridPaste', payload);
+      if (token === pasteToken) pastePreview.value = result;
+    } catch (error) {
+      if (token === pasteToken) pastePreview.value = { valid: false, error: error instanceof Error ? error.message : 'invalidRequest', placements: 0, changedCells: 0, replacedItems: 0, cells: [] };
+    } finally {
+      if (token === pasteToken) {
+        if (pasteNeedsReveal) { pasteNeedsReveal = false; await revealPastePreview(); }
+        if (token === pasteToken) pasteLoading.value = false;
+      }
+    }
+  }, 80);
+}
+watch(() => [props.data, props.clipboard, props.busy, gridSelection.dragging.value, JSON.stringify(gridPayload())], refreshPastePreview, { flush: 'sync' });
+async function confirmPaste() {
+  const payload = gridPayload();
+  if (!payload || props.busy || pasteLoading.value || !pastePreview.value?.valid || !pastePreview.value.changedCells) return;
+  if (await props.execute('pasteGrid', payload)) { fields.value = stored(); closePastePreview(); }
+  else refreshPastePreview();
+}
+async function gridAction(name: 'copyGrid' | 'pasteGrid' | 'delete' | 'rotate') {
+  if (!props.data || props.busy || !gridSelection.selected.value.length || strokeMeta.value) return;
+  if (name === 'pasteGrid') {
+    setTool('select'); pasteNeedsReveal = !pasteOpen.value; pasteOpen.value = true; refreshPastePreview(); focusGrid();
+    return;
+  }
+  closePastePreview(false);
+  const success = await props.execute(name === 'delete' || name === 'rotate' ? 'editGrid' : name, { ...gridPayload(), operation: name });
   if (success && name !== 'copyGrid' && !brush.value.enabled) fields.value = stored();
 }
 function gridPointerDown(event: PointerEvent) {
+  pasteNeedsReveal = false;
   if (brush.value.enabled && !event.ctrlKey && !event.metaKey && !event.shiftKey) startStroke(event);
   else gridSelection.down(event);
 }
@@ -205,6 +260,8 @@ function gridPointerMove(event: PointerEvent) { if (gridSelection.dragging.value
 function gridPointerUp(event: PointerEvent) { if (gridSelection.dragging.value) void gridSelection.up(event); else void endStroke(event); }
 function cancelGridPointer() { gridSelection.cancel(); cancelStroke(); }
 function gridKeydown(event: KeyboardEvent) {
+  if (event.key.startsWith('Arrow')) pasteNeedsReveal = false;
+  if (pasteOpen.value && event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); event.stopPropagation(); if (!event.repeat) void confirmPaste(); return; }
   if (strokeMeta.value) {
     strokeKeyboard(event);
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cancelStroke(); }
@@ -344,7 +401,7 @@ function overviewClick(event: MouseEvent) {
   // Pointer gestures commit on release; keyboard activation keeps the current acre.
   if (event.detail === 0 && !props.busy) void props.navigate({ acre: displayedAcre.value });
 }
-onBeforeUnmount(() => { overviewCancel(); cancelPan(); canvasObserver?.disconnect(); window.removeEventListener('keydown', canvasKeyboard, true); window.removeEventListener('keyup', canvasKeyup); window.removeEventListener('blur', canvasBlur); });
+onBeforeUnmount(() => { closePastePreview(false); overviewCancel(); cancelPan(); canvasObserver?.disconnect(); window.removeEventListener('keydown', canvasKeyboard, true); window.removeEventListener('keyup', canvasKeyup); window.removeEventListener('blur', canvasBlur); });
 defineExpose({ applyPending, chooseItem });
 </script>
 <template>
@@ -434,7 +491,7 @@ defineExpose({ applyPending, chooseItem });
                 :data-columns="data.gridSize" :data-rows="data.gridSize" :style="{ gridTemplateColumns: `repeat(${data.gridSize}, 1fr)` }">
                 <button tabindex="-1" :aria-pressed="gridSelection.keys.value.has(pointKey(cell))" v-for="cell in data.cells" :key="`${cell.x},${cell.y}`" :disabled="selectionBusy || !cell.valid"
                   :aria-label="`${cell.x}, ${cell.y}${cell.name ? ' · ' + cell.name : ''}`" :title="`${cell.relativeX}, ${cell.relativeY} ${cell.name}`"
-                  :class="{ selected: gridSelection.selected.value.length === 1 && gridSelection.keys.value.has(pointKey(cell)), occupied: !!cell.name, extension: cell.extension, 'stroke-preview': strokeKeys.has(`${cell.x},${cell.y}`), 'multi-selected': gridSelection.keys.value.has(pointKey(cell)) }"
+                  :class="{ selected: gridSelection.selected.value.length === 1 && gridSelection.keys.value.has(pointKey(cell)), occupied: !!cell.name, extension: cell.extension, 'stroke-preview': strokeKeys.has(`${cell.x},${cell.y}`), 'paste-preview': pasteKeys.has(pointKey(cell)), 'multi-selected': gridSelection.keys.value.has(pointKey(cell)) }"
                   @click="!brush.enabled && !handTool && gridSelection.click($event, cell)" />
               </div>
             </div>
@@ -442,6 +499,7 @@ defineExpose({ applyPending, chooseItem });
         </div>
         <div class="canvas-status"><span v-if="['terrain', 'items'].includes(data.target.mode)">X {{ data.target.x }} · Y {{ data.target.y }}</span><span v-else>{{ acreName }}</span><span :class="{ 'loading-view': loading }">{{ loading ? t('mapLoadingView') : t(panMode || panning ? 'mapPanCanvasHint' : brush.enabled ? 'mapBrushCanvasHint' : 'mapCanvasHint') }}</span></div>
         <GridToolbar v-if="['terrain', 'items'].includes(data.target.mode)" :count="gridSelection.selected.value.length" :clipboard="clipboard" :kind="data.target.mode === 'terrain' ? 'terrain' : 'items'" :busy="busy || !!strokeMeta || gridSelection.dragging.value" :action="gridAction" :clear="gridSelection.clear" />
+        <MapPastePreview v-if="pasteOpen" :preview="pastePreview" :loading="pasteLoading" :busy="busy" :outside="pasteOutside" :pending="pending" :confirm="confirmPaste" :cancel="closePastePreview" />
       </section>
 
       <aside class="map-inspector map-panel">
@@ -546,6 +604,7 @@ h3 { font-size: 12px; margin: 0; }
 .map-grid button.selected { outline: 2px solid #ed651c; outline-offset: -2px; background: #ffb52b30; z-index: 1; }
 .map-grid.brush-enabled { cursor: crosshair; }
 .map-grid button.stroke-preview { background: #36acfa80; }
+.map-grid button.paste-preview { background: #f3ba4080; box-shadow: inset 0 0 0 1px #a66a00; }
 .hand-tool, .hand-tool * { cursor: grab !important; touch-action: none; }
 .hand-tool.panning, .hand-tool.panning * { cursor: grabbing !important; }
 .canvas-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; font-size: 10px; color: var(--muted); border-top: 1px solid var(--line); }

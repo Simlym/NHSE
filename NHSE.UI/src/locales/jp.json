@@ -580,5 +580,21 @@
   "imagesBusy": "画像をダウンロード中",
   "imagesInvalidPackage": "画像パックが不完全か、対応するPNG画像がありません。既存の画像を保持しました。",
   "imagesTooLarge": "画像パックが対応サイズを超えています。",
-  "imagesDownloadFailed": "取得またはインストールに失敗しました。接続とフォルダー権限を確認して再試行してください。"
+  "imagesDownloadFailed": "取得またはインストールに失敗しました。接続とフォルダー権限を確認して再試行してください。",
+  "navPlayerGroup": "プレイヤーと収集",
+  "navIslandGroup": "島と暮らし",
+  "navToolsGroup": "ツールと詳細編集",
+  "advancedGroupNames": "手紙の内容|添付アイテム|差出人|受取人|日付と状態|生のパラメータ|住民情報|DIY 活動|関係と記憶|あいさつ|イベントフラグ|アイテム設定|水やり記録|部屋設定",
+  "advancedSenderOverlapHint": "プレイヤー・住民・NPC の差出人項目は保存領域を共有します。対象の差出人の種類に対応する項目だけを編集してください。",
+  "advancedMailPreview": "手紙のプレビュー",
+  "advancedNoFields": "一致する項目はありません。",
+  "advancedDraftPending": "未適用の変更あり",
+  "mapPastePreview": "貼り付けプレビュー",
+  "mapPasteChecking": "配置を確認中…",
+  "mapPasteImpact": "配置予定 {0} 件 · 変更 {1} マス · 置換 {2} 個",
+  "mapPasteUnchanged": "貼り付け先は同じデータです。変更は不要です。",
+  "mapPasteOutside": "変更される {0} マスは現在の区画表示の外にあります。",
+  "mapPastePreviewHint": "琥珀色は実際に変更されるマスです。既存アイテムの占有範囲の消去も含みます。貼り付け先や重なり保護を変更すると更新されます。グリッドで Enter で確定、Esc で取消。",
+  "mapPasteDraftHint": "適用済みデータを使ってプレビューします。右側の未適用の変更は含まれず、貼り付け後にリセットされます。",
+  "mapPasteConfirm": "貼り付けを確定"
 }

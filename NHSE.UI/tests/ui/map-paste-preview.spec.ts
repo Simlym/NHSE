@@ -1,0 +1,91 @@
+import { test, expect, type Page } from '@playwright/test';
+import { mockHost } from './mock-host';
+const payloads = (page: Page, command: string) => page.evaluate(command => (window as unknown as { nhseTestPayloads: { command: string; payload: Record<string, unknown> }[] }).nhseTestPayloads.filter(m => m.command === command).map(m => m.payload), command);
+async function prepare(page: Page) {
+  await mockHost(page); await page.goto('/'); await page.getByRole('button', { name: '打开存档', exact: true }).click();
+  await page.locator('.sidebar nav').getByRole('button', { name: '地图与建筑', exact: true }).click();
+  const map = page.locator('.map-page'), grid = map.locator('.map-grid');
+  await map.getByRole('spinbutton', { name: '高度', exact: true }).fill('2');
+  await map.getByRole('button', { name: '应用修改', exact: true }).click();
+  await grid.focus(); await page.keyboard.press('Control+c');
+  await expect(map.getByText(/剪贴板：1 条/)).toBeVisible();
+  await grid.getByRole('button', { name: '4, 4', exact: true }).click();
+  return { map, grid, preview: map.locator('.map-paste-preview') };
+}
+test('paste previews exact changes without a write, Escape cancels and Enter commits one undoable edit', async ({ page }) => {
+  const { map, grid, preview } = await prepare(page);
+  await page.keyboard.press('Control+v');
+  await expect(preview.getByText('计划放置 1 条 · 改动 1 格 · 替换 0 个原有物品', { exact: true })).toBeVisible();
+  await expect(grid.locator('.paste-preview')).toHaveCount(1);
+  await expect(map.getByRole('spinbutton', { name: '高度', exact: true })).toHaveValue('0');
+  expect(await payloads(page, 'pasteGrid')).toHaveLength(0);
+  await page.keyboard.press('Escape'); await expect(preview).toHaveCount(0);
+  await expect(grid).toBeFocused(); await expect(grid.locator('.paste-preview')).toHaveCount(0);
+  await page.keyboard.press('Control+v');
+  await expect(preview.getByRole('button', { name: /确认粘贴/ })).toBeEnabled();
+  await page.keyboard.press('Enter'); await expect(preview).toHaveCount(0);
+  await expect(map.getByRole('spinbutton', { name: '高度', exact: true })).toHaveValue('2');
+  expect(await payloads(page, 'pasteGrid')).toHaveLength(1);
+  await page.keyboard.press('Control+z');
+  await expect(map.getByRole('spinbutton', { name: '高度', exact: true })).toHaveValue('0');
+});
+test('destination changes discard delayed previews and keyboard confirmation waits for the current result', async ({ page }) => {
+  const { grid, preview } = await prepare(page);
+  await page.evaluate(() => Object.assign(window, { nhseDelayPreviewNext: 400, nhsePreviewNext: { valid: true, placements: 99, changedCells: 99, replacedItems: 0, cells: [{ x: 0, y: 0 }] } }));
+  await page.keyboard.press('Control+v');
+  await expect.poll(async () => (await payloads(page, 'previewGridPaste')).length).toBe(1);
+  await page.keyboard.press('ArrowRight'); await page.keyboard.press('Enter');
+  await expect(preview.getByRole('button', { name: /确认粘贴/ })).toBeEnabled();
+  await expect(grid.getByRole('button', { name: '5, 4', exact: true })).toHaveClass(/paste-preview/);
+  await expect(preview.getByText(/计划放置 99 条/)).toHaveCount(0);
+  await page.waitForTimeout(450);
+  await expect(grid.getByRole('button', { name: '5, 4', exact: true })).toHaveClass(/paste-preview/);
+  expect(await payloads(page, 'pasteGrid')).toHaveLength(0);
+  await page.keyboard.press('Enter');
+  expect((await payloads(page, 'pasteGrid'))[0]).toMatchObject({ anchor: { x: 5, y: 4 } });
+});
+test('blocked placement cannot be committed and retrying a failed write retains a fresh preview', async ({ page }) => {
+  const { preview } = await prepare(page);
+  await page.evaluate(() => Object.assign(window, { nhsePreviewNext: { valid: false, error: 'roomPlacementBlocked', placements: 0, changedCells: 0, replacedItems: 0, cells: [] } }));
+  await page.keyboard.press('Control+v');
+  await expect(preview.getByRole('button', { name: /确认粘贴/ })).toBeDisabled();
+  await expect(preview.locator('.preview-error')).toBeVisible();
+  await page.keyboard.press('Enter'); expect(await payloads(page, 'pasteGrid')).toHaveLength(0);
+  await page.keyboard.press('ArrowRight');
+  await expect(preview.getByRole('button', { name: /确认粘贴/ })).toBeEnabled();
+  await page.evaluate(() => Object.assign(window, { nhseGridErrorNext: 'roomPlacementBlocked' }));
+  await page.keyboard.press('Enter');
+  await expect(preview).toBeVisible();
+  await expect(preview.getByRole('button', { name: /确认粘贴/ })).toBeEnabled();
+  expect(await payloads(page, 'pasteGrid')).toHaveLength(1);
+});
+test('unchanged destinations disable commit while selection fill shows actual planned count', async ({ page }) => {
+  const { grid, preview } = await prepare(page);
+  await grid.getByRole('button', { name: '0, 0', exact: true }).click();
+  await page.keyboard.press('Control+v');
+  await expect(preview.getByText('目标数据已相同，无需修改。', { exact: true })).toBeVisible();
+  await expect(preview.getByRole('button', { name: /确认粘贴/ })).toBeDisabled();
+  await grid.getByRole('button', { name: '4, 4', exact: true }).click();
+  await page.keyboard.press('Shift+ArrowRight');
+  await expect(preview.getByText('计划放置 2 条 · 改动 2 格 · 替换 0 个原有物品', { exact: true })).toBeVisible();
+  await expect(grid.locator('.paste-preview')).toHaveCount(2);
+});
+for (const width of [1180, 390]) test(`preview shows offscreen changes and draft warning without page overflow at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
+  const { map, grid, preview } = await prepare(page);
+  await map.getByRole('spinbutton', { name: '高度', exact: true }).fill('3');
+  await page.evaluate(() => Object.assign(window, { nhsePreviewNext: { valid: true, placements: 2, changedCells: 3, replacedItems: 1, cells: [{ x: 4, y: 4 }, { x: 16, y: 4 }, { x: 17, y: 4 }] } }));
+  await grid.focus(); await page.keyboard.press('Control+v');
+  await expect(preview.getByText('另有 2 个改动格位于当前分区视图之外。', { exact: true })).toBeVisible();
+  await expect(preview.getByText(/预览基于已应用数据/)).toBeVisible();
+  await expect.poll(async () => preview.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    const scroller = element.closest('.workspace-content')!.getBoundingClientRect();
+    return rect.top >= scroller.top && rect.bottom <= scroller.bottom;
+  })).toBe(true);
+  await expect(grid.locator('.paste-preview')).toHaveCount(1);
+  await expect(map.getByRole('spinbutton', { name: '高度', exact: true })).toHaveValue('3');
+  expect(await payloads(page, 'pasteGrid')).toHaveLength(0);
+  const dimensions = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
+  expect(dimensions[0]).toBeLessThanOrEqual(dimensions[1]!);
+});

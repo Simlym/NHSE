@@ -10,6 +10,8 @@ internal sealed partial class WorkspaceSession
     internal sealed record GridTarget(string Kind, MapTarget? Map = null, int House = 0, int Room = 0, int Layer = 0,
         int Player = 0, string Container = "pocket", int[]? Slots = null, int Columns = 10);
     internal sealed record GridClipboardInfo(string Kind, int Count, int Width, int Height);
+    internal sealed record GridPastePreview(bool Valid, string? Error, int Placements, int ChangedCells, int ReplacedItems, MapPoint[] Cells);
+    private sealed record GridPastePlan(GridPastePreview Preview, Action Commit);
     private sealed record GridEntry(int X, int Y, byte[] Data);
     private sealed record GridClipboard(GridClipboardInfo Info, GridEntry[] Entries);
     private GridClipboard? GridBuffer;
@@ -106,6 +108,23 @@ internal sealed partial class WorkspaceSession
     public void PasteGrid(GridTarget target, MapPoint anchor, MapPoint[] selection, bool noOverwrite)
     {
         if (target.Kind == "inventory") { ChangeInventoryGrid(target, selection, "paste", anchor); return; }
+        PrepareGridPaste(target, anchor, selection, noOverwrite).Commit();
+    }
+    // Both operations validate and edit independent decoded layers. Only PasteGrid invokes the resulting commit.
+    public GridPastePreview PreviewGridPaste(GridTarget target, MapPoint anchor, MapPoint[] selection, bool noOverwrite)
+    {
+        try { return PrepareGridPaste(target, anchor, selection, noOverwrite).Preview; }
+        catch (ArgumentException ex) { return new(false, ex.Message, 0, 0, 0, []); }
+    }
+    private MapPoint GridPreviewCoordinate(GridTarget target, int x, int y)
+    {
+        if (target.Map is null) return new(x, y);
+        var (offsetX, offsetY) = MapCoordinates(target.Map, 0, 0);
+        return new(x - offsetX, y - offsetY);
+    }
+    private GridPastePlan PrepareGridPaste(GridTarget target, MapPoint anchor, MapPoint[] selection, bool noOverwrite)
+    {
+        if (target.Kind == "inventory") throw new ArgumentException("invalidRequest");
         var buffer = GridBuffer ?? throw new ArgumentException("gridNoClipboard");
         if (buffer.Info.Kind != (target.Kind == "terrain" ? "terrain" : "items")) throw new ArgumentException("gridTypeMismatch");
         var terrain = target.Kind == "terrain" ? ReadTerrainGrid(target) : null;
@@ -120,15 +139,22 @@ internal sealed partial class WorkspaceSession
             : buffer.Entries.Select(e => new GridEntry(origin.X + e.X, origin.Y + e.Y, e.Data)).ToList();
         if (terrain is not null)
         {
+            var before = terrain.DumpAll();
             foreach (var e in entries)
             {
                 if (!terrain.Contains(e.X, e.Y)) throw new ArgumentException("roomPlacementBlocked");
                 terrain.GetTile(e.X, e.Y).CopyFrom(TerrainTile.GetArray(e.Data)[0]);
             }
-            CommitMapPatches([MapPatch(SaveFile.Main.Offsets.LandMakingMap, terrain.DumpAll())]);
-            return;
+            var after = terrain.DumpAll();
+            var changed = Enumerable.Range(0, terrain.Tiles.Length)
+                .Where(i => !before.AsSpan(i * TerrainTile.SIZE, TerrainTile.SIZE).SequenceEqual(after.AsSpan(i * TerrainTile.SIZE, TerrainTile.SIZE)))
+                .Select(i => GridPreviewCoordinate(target, i / terrain.TileInfo.TotalHeight, i % terrain.TileInfo.TotalHeight))
+                .OrderBy(p => p.Y).ThenBy(p => p.X).ToArray();
+            return new(new(true, null, entries.Count, changed.Length, 0, changed),
+                () => CommitMapPatches([MapPatch(SaveFile.Main.Offsets.LandMakingMap, after)]));
         }
         var layer = grid!.Layer;
+        var beforeItems = layer.Tiles.Select(item => item.RawValue).ToArray();
         var planned = new List<(MapPoint Point, Item Item)>();
         var covered = new HashSet<MapPoint>();
         foreach (var entry in entries)
@@ -157,7 +183,10 @@ internal sealed partial class WorkspaceSession
             if (layer.IsOccupied(item, point.X, point.Y) != PlacedItemPermission.NoCollision) throw new ArgumentException("roomPlacementBlocked");
             layer.SetExtensionTiles(item, point.X, point.Y); layer.GetTile(point.X, point.Y).CopyFrom(item);
         }
-        grid.Save();
+        var changedItems = Enumerable.Range(0, layer.Tiles.Length).Where(i => layer.Tiles[i].RawValue != beforeItems[i])
+            .Select(i => GridPreviewCoordinate(target, i / layer.TileInfo.TotalHeight, i % layer.TileInfo.TotalHeight))
+            .OrderBy(p => p.Y).ThenBy(p => p.X).ToArray();
+        return new(new(true, null, planned.Count, changedItems.Length, remove.Count, changedItems), grid.Save);
     }
     public void EditGrid(GridTarget target, MapPoint[] selection, string operation)
     {

@@ -143,6 +143,7 @@ defineExpose({ applyPending });
           ><ArrowRight :size="18" />
         </button>
       </div>
+      <div class="form-actions"><button v-for="tool in ['bulletin', 'visitors']" :key="tool" class="button" :disabled="busy" @click="openTool(tool)">{{ t(tool as 'bulletin' | 'visitors') }}</button></div>
       <button class="button" :disabled="busy" @click="openTool('museum')">{{ t('museum') }}</button>
       <h2 class="world-tools-title">{{ t('designs') }}</h2>
       <div class="world-shortcuts">

@@ -137,6 +137,27 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
         thresholds: [10, 100, 500, 2000, 5000, 0],
       })),
     }));
+    type IslandField = { key: string; type: string; value: string; group: string; min: string; max: string; length: number; choices: string[] | null };
+    let islandRecordStore: Record<string, Record<string, string>> = {};
+    const islandRecords = (section: string, index: number) => {
+      const f = (key: string, type: string, value: string, group: string, min = '', max = '', length = 0, choices: string[] | null = null): IslandField => ({ key, type, value, group, min, max, length, choices });
+      const visitorNames: Record<string, string[]> = {"en": ["None", "Gulliver", "Label", "Saharah", "Wisp", "Mabel", "C.J.", "Flick", "Kicks", "Leif", "Redd", "Gullivarrr"], "jp": ["None", "ジョニー", "ことの", "ローラン", "ゆうたろう", "きぬよ", "ジャスティン", "レックス", "シャンク", "レイジ", "つねきち", "かいぞく"], "de": ["None", "Gulliver", "Minna", "Aziza", "Buhu", "Tina", "Lomeus", "Carlson", "Schubert", "Gerd", "Reiner", "Gullivarrr"], "es": ["None", "Gulliver", "Tili", "Alcatifa", "Buh", "Pili", "CJ", "Kamilo", "Betunio", "Gandulio", "Ladino", "Gullivarrr"], "fr": ["None", "Gulliver", "Tiquette", "Sarah", "Follet", "Layette", "Pollux", "Djason", "Blaise", "Racine", "Rounard", "Gullivarrr"], "it": ["None", "Gulliver", "Beatrice", "Sahara", "Spirideo", "Agostina", "Castorino", "Ivano", "Sciuscià", "Florindo", "Volpolo", "Gullivarrr"], "ko": ["None", "죠니", "고숙이", "사하라", "깨빈", "고순이", "저스틴", "레온", "패트릭", "늘봉", "여욱", "해적"], "zhs": ["None", "吕游", "绵儿", "骆岚", "幽幽", "绢儿", "俞司廷", "龙克斯", "薛革", "然然", "狐利", "海盗"], "zht": ["None", "呂遊", "綿兒", "駱嵐", "幽幽", "絹兒", "俞司廷", "龍克斯", "薛革", "然然", "狐利", "海盜"]};
+      const choices = visitorNames[locale]!;
+      const fields: IslandField[] = section === 'bulletin' ? [
+        f('Date', 'date', index === 0 ? '65535-255-255' : '', 'content'), f('Body', 'text', index === 0 ? '欢迎来到岛屿' : '', 'content', '', '', 239),
+        f('Footer', 'text', '', 'content', '', '', 47), f('PlayerName', 'text', '夏夏', 'author', '', '', 9), f('IslandName', 'text', '忘忧', 'author', '', '', 9),
+        f('PopId', 'number', '0', 'advanced', '0', '18446744073709551615'), f('NsaId', 'number', '0', 'advanced', '0', '18446744073709551615'),
+        f('HandWrite.Image', 'hex', '00'.repeat(30000), 'handwriting', '', '', 60000), f('HandWrite.Palette', 'hex', '00000000', 'handwriting', '', '', 8),
+        f('HandWrite.VerticesNum', 'number', '0', 'handwriting', '0', '4294967295'), f('BuiltDate', 'date', '', 'board'), f('LatestUniqueId', 'number', '0', 'board', '0', '4294967295'),
+        ...Array.from({ length: 30 }, (_, i) => f('IndexTable.' + i, 'number', String(i), 'board', '-2147483648', '2147483647')),
+      ] : [
+        ...Array.from({ length: 7 }, (_, i) => [f('VisitorNPC.' + i, 'number', i === 6 ? '999' : '0', 'day' + i, '-2147483648', '2147483647', 0, choices), f('InitSchedule.' + i, 'number', '0', 'day' + i, '-2147483648', '2147483647', 0, choices), f('IsNormalLive.' + i, 'boolean', 'False', 'day' + i), f('IsBirthdayLive.' + i, 'boolean', 'False', 'day' + i)]).flat(),
+        f('DayWisp', 'number', '-1', 'special', '-2147483648', '2147483647'), f('DayCeleste', 'number', '-1', 'special', '-2147483648', '2147483647'),
+        ...['CreatePos', '_61e631dc'].flatMap(prefix => ['X', 'Y', 'Z'].map(axis => f(prefix + '.' + axis, 'float', prefix === 'CreatePos' && axis === 'X' ? 'NaN' : '0', 'advanced'))),
+        ...Array.from({ length: 14 }, (_, i) => f('_437619d8.' + i, 'boolean', 'False', 'advanced')),
+      ];
+      return { section, index, fields: fields.map(field => ({ ...field, value: islandRecordStore[field.group === 'board' ? 'board' : section + ':' + index]?.[field.key] ?? field.value })), entries: section === 'bulletin' ? Array.from({ length: 30 }, (_, i) => ({ index: i, body: islandRecordStore['bulletin:' + i]?.Body ?? (i === 0 ? '欢迎来到岛屿' : ''), date: islandRecordStore['bulletin:' + i]?.Date ?? (i === 0 ? '65535-255-255' : '') })) : [] };
+    };
     type AdvancedTarget = { kind: string; player: number; resident: number; index: number; container: string };
     let advancedRecords: Record<string, Record<string, string>> = {};
     const advancedKey = (target: AdvancedTarget) => `${target.kind}:${target.player}:${target.resident}:${target.container}:${target.index}`;
@@ -335,6 +356,7 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
         overview: mapImages?.overview ?? avatar, viewport: mapImages?.viewport ?? avatar, itemImage: mapImages?.itemImage ?? null, active: mode === 'items' ? (mapFlags[mapKey(target)] ?? false) : null };
     };
     type Snapshot = {
+      islandRecordStore: typeof islandRecordStore;
       advancedRecords: typeof advancedRecords;
       museumRecords: typeof museumRecords;
       inventoryRecords: typeof inventoryRecords;
@@ -355,6 +377,7 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
       redo: Snapshot[] = [];
     const capture = (): Snapshot =>
       structuredClone({
+        islandRecordStore,
         advancedRecords,
         museumRecords,
         inventoryRecords,
@@ -372,6 +395,7 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
         mapFlags,
       });
     const restore = (value: Snapshot) => {
+      islandRecordStore = value.islandRecordStore;
       advancedRecords = value.advancedRecords;
       museumRecords = value.museumRecords;
       inventoryRecords = value.inventoryRecords;
@@ -559,6 +583,24 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
             }
             if (message.command === 'language') locale = String(p.language);
             if (message.command === 'open' || message.command === 'openRecent') { opened = true; gridClipboard = null; }
+            if (message.command === 'islandRecords') {
+              const controls = window as unknown as { nhseRecordNavigationErrorNext?: boolean };
+              if (controls.nhseRecordNavigationErrorNext) {
+                controls.nhseRecordNavigationErrorNext = false;
+                queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error: 'operationFailed' } }))); return;
+              }
+            }
+            if (message.command === 'setIslandRecords') {
+              const doc = islandRecords(String(p.section), Number(p.index));
+              const changes = doc.fields.filter(f => String((p.values as Record<string, string>)[f.key]) !== f.value);
+              if (changes.length) {
+                remember();
+                for (const field of changes) {
+                  const key = field.group === 'board' ? 'board' : String(p.section) + ':' + p.index;
+                  (islandRecordStore[key] ??= {})[field.key] = String((p.values as Record<string, string>)[field.key]);
+                }
+              }
+            }
             if (message.command === 'setMiscProfile') {
               remember(); Object.assign(players[Number(p.player)]!.misc, Object.fromEntries(Object.entries(p).filter(([key]) => key !== 'player')));
             }
@@ -792,6 +834,8 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
               };
             } else if (message.command === 'advancedData') {
               data = advanced(p.target as AdvancedTarget);
+            } else if (message.command === 'islandRecords') {
+              data = islandRecords(String(p.section), Number(p.index));
             } else if (message.command === 'museum') {
               const controls = window as unknown as { nhseMuseumRawDateNext?: boolean };
               if (controls.nhseMuseumRawDateNext) { museumRecords.entries[7]!.date = '65535-255-255'; controls.nhseMuseumRawDateNext = false; }

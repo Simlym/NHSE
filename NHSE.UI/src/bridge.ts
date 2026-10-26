@@ -264,3 +264,13 @@ export interface MapEditRule { key: string; operator: string; value: string }
 export interface MapBrush { enabled: boolean; radius: number; randomVariation: boolean }
 export interface GridTarget { kind: 'terrain' | 'mapItems' | 'roomItems' | 'inventory'; map?: MapTarget; house?: number; room?: number; layer?: number; player?: number; container?: string; slots?: number[]; columns?: number }
 export interface GridClipboardInfo { kind: 'items' | 'terrain'; count: number; width: number; height: number }
+
+export type IslandRecordSection = 'bulletin' | 'visitors';
+export interface IslandRecordField {
+  key: string; type: 'number' | 'boolean' | 'text' | 'date' | 'float' | 'hex'; value: string;
+  group: string; min: string; max: string; length: number; choices: string[] | null;
+}
+export interface IslandRecordsData {
+  section: IslandRecordSection; index: number; entries: { index: number; body: string; date: string }[];
+  fields: IslandRecordField[];
+}

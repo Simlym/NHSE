@@ -125,7 +125,7 @@ public sealed partial class WorkspaceForm : Form
         catch (Exception ex)
         {
             if (id is not null)
-                Reply(new { id, ok = false, error = ex.Message is "villagerHouseMissing" or "roomPlacementBlocked" or "designFileSize" or "designCapacity" or "designNoFiles" ? ex.Message : ex is ArgumentException ? "invalidRequest" : "operationFailed", detail = ex.Message });
+                Reply(new { id, ok = false, error = ex.Message is "villagerHouseMissing" or "roomPlacementBlocked" or "designFileSize" or "designCapacity" or "designNoFiles" or "recordDateInvalid" or "recordHexInvalid" or "recordFloatInvalid" ? ex.Message : ex is ArgumentException ? "invalidRequest" : "operationFailed", detail = ex.Message });
         }
         finally { if (claimed) HandlingMessage = false; }
     }
@@ -338,6 +338,10 @@ public sealed partial class WorkspaceForm : Form
                 ExportDesignPng(Str(p, "kind"), Int(p, "index"), Int(p, "sheet"), p.GetProperty("palette").GetBoolean());
                 return State();
             case "housing": return RequireSession().GetHousing(Str(p, "kind"), Int(p, "player"), p.TryGetProperty("resident", out var houseResident) ? RequireSession().FindResidentHouse(houseResident.GetInt32()) : Int(p, "index"), Int(p, "room"), Int(p, "layer"), Sprite);
+            case "islandRecords": return RequireSession().GetIslandRecords(Str(p, "section"), Int(p, "index"));
+            case "setIslandRecords":
+                RequireSession().SetIslandRecords(Str(p, "section"), Int(p, "index"),
+                    p.GetProperty("values").Deserialize<Dictionary<string, string>>() ?? throw new ArgumentException("invalidRequest")); return State();
             case "museum": return RequireSession().GetMuseum();
             case "advancedData":
                 return RequireSession().GetAdvanced(p.GetProperty("target").Deserialize<WorkspaceSession.AdvancedTarget>(Json) ?? throw new ArgumentException("invalidRequest"));

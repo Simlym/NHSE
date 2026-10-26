@@ -35,6 +35,7 @@ import { languages, language, setLanguage, t, hasText } from './i18n';
 import VillagerPicker from './VillagerPicker.vue';
 import ResidentsPage from './ResidentsPage.vue';
 import IslandPage from './IslandPage.vue';
+import IslandRecordsPage from './IslandRecordsPage.vue';
 import ProgressPage from './ProgressPage.vue';
 import MiscProfile from './MiscProfile.vue';
 import HousingPage from './HousingPage.vue';
@@ -55,6 +56,8 @@ import {
   type DesignKind,
   type HousingData,
   type MuseumData,
+  type IslandRecordsData,
+  type IslandRecordSection,
   type AdvancedData,
   type ConsoleState,
   type AdvancedTarget,
@@ -79,6 +82,7 @@ type Page =
   | 'inventory'
   | 'villagers'
   | 'island'
+  | 'islandRecords'
   | 'tools'
   | 'progress'
   | 'housing'
@@ -89,6 +93,7 @@ type Page =
   | 'consoleTools';
 const state = ref<State>({ language: 'en', recent: '', session: null, fullScreen: false });
 const page = ref<Page>('overview');
+const navigationPage = computed(() => page.value === 'islandRecords' ? 'island' : page.value);
 const playerIndex = ref(0);
 const container = ref('pocket');
 const inventory = ref<Inventory | null>(null);
@@ -169,6 +174,9 @@ let catalogTarget: 'inventory' | 'housing' | 'map' | 'museum' | 'advanced' = 'in
 const progressPage = ref<InstanceType<typeof ProgressPage> | null>(null);
 const progressData = ref<ProgressData | null>(null);
 const progressSection = ref<ProgressSection>('recipes');
+const islandRecordsPage = ref<InstanceType<typeof IslandRecordsPage> | null>(null);
+const islandRecordsData = ref<IslandRecordsData | null>(null);
+const islandRecordsTarget = ref<{ section: IslandRecordSection; index: number }>({ section: 'bulletin', index: 0 });
 const islandPage = ref<InstanceType<typeof IslandPage> | null>(null);
 const currentPlayer = computed(() => state.value.session?.players.find((p) => p.index === playerIndex.value));
 const currentItem = computed(() => draftItem.value ?? selected.value);
@@ -327,6 +335,16 @@ async function openAdvanced(part: Partial<AdvancedTarget>) {
     advancedTarget.value = data.target; advancedData.value = data; page.value = 'advancedEditor';
   });
 }
+async function loadIslandRecords() {
+  if (state.value.session) islandRecordsData.value = await request<IslandRecordsData>('islandRecords', { ...islandRecordsTarget.value });
+}
+async function navigateIslandRecords(section: IslandRecordSection, index: number) {
+  if (busy.value || !(await applyWorldDrafts())) return;
+  await run(async () => {
+    const data = await request<IslandRecordsData>('islandRecords', { section, index });
+    islandRecordsTarget.value = { section: data.section, index: data.index }; islandRecordsData.value = data;
+  });
+}
 async function loadMuseum() {
   if (state.value.session) museumData.value = await request<MuseumData>('museum');
 }
@@ -411,6 +429,7 @@ async function command(
     if (page.value === 'mapEditor' && name !== 'copyGrid') await loadMap();
     if (page.value === 'designs') await loadDesigns();
     if (page.value === 'museum') await loadMuseum();
+    if (page.value === 'islandRecords') await loadIslandRecords();
     if (page.value === 'advancedEditor') await loadAdvanced();
     if (success) toast(success);
   });
@@ -431,6 +450,7 @@ async function go(destination: Page) {
   if (destination === 'mapEditor') await run(loadMap);
   if (destination === 'designs') await run(loadDesigns);
   if (destination === 'museum') await run(loadMuseum);
+  if (destination === 'islandRecords') await run(loadIslandRecords);
   if (destination === 'advancedEditor') await run(loadAdvanced);
   if (destination === 'consoleTools') await run(loadConsole);
 }
@@ -450,6 +470,7 @@ async function save() {
   await command('save', {}, 'saveSuccess');
 }
 async function applyWorldDrafts() {
+  if (page.value === 'islandRecords' && islandRecordsPage.value && !(await islandRecordsPage.value.applyPending())) return false;
   if (page.value === 'player' && miscProfile.value && !(await miscProfile.value.applyPending())) return false;
   if (page.value === 'advancedEditor' && advancedPage.value && !(await advancedPage.value.applyPending())) return false;
   if (page.value === 'museum' && museumPage.value && !(await museumPage.value.applyPending())) return false;
@@ -464,6 +485,14 @@ async function applyWorldDrafts() {
   return true;
 }
 async function worldCommand(name: string, payload: Record<string, unknown> = {}) {
+  if (name === 'tool' && ['bulletin', 'visitors'].includes(String(payload.tool))) {
+    if (busy.value || !(await applyWorldDrafts())) return false;
+    const section = payload.tool as IslandRecordSection;
+    return await run(async () => {
+      const data = await request<IslandRecordsData>('islandRecords', { section, index: 0 });
+      islandRecordsData.value = data; islandRecordsTarget.value = { section, index: 0 }; page.value = 'islandRecords';
+    });
+  }
   if (name === 'advanced') return await openAdvanced(payload as Partial<AdvancedTarget>);
   if (name === 'tool' && payload.tool === 'museum') { await go('museum'); return page.value === 'museum'; }
   if (name === 'copyGrid') return await command(name, payload, 'gridCopied');
@@ -744,13 +773,13 @@ onUnmounted(() => {
           ><button
             v-for="item in nav"
             :key="item.id"
-            :class="{ active: page === item.id }"
-            :aria-current="page === item.id ? 'page' : undefined"
+            :class="{ active: navigationPage === item.id }"
+            :aria-current="navigationPage === item.id ? 'page' : undefined"
             :disabled="busy"
             @click="go(item.id)"
           >
             <component :is="item.icon" :size="19" />{{ t(item.id)
-            }}<span v-if="page === item.id" class="nav-dot"></span></button
+            }}<span v-if="navigationPage === item.id" class="nav-dot"></span></button
         ></template>
         <button v-else class="active" aria-current="page">
           <LayoutDashboard :size="19" />{{ t('home') }}<span class="nav-dot"></span>
@@ -1189,6 +1218,7 @@ onUnmounted(() => {
         />
         <ConsolePage v-else-if="page === 'consoleTools'" :data="consoleData" :players="state.session.players" :busy="busy" :execute="consoleCommand" />
         <AdvancedPage v-else-if="page === 'advancedEditor'" ref="advancedPage" :data="advancedData" :players="state.session.players" :residents="state.session.residents" :busy="busy" :navigate="navigateAdvanced" :execute="worldCommand" :pick-item="() => showCatalog('advanced')" :item-only="advancedOrigin === 'inventory'" :back="() => go(advancedOrigin ?? 'overview')" />
+        <IslandRecordsPage v-else-if="page === 'islandRecords'" ref="islandRecordsPage" :data="islandRecordsData" :busy="busy" :execute="worldCommand" :navigate="navigateIslandRecords" :back="() => go('island')" />
         <MuseumPage v-else-if="page === 'museum'" ref="museumPage" :data="museumData" :busy="busy" :execute="worldCommand" :pick-item="() => showCatalog('museum')" />
         <HousingPage
           v-else-if="page === 'housing'"

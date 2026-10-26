@@ -125,3 +125,33 @@ test('console repetitions stop on errors and page exit without sending unapprove
   const count = (await messages(page, 'consoleRead')).length;
   await page.waitForTimeout(1200); expect(await messages(page, 'consoleRead')).toHaveLength(count);
 });
+
+test('blocked advanced navigation restores every control to the actual target', async ({ page }) => {
+  await open(page);
+  const kind = page.getByRole('combobox', { name: '编辑类别', exact: true });
+  const player = page.getByRole('combobox', { name: '玩家资料', exact: true });
+  const slot = page.getByRole('spinbutton', { name: '格子', exact: true });
+  await field(page, 'Value').fill('abc');
+  await kind.selectOption('mailbox');
+  await expect(kind).toHaveValue('flagsPlayer');
+  await expect(page.locator('.advanced-fields h2')).toHaveText('玩家事件标记 · #0');
+  await player.selectOption('1'); await expect(player).toHaveValue('0');
+  await slot.fill('9'); await slot.press('Tab'); await expect(slot).toHaveValue('0');
+  expect(await messages(page, 'setAdvanced')).toHaveLength(0);
+  await field(page, 'Value').fill('12'); await kind.selectOption('flagsLand');
+  await expect(kind).toHaveValue('flagsLand');
+  await expect(page.locator('.advanced-target').getByRole('combobox', { name: '玩家资料', exact: true })).toHaveCount(0);
+  expect((await messages(page, 'setAdvanced')).at(-1)).toMatchObject({ target: { kind: 'flagsPlayer', index: 0 }, values: { Value: '12' } });
+});
+
+test('console validation failure keeps the host connection and permits retry', async ({ page }) => {
+  await open(page, '主机工具');
+  await page.getByRole('button', { name: '连接', exact: true }).click();
+  await page.evaluate(() => Object.assign(window, { nhseConsoleValidationNext: true }));
+  await page.getByRole('button', { name: '读取主机背包', exact: true }).click();
+  await expect(page.locator('.console-page [role=status]')).toContainText('已连接');
+  await expect(page.getByRole('button', { name: '读取主机背包', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: '读取主机背包', exact: true }).click();
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled();
+  expect(await messages(page, 'consoleConnect')).toHaveLength(1);
+});

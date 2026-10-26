@@ -29,6 +29,7 @@ internal sealed partial class WorkspaceSession(HorizonSave save)
         residents = GetResidents(getVillagerImage),
         players = SaveFile.Players.Select((p, i) => new
         {
+            misc = GetMiscProfile(p.Personal),
             index = i, name = p.Personal.PlayerName, island = p.Personal.TownName, avatar = getAvatar?.Invoke(i),
             wallet = (uint)p.Personal.Wallet, bank = (uint)p.Personal.Bank,
             miles = (uint)p.Personal.NookMiles, earnedMiles = (uint)p.Personal.TotalNookMiles,

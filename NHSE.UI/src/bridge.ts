@@ -1,4 +1,13 @@
+export interface MiscProfile {
+  month: number;
+  day: number;
+  madeVillage: boolean;
+  timestamp: string;
+  fruit: number;
+  fruits: { id: number; name: string }[];
+}
 export interface Player {
+  misc: MiscProfile;
   index: number;
   name: string;
   island: string;
@@ -177,7 +186,7 @@ export function request<T>(
   });
 }
 
-export type ProgressSection = 'recipes' | 'reactions' | 'achievements';
+export type ProgressSection = 'recipes' | 'reactions' | 'achievements' | 'collection' | 'remakes';
 export interface ProgressEntry {
   index: number;
   name: string;

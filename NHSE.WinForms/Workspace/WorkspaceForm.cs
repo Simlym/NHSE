@@ -373,6 +373,13 @@ public sealed partial class WorkspaceForm : Form
                     p.GetProperty("autoExtensions").GetBoolean(), p.GetProperty("noOverwrite").GetBoolean(), p.GetProperty("delete").GetBoolean());
                 return State();
             case "progress": return RequireSession().GetProgress(Int(p, "player"), Str(p, "section"));
+            case "setMiscProfile":
+                RequireSession().SetMiscProfile(Int(p, "player"), Int(p, "month"), Int(p, "day"),
+                    p.GetProperty("madeVillage").GetBoolean(), Str(p, "timestamp"), Int(p, "fruit")); return State();
+            case "setCollection":
+                RequireSession().SetCollection(Int(p, "player"), Str(p, "section"), Int(p, "index"), p.GetProperty("known").GetBoolean()); return State();
+            case "collectionBatch":
+                RequireSession().CollectionBatch(Int(p, "player"), Str(p, "category"), p.GetProperty("known").GetBoolean(), p.GetProperty("remakeOnly").GetBoolean()); return State();
             case "setRecipe":
                 RequireSession().SetRecipe(Int(p, "player"), Int(p, "index"), p.GetProperty("known").GetBoolean(),
                     p.GetProperty("made").GetBoolean(), p.GetProperty("fresh").GetBoolean(), p.GetProperty("favorite").GetBoolean());

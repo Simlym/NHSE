@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using NHSE.Core;
@@ -14,6 +15,27 @@ internal sealed partial class WorkspaceSession
         object[] entries;
         switch (section)
         {
+            case "collection":
+                entries = Enumerable.Range(0, GameInfo.Strings.itemlistdisplay.Length).Select(i => (object)new
+                {
+                    index = i, name = GameInfo.Strings.itemlistdisplay[i],
+                    known = FlagUtil.GetFlag(p.Data, p.Offsets.ItemCollectBit, i),
+                }).ToArray();
+                break;
+            case "remakes":
+                var inverse = ItemRemakeUtil.GetInvertedDictionary();
+                entries = Enumerable.Range(0, p.Offsets.MaxRemakeBitFlag).Select(i =>
+                {
+                    var remake = (short)(i / ItemRemakeInfo.BodyColorCountMax);
+                    var variant = i % ItemRemakeInfo.BodyColorCountMax;
+                    var itemId = inverse.GetValueOrDefault(remake, (ushort)0);
+                    var name = remake == 652 ? "photo" : GameInfo.Strings.itemlistdisplay[itemId];
+                    if (ItemRemakeInfoData.List.TryGetValue(remake, out var info))
+                        name += $" ({info.GetBodyDescription(variant, GameInfo.Strings)})";
+                    return (object)new { index = i, name = $"{remake:0000} V{variant} · {name}",
+                        known = FlagUtil.GetFlag(p.Data, p.Offsets.ItemRemakeCollectBit, i) };
+                }).ToArray();
+                break;
             case "recipes":
                 var book = p.GetRecipeBook();
                 entries = Enumerable.Range(0, RecipeBook.RecipeCount).Select(i =>
@@ -153,5 +175,90 @@ internal sealed partial class WorkspaceSession
             });
         }
         else throw new ArgumentException("invalidRequest");
+    }
+
+    public void SetCollection(int player, string section, int index, bool known)
+    {
+        var p = Player(player);
+        var max = section switch { "collection" => GameInfo.Strings.itemlistdisplay.Length,
+            "remakes" => p.Offsets.MaxRemakeBitFlag, _ => throw new ArgumentException("invalidRequest") };
+        if ((uint)index >= max) throw new ArgumentException("invalidRequest");
+        EditProgress(player, value => FlagUtil.SetFlag(value.Data,
+            section == "collection" ? value.Offsets.ItemCollectBit : value.Offsets.ItemRemakeCollectBit, index, known));
+    }
+
+    // Match ItemReceivedEditor: bulk categories include valid body variants, with optional variants-only mode.
+    public void CollectionBatch(int player, string category, bool known, bool remakeOnly)
+    {
+        ushort[] indexes;
+        switch (category)
+        {
+            case "bugs": indexes = GameLists.Bugs.ToArray(); break;
+            case "fish": indexes = GameLists.Fish.ToArray(); break;
+            case "art": indexes = GameLists.Art.ToArray(); break;
+            case "dive": indexes = GameLists.Dive.ToArray(); break;
+            case "everything":
+            case "furniture":
+                var clearEverything = category == "everything" && !known;
+                var start = clearEverything ? 0 : 1;
+                indexes = Enumerable.Range(start, GameInfo.Strings.itemlistdisplay.Length - start)
+                    .Where(i => clearEverything ||
+                        (!string.IsNullOrEmpty(GameInfo.Strings.itemlist[i]) && !GameLists.NoCheckReceived.Contains((ushort)i)
+                        && (category != "furniture" || !(GameLists.Bugs.Contains((ushort)i) || GameLists.Fish.Contains((ushort)i)
+                            || GameLists.Art.Contains((ushort)i) || GameLists.Dive.Contains((ushort)i)))))
+                    .Select(i => (ushort)i).ToArray();
+                break;
+            default: throw new ArgumentException("invalidRequest");
+        }
+        EditProgress(player, p =>
+        {
+            foreach (var item in indexes)
+            {
+                if (!remakeOnly) FlagUtil.SetFlag(p.Data, p.Offsets.ItemCollectBit, item, known);
+                var remake = ItemRemakeUtil.GetRemakeIndex(item);
+                if (!ItemRemakeInfoData.List.TryGetValue(remake, out var info)) continue;
+                for (var variant = 0; variant < ItemRemakeInfo.BodyColorCountMax; variant++)
+                {
+                    var index = remake * ItemRemakeInfo.BodyColorCountMax + variant;
+                    if (info.HasBodyColor(variant) && index < p.Offsets.MaxRemakeBitFlag)
+                        FlagUtil.SetFlag(p.Data, p.Offsets.ItemRemakeCollectBit, index, known);
+                }
+            }
+        });
+    }
+
+    private static object GetMiscProfile(Personal p) => new
+    {
+        month = (int)p.Birthday.Month, day = (int)p.Birthday.Day,
+        madeVillage = p.ProfileIsMakeVillage,
+        timestamp = p.ProfileTimestamp.IsEmpty ? "" : p.ProfileTimestamp.ToString(),
+        fruit = (int)p.ProfileFruit,
+        fruits = GameLists.Fruits.ToArray().Select(id => new { id = (int)id, name = GameInfo.Strings.itemlistdisplay[id] }).ToArray(),
+    };
+
+    public void SetMiscProfile(int player, int month, int day, bool madeVillage, string timestamp, int fruit)
+    {
+        var p = Player(player);
+        var birthdayChanged = month != p.Birthday.Month || day != p.Birthday.Day;
+        if (birthdayChanged && (month is < 1 or > 12 || day < 1 || day > DateTime.DaysInMonth(2000, month)))
+            throw new ArgumentException("invalidRequest");
+        if (fruit != p.ProfileFruit && (fruit is < 0 or > ushort.MaxValue || !GameLists.Fruits.Contains((ushort)fruit)))
+            throw new ArgumentException("invalidRequest");
+        var originalDate = p.ProfileTimestamp.IsEmpty ? "" : p.ProfileTimestamp.ToString();
+        var date = p.ProfileTimestamp;
+        if (timestamp != originalDate)
+        {
+            if (timestamp == "") date = default;
+            else if (DateTime.TryParseExact(timestamp, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                date = new GSaveDate { Year = (ushort)dt.Year, Month = (byte)dt.Month, Day = (byte)dt.Day };
+            else throw new ArgumentException("invalidRequest");
+        }
+        EditProgress(player, value =>
+        {
+            if (birthdayChanged) value.Birthday = value.ProfileBirthday = new GSaveDateMD { Month = (byte)month, Day = (byte)day };
+            if (madeVillage != value.ProfileIsMakeVillage) value.ProfileIsMakeVillage = madeVillage;
+            if (fruit != value.ProfileFruit) value.ProfileFruit = (ushort)fruit;
+            if (timestamp != originalDate) value.ProfileTimestamp = date;
+        });
     }
 }

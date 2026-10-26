@@ -36,6 +36,7 @@ import VillagerPicker from './VillagerPicker.vue';
 import ResidentsPage from './ResidentsPage.vue';
 import IslandPage from './IslandPage.vue';
 import ProgressPage from './ProgressPage.vue';
+import MiscProfile from './MiscProfile.vue';
 import HousingPage from './HousingPage.vue';
 import MuseumPage from './MuseumPage.vue';
 import AdvancedPage from './AdvancedPage.vue';
@@ -147,6 +148,7 @@ const fields = ref({
   poki: null as number | null,
 });
 const playerForm = ref<HTMLFormElement | null>(null);
+const miscProfile = ref<InstanceType<typeof MiscProfile> | null>(null);
 const residentsPage = ref<InstanceType<typeof ResidentsPage> | null>(null);
 const designData = ref<DesignData | null>(null);
 const designTarget = ref<{ kind: DesignKind; index: number }>({ kind: 'patterns', index: 0 });
@@ -294,9 +296,16 @@ async function navigateDesigns(kind: DesignKind, index: number) {
 }
 async function loadConsole() { consoleData.value = await request<ConsoleState>('consoleState'); }
 async function consoleCommand(name: string, payload: Record<string, unknown> = {}) {
-  const success = await run(async () => { const data = await request<ConsoleState>(name, payload); consoleData.value = data; accept(data.state); });
-  if (!success && consoleData.value) consoleData.value = { ...consoleData.value, connected: false };
-  return success;
+  return await run(async () => {
+    try {
+      const data = await request<ConsoleState>(name, payload);
+      consoleData.value = data; accept(data.state);
+    } catch (reason) {
+      // Validation need not disconnect the transport; keep controls busy while querying its actual state.
+      try { await loadConsole(); } catch { /* Preserve the operation error and the last confirmed state. */ }
+      throw reason;
+    }
+  });
 }
 async function loadAdvanced() {
   if (state.value.session) advancedData.value = await request<AdvancedData>('advancedData', { target: { ...advancedTarget.value } });
@@ -441,6 +450,7 @@ async function save() {
   await command('save', {}, 'saveSuccess');
 }
 async function applyWorldDrafts() {
+  if (page.value === 'player' && miscProfile.value && !(await miscProfile.value.applyPending())) return false;
   if (page.value === 'advancedEditor' && advancedPage.value && !(await advancedPage.value.applyPending())) return false;
   if (page.value === 'museum' && museumPage.value && !(await museumPage.value.applyPending())) return false;
   if (page.value === 'mapEditor' && mapPage.value && !(await mapPage.value.applyPending())) return false;
@@ -1054,6 +1064,7 @@ onUnmounted(() => {
               </button>
             </div>
           </form>
+          <MiscProfile v-if="currentPlayer" ref="miscProfile" :player="currentPlayer.index" :data="currentPlayer.misc" :busy="busy" :execute="worldCommand" />
         </section>
         <section v-else-if="page === 'inventory'" class="inventory-page">
           <p class="page-description">{{ t('inventoryHint') }}</p>

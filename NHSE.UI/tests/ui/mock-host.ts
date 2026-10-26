@@ -30,6 +30,7 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
         maxStorageCapacity: 5000,
         hotelTickets: null,
         poki: null,
+        misc: { month: 1, day: 1, madeVillage: false, timestamp: '', fruit: 2213, fruits: [{ id: 2213, name: '苹果' }, { id: 2214, name: '橙子' }] },
       },
       {
         index: 1,
@@ -46,6 +47,7 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
         maxStorageCapacity: 5000,
         hotelTickets: null,
         poki: null,
+        misc: { month: 1, day: 1, madeVillage: false, timestamp: '', fruit: 2213, fruits: [{ id: 2213, name: '苹果' }, { id: 2214, name: '橙子' }] },
       },
     ];
     const catalog = Array.from({ length: 240 }, (_, index) => ({
@@ -106,6 +108,8 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
       thresholds?: number[];
     };
     let progressRecords: Record<string, ProgressEntry[]>[] = [0, 1].map(() => ({
+      collection: Array.from({ length: 16000 }, (_, index) => ({ index, name: `Item ${index}`, known: false })),
+      remakes: Array.from({ length: 16000 }, (_, index) => ({ index, name: `Variant ${index}`, known: false })),
       recipes: Array.from({ length: 2048 }, (_, index) => ({
         index,
         name: `Recipe ${index}`,
@@ -446,7 +450,11 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
               }
             }
             if (message.command.startsWith('console')) {
-              const controls = window as unknown as { nhseConsoleErrorNext?: boolean };
+              const controls = window as unknown as { nhseConsoleErrorNext?: boolean; nhseConsoleValidationNext?: boolean };
+              if (controls.nhseConsoleValidationNext && message.command !== 'consoleState') {
+                controls.nhseConsoleValidationNext = false;
+                queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error: 'consoleValidationError' } }))); return;
+              }
               if (controls.nhseConsoleErrorNext) {
                 controls.nhseConsoleErrorNext = false; consoleState.connected = false;
                 queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error: 'consoleConnectionError' } })));
@@ -551,6 +559,18 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
             }
             if (message.command === 'language') locale = String(p.language);
             if (message.command === 'open' || message.command === 'openRecent') { opened = true; gridClipboard = null; }
+            if (message.command === 'setMiscProfile') {
+              remember(); Object.assign(players[Number(p.player)]!.misc, Object.fromEntries(Object.entries(p).filter(([key]) => key !== 'player')));
+            }
+            if (message.command === 'setCollection') {
+              remember(); progressRecords[Number(p.player)]![String(p.section)]![Number(p.index)]!.known = Boolean(p.known);
+            }
+            if (message.command === 'collectionBatch') {
+              remember();
+              const records = progressRecords[Number(p.player)]!;
+              for (const section of p.remakeOnly ? ['remakes'] : ['collection', 'remakes'])
+                for (const entry of records[section]!) entry.known = Boolean(p.known);
+            }
             if (['setRecipe', 'setReaction', 'setAchievement'].includes(message.command)) {
               remember();
               const section = (

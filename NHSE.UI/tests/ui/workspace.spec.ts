@@ -160,7 +160,7 @@ test('player names and island names remain editable with avatar switching and un
   await page.getByRole('textbox', { name: '玩家名字', exact: true }).fill('新玩家');
   await page.getByRole('textbox', { name: '岛屿名称', exact: true }).fill('新岛屿');
   await page.getByRole('spinbutton', { name: '背包容量', exact: true }).fill('32');
-  await page.getByRole('button', { name: '应用修改', exact: true }).click();
+  await page.locator('.balance-form').getByRole('button', { name: '应用修改', exact: true }).click();
   await expect(page.locator('.player-chip').first()).toContainText('新玩家');
   await expect(page.locator('.breadcrumb')).toContainText('新岛屿');
   await page.getByRole('button', { name: '玩家资料 小雨', exact: true }).click();
@@ -176,7 +176,7 @@ test('player names and island names remain editable with avatar switching and un
   await page.getByRole('button', { name: '保存存档', exact: true }).click();
   await expect(page.locator('.player-chip').first()).toContainText('保存时应用');
   await expect(page.locator('.statusbar')).toContainText('修改已保存');
-  await expect(page.locator('.player-card')).toHaveCount(3);
+  await expect(page.locator('.player-card')).toHaveCount(4);
   await expect(page.locator('.player-assets')).toContainText('可用狸端里程');
   await expect(page.locator('.player-capacity')).toContainText('仓库容量');
   await expect(page.locator('.player-apply-help')).toContainText('写入存档文件');

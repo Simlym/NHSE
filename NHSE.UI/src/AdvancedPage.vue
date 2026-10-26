@@ -10,6 +10,7 @@ const kinds = ['flagsPlayer', 'flagsLand', 'flagsResident', 'resident', 'memory'
 const kindNames = computed(() => t('advancedKinds').split('|'));
 const residentKinds = ['flagsResident', 'resident', 'memory', 'wear', 'furniture', 'room'];
 const itemKinds = ['item', 'wear', 'furniture'];
+const playerScoped = computed(() => props.data && ['flagsPlayer', 'mailbox', 'item'].includes(props.data.target.kind) && !(props.data.target.kind === 'item' && props.data.target.container === 'recycle'));
 const query = ref(''), fieldQuery = ref(''), page = ref(0), text = ref('');
 const form = ref<HTMLFormElement | null>(null), dialog = ref<HTMLDialogElement | null>(null);
 const fields = ref<Record<string, string>>({});
@@ -54,7 +55,19 @@ async function applyPending() {
   return await props.execute('setAdvanced', { target: { ...props.data.target }, values: { ...fields.value } });
 }
 async function navigate(part: Partial<AdvancedTarget>) { if (await applyPending()) await props.navigate(part); }
-async function change(event: Event, key: keyof AdvancedTarget) { const input = event.target as HTMLSelectElement; await navigate({ [key]: ['player', 'resident', 'index'].includes(key) ? Number(input.value) : input.value, ...(['kind', 'player', 'resident', 'container'].includes(key) ? { index: 0 } : {}) }); }
+async function change(event: Event, key: keyof AdvancedTarget) {
+  const input = event.target as HTMLSelectElement | HTMLInputElement;
+  const value = input.value;
+  try {
+    if (!input.reportValidity()) return;
+    await navigate({ [key]: ['player', 'resident', 'index'].includes(key) ? Number(value) : value,
+      ...(['kind', 'player', 'resident', 'container'].includes(key) ? { index: 0 } : {}) });
+  } finally {
+    // Native controls change before validation/navigation; reflect the accepted target on every outcome.
+    await nextTick();
+    if (props.data) input.value = String(props.data.target[key]);
+  }
+}
 const confirmation = shallowRef<{ name: string; payload: Record<string, unknown>; title: string } | null>(null);
 async function ask(name: string, payload: Record<string, unknown>, title: string) {
   if (props.busy || !(await applyPending())) return;
@@ -79,7 +92,7 @@ defineExpose({ applyPending, chooseItem });
     <p class="page-description">{{ t('advancedHint') }}</p>
     <div v-if="!itemOnly" class="advanced-target">
       <label>{{ t('advancedSection') }}<select :value="data.target.kind" :disabled="busy" @change="change($event, 'kind')"><option v-for="(kind, i) in kinds" :key="kind" :value="kind">{{ kindNames[i] }}</option></select></label>
-      <label>{{ t('player') }}<select :value="data.target.player" :disabled="busy" @change="change($event, 'player')"><option v-for="player in players" :key="player.index" :value="player.index">{{ player.name }}</option></select></label>
+      <label v-if="playerScoped">{{ t('player') }}<select :value="data.target.player" :disabled="busy" @change="change($event, 'player')"><option v-for="player in players" :key="player.index" :value="player.index">{{ player.name }}</option></select></label>
       <label v-if="residentKinds.includes(data.target.kind)">{{ t('villagers') }}<select :value="data.target.resident" :disabled="busy" @change="change($event, 'resident')"><option v-for="resident in residents" :key="resident.index" :value="resident.index">{{ resident.index }} · {{ resident.name }}</option></select></label>
       <label v-if="data.target.kind === 'item'">{{ t('inventory') }}<select :value="data.target.container" :disabled="busy" @change="change($event, 'container')"><option v-for="container in ['pocket', 'storage', 'recycle']" :key="container" :value="container">{{ t(container as 'pocket' | 'storage' | 'recycle') }}</option></select></label>
     </div>
@@ -99,7 +112,7 @@ defineExpose({ applyPending, chooseItem });
       <section v-if="!itemOnly" class="advanced-browser">
         <label class="search-field"><span class="sr-only">{{ t('advancedSearch') }}</span><input v-model="query" type="search" :placeholder="t('advancedSearch')" :disabled="busy" /></label>
         <p role="status">{{ filtered.length }} · {{ t('page') }} {{ page + 1 }} / {{ pages }}</p>
-        <label>{{ t('slot') }}<input type="number" min="0" :max="data.entries.length - 1" :value="data.target.index" :disabled="busy" @change="($event.target as HTMLInputElement).reportValidity() && navigate({ index: Number(($event.target as HTMLInputElement).value) })" /></label>
+        <label>{{ t('slot') }}<input type="number" min="0" :max="data.entries.length - 1" :value="data.target.index" :disabled="busy" @change="change($event, 'index')" /></label>
         <div class="advanced-list"><button v-for="entry in visible" :key="entry.index" class="advanced-entry" :aria-pressed="entry.index === data.target.index" :disabled="busy || !entry.available" @click="navigate({ index: entry.index })">#{{ entry.index }} · {{ entry.name || t('empty') }}</button></div>
         <div class="form-actions"><button class="button" :disabled="busy || !page" @click="page--">{{ t('previous') }}</button><button class="button" :disabled="busy || page >= pages - 1" @click="page++">{{ t('next') }}</button></div>
       </section>
@@ -121,7 +134,7 @@ defineExpose({ applyPending, chooseItem });
       <textarea v-model="text" rows="7" maxlength="32000" :aria-label="t('advancedTextBatch')" :disabled="busy" spellcheck="false" />
       <button class="button" :disabled="busy || !text.trim()" @click="ask('advancedTextBatch', { target: { ...data!.target }, text }, t('advancedTextBatch'))">{{ t('mapRunBatch') }}</button>
     </details>
-    <dialog v-if="confirmation" ref="dialog" class="modal" :aria-label="confirmation.title" @cancel.prevent="cancel"><h2>{{ confirmation.title }}</h2><p>{{ t('advancedConfirm') }}</p><p>{{ kindNames[kinds.indexOf(data.target.kind)] }} · {{ players.find(p => p.index === data!.target.player)?.name }} · {{ data.target.resident }} · #{{ data.target.index }}</p><div class="form-actions"><button class="button" @click="cancel">{{ t('cancel') }}</button><button class="button primary" @click="confirm">{{ t('apply') }}</button></div></dialog>
+    <dialog v-if="confirmation" ref="dialog" class="modal" :aria-label="confirmation.title" @cancel.prevent="cancel"><h2>{{ confirmation.title }}</h2><p>{{ t('advancedConfirm') }}</p><p>{{ kindNames[kinds.indexOf(data.target.kind)] }}<template v-if="playerScoped"> · {{ players.find(p => p.index === data!.target.player)?.name }}</template><template v-if="residentKinds.includes(data.target.kind)"> · {{ t('villagers') }} #{{ data.target.resident }}</template> · #{{ data.target.index }}</p><div class="form-actions"><button class="button" @click="cancel">{{ t('cancel') }}</button><button class="button primary" @click="confirm">{{ t('apply') }}</button></div></dialog>
   </section>
 </template>
 <style scoped>

@@ -10,18 +10,23 @@ const props = defineProps<{
   execute: (name: string, payload?: Record<string, unknown>) => Promise<boolean>;
   changeSection: (section: ProgressSection) => Promise<void>;
 }>();
-const sections = ['recipes', 'reactions', 'achievements'] as const;
+const sections = ['recipes', 'reactions', 'achievements', 'collection', 'remakes'] as const;
+const collecting = computed(() => props.section === 'collection' || props.section === 'remakes');
+const category = ref('everything'), remakeOnly = ref(false);
+const collectionCategories = ['everything', 'furniture', 'bugs', 'fish', 'art', 'dive'];
 const labels = {
   recipes: 'progressRecipes',
   reactions: 'progressReactions',
   achievements: 'progressAchievements',
+  collection: 'progressCollection',
+  remakes: 'progressRemakes',
 } as const;
 const selected = ref(0);
 const query = ref('');
 const page = ref(0);
 const form = ref<HTMLFormElement | null>(null);
 const dialog = ref<HTMLDialogElement | null>(null);
-const confirmation = ref<{ action: string; index: number } | null>(null);
+const confirmation = ref<{ action: string; index: number; category?: string; remakeOnly?: boolean; known?: boolean } | null>(null);
 const entry = computed(() => props.data?.entries.find((e) => e.index === selected.value));
 function values(e?: ProgressEntry) {
   return {
@@ -81,12 +86,17 @@ async function applyPending() {
     read: [...fields.value.read],
   };
   return await props.execute(
-    { recipes: 'setRecipe', reactions: 'setReaction', achievements: 'setAchievement' }[props.section],
-    payload,
+    { recipes: 'setRecipe', reactions: 'setReaction', achievements: 'setAchievement', collection: 'setCollection', remakes: 'setCollection' }[props.section],
+    { ...payload, section: props.section },
   );
 }
 async function select(index: number) {
   if (await applyPending()) selected.value = index;
+}
+async function collectionBatch(known: boolean) {
+  if (!(await applyPending())) return;
+  confirmation.value = { action: 'collectionBatch', index: -1, category: category.value, remakeOnly: remakeOnly.value, known };
+  await nextTick(); dialog.value?.showModal();
 }
 async function batch(action: string, index = -1) {
   if (!(await applyPending())) return;
@@ -103,7 +113,7 @@ function cancel() {
 async function confirm() {
   const operation = confirmation.value;
   cancel();
-  if (operation) await props.execute('progressBatch', { section: props.section, ...operation });
+  if (operation) await props.execute(operation.action === 'collectionBatch' ? 'collectionBatch' : 'progressBatch', { section: props.section, ...operation });
 }
 defineExpose({ applyPending });
 </script>
@@ -143,6 +153,12 @@ defineExpose({ applyPending });
           {{ t('progressClearAll') }}
         </button>
       </template>
+      <template v-else-if="collecting">
+        <label>{{ t('collectionScope') }}<select v-model="category" :disabled="busy"><option v-for="(id, i) in collectionCategories" :key="id" :value="id">{{ t('collectionCategories').split('|')[i] }}</option></select></label>
+        <label><input v-model="remakeOnly" type="checkbox" :disabled="busy" />{{ t('collectionVariantsOnly') }}</label>
+        <button class="button" :disabled="busy || !data" @click="collectionBatch(true)">{{ t('collectionMark') }}</button>
+        <button class="button" :disabled="busy || !data" @click="collectionBatch(false)">{{ t('collectionClear') }}</button>
+      </template>
       <template v-else>
         <button class="button" :disabled="busy || !data" @click="batch('complete')">
           {{ t('progressCompleteAll') }}
@@ -152,6 +168,7 @@ defineExpose({ applyPending });
         </button>
       </template>
     </div>
+    <p v-if="collecting" class="field-help">{{ t('collectionHint') }}</p>
     <p v-if="section === 'reactions'" class="field-help">{{ t('progressReactionHint') }}</p>
     <div class="progress-layout">
       <div class="progress-browser">
@@ -180,8 +197,8 @@ defineExpose({ applyPending });
               ></small
             >
             <span>{{ row.name }}</span>
-            <small v-if="section === 'recipes'">{{
-              t(row.known ? 'progressKnown' : 'progressUnknown')
+            <small v-if="section === 'recipes' || collecting">{{
+              t(collecting ? (row.known ? 'collectionKnown' : 'collectionUnknown') : (row.known ? 'progressKnown' : 'progressUnknown'))
             }}</small>
             <small v-if="section === 'achievements'">{{ row.count }}</small>
           </button>
@@ -225,6 +242,9 @@ defineExpose({ applyPending });
           <label v-if="!entry.wheel"
             ><input v-model="fields.fresh" type="checkbox" :disabled="busy" />{{ t('progressNew') }}</label
           >
+        </div>
+        <div v-else-if="collecting" class="progress-flags">
+          <label><input v-model="fields.known" type="checkbox" :disabled="busy" />{{ t('collectionKnown') }}</label>
         </div>
         <div v-else class="progress-fields">
           <label
@@ -287,6 +307,7 @@ defineExpose({ applyPending });
     >
       <h2>{{ t('progressBatchTitle') }}</h2>
       <p>{{ t('progressBatchHint') }}</p>
+      <p v-if="confirmation.action === 'collectionBatch'" class="collection-confirm">{{ t('collectionScope') }}: {{ t('collectionCategories').split('|')[collectionCategories.indexOf(confirmation.category!)] }} · {{ t(confirmation.known ? 'collectionMark' : 'collectionClear') }} · {{ t(confirmation.remakeOnly ? 'collectionVariantsOnly' : 'collectionWithVariants') }}</p>
       <div class="form-actions">
         <button class="button" @click="cancel">{{ t('cancel') }}</button
         ><button class="button primary" @click="confirm">{{ t('apply') }}</button>
@@ -303,6 +324,10 @@ defineExpose({ applyPending });
   gap: 0.5rem;
   margin-block: 1rem;
 }
+.progress-batch { align-items: center; }
+.progress-batch label { display: flex; align-items: center; gap: .5rem; }
+.progress-batch input[type=checkbox] { width: auto; }
+.progress-batch select { max-width: 100%; padding: .5rem; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: .5rem; }
 .progress-layout {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(260px, 1fr);

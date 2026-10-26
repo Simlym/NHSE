@@ -1057,6 +1057,109 @@ Check(museumSave.Players[0].Personal.Data.SequenceEqual(museumPersonalBefore) &&
 museumSession.Save(); var museumReload = new HorizonSave(provider);
 Check(new WorkspaceSession(museumReload).ExportMuseum().SequenceEqual(completedMuseum) && !museumReload.GetInvalidHashes().Any(), "museum edits survive encrypted save/reload with valid hashes");
 CompletionChecks.Run(provider, originalSave);
+// Catalogue/profile UI adapters use existing personal accessors and preserve unrelated bytes.
+var catalogueSave = new HorizonSave(provider);
+var catalogue = new WorkspaceSession(catalogueSave);
+var cataloguePlayer = catalogueSave.Players[0].Personal;
+var catalogueOther = catalogueSave.Players[1].Personal.Data.ToArray();
+var catalogueMain = catalogueSave.Main.Data.ToArray();
+var catalogueBefore = cataloguePlayer.Data.ToArray();
+var collectionRows = System.Text.Json.JsonSerializer.SerializeToElement(catalogue.GetProgress(0, "collection")).GetProperty("entries");
+var variantRows = System.Text.Json.JsonSerializer.SerializeToElement(catalogue.GetProgress(0, "remakes")).GetProperty("entries");
+Check(collectionRows.GetArrayLength() == GameInfo.Strings.itemlistdisplay.Length && variantRows.GetArrayLength() == cataloguePlayer.Offsets.MaxRemakeBitFlag,
+    "catalogue exposes full item and remake capacities without mutating either file");
+Check(cataloguePlayer.Data.SequenceEqual(catalogueBefore) && !catalogue.IsDirty, "catalogue query is read only");
+var lastCollection = collectionRows.GetArrayLength() - 1;
+var lastVariant = variantRows.GetArrayLength() - 1;
+var collectOffset = cataloguePlayer.Offsets.ItemCollectBit;
+var variantOffset = cataloguePlayer.Offsets.ItemRemakeCollectBit;
+var oldCollected = FlagUtil.GetFlag(cataloguePlayer.Data, collectOffset, lastCollection);
+catalogue.SetCollection(0, "collection", lastCollection, !oldCollected);
+Check(FlagUtil.GetFlag(cataloguePlayer.Data, collectOffset, lastCollection) == !oldCollected, "individual catalogue edits reach the final flag");
+catalogue.Undo(); Check(cataloguePlayer.Data.SequenceEqual(catalogueBefore), "individual catalogue undo is byte exact");
+var oldVariant = FlagUtil.GetFlag(cataloguePlayer.Data, variantOffset, lastVariant);
+catalogue.SetCollection(0, "remakes", lastVariant, !oldVariant);
+Check(FlagUtil.GetFlag(cataloguePlayer.Data, variantOffset, lastVariant) == !oldVariant, "individual remake editing reaches even unmapped raw flags");
+catalogue.Undo();
+catalogue.SetCollection(0, "collection", lastCollection, oldCollected);
+Check(!catalogue.IsDirty, "unchanged catalogue flags create no history");
+ExpectInvalid(() => catalogue.SetCollection(0, "collection", lastCollection + 1, true));
+ExpectInvalid(() => catalogue.SetCollection(0, "remakes", -1, true));
+ExpectInvalid(() => catalogue.SetCollection(0, "bad", 0, true));
+ExpectInvalid(() => catalogue.CollectionBatch(0, "bad", true, false));
+Check(cataloguePlayer.Data.SequenceEqual(catalogueBefore), "invalid catalogue targets reject before writes");
+var sampleRemake = ItemRemakeInfoData.List.Values.First(v => v.Index >= 0 && v.HasBodyColor(0) && v.ItemUniqueID != 0);
+var sampleIndex = sampleRemake.Index * ItemRemakeInfo.BodyColorCountMax;
+catalogue.CollectionBatch(0, "everything", true, true);
+Check(cataloguePlayer.Data.Slice(collectOffset, GameInfo.Strings.itemlistdisplay.Length / 8).SequenceEqual(catalogueBefore.AsSpan(collectOffset, GameInfo.Strings.itemlistdisplay.Length / 8))
+    && FlagUtil.GetFlag(cataloguePlayer.Data, variantOffset, sampleIndex), "variants-only bulk marking leaves item collection flags unchanged");
+catalogue.Undo(); Check(cataloguePlayer.Data.SequenceEqual(catalogueBefore), "all valid variants undo as one operation");
+catalogue.CollectionBatch(0, "everything", false, false);
+var cleanCatalogue = cataloguePlayer.Data.ToArray();
+catalogue.CollectionBatch(0, "furniture", true, false);
+Check(!FlagUtil.GetFlag(cataloguePlayer.Data, collectOffset, GameLists.Bugs[0])
+    && !FlagUtil.GetFlag(cataloguePlayer.Data, collectOffset, GameLists.Fish[0])
+    && !FlagUtil.GetFlag(cataloguePlayer.Data, collectOffset, GameLists.Art[0])
+    && !FlagUtil.GetFlag(cataloguePlayer.Data, collectOffset, GameLists.Dive[0]), "furniture category excludes all four creature/art groups");
+catalogue.Undo(); Check(cataloguePlayer.Data.SequenceEqual(cleanCatalogue), "furniture category is a single reversible batch");
+catalogue.CollectionBatch(0, "bugs", true, false);
+Check(GameLists.Bugs.ToArray().All(id => FlagUtil.GetFlag(cataloguePlayer.Data, collectOffset, id))
+    && !FlagUtil.GetFlag(cataloguePlayer.Data, collectOffset, GameLists.Fish[0]), "creature category marks only its own group");
+catalogue.Undo(); catalogue.Undo();
+Check(cataloguePlayer.Data.SequenceEqual(catalogueBefore), "catalogue history restores all original bytes");
+// Do not normalize untouched odd dates, birthday copies or raw boolean encodings.
+cataloguePlayer.Birthday = new GSaveDateMD { Month = 0, Day = 255 };
+cataloguePlayer.ProfileBirthday = new GSaveDateMD { Month = 4, Day = 9 };
+cataloguePlayer.ProfileTimestamp = new GSaveDate { Year = 65535, Month = 255, Day = 255 };
+cataloguePlayer.Data[cataloguePlayer.Offsets.ProfileIsMakeVillage] = 2;
+var miscBefore = cataloguePlayer.Data.ToArray();
+var newFruit = GameLists.Fruits.ToArray().First(id => id != cataloguePlayer.ProfileFruit);
+catalogue.SetMiscProfile(0, 0, 255, true, "65535-255-255", newFruit);
+Check(cataloguePlayer.Birthday.ToString() == "00-255" && cataloguePlayer.ProfileBirthday.ToString() == "04-09"
+    && cataloguePlayer.ProfileTimestamp.ToString() == "65535-255-255" && cataloguePlayer.Data[cataloguePlayer.Offsets.ProfileIsMakeVillage] == 2,
+    "unrelated profile edits preserve unusual date bytes, separate birthday copy and raw boolean");
+catalogue.Undo(); Check(cataloguePlayer.Data.SequenceEqual(miscBefore), "profile fruit undo preserves unrelated bytes");
+ExpectInvalid(() => catalogue.SetMiscProfile(0, 2, 30, false, "2024-02-29", newFruit));
+ExpectInvalid(() => catalogue.SetMiscProfile(0, 13, 1, false, "2024-02-29", newFruit));
+ExpectInvalid(() => catalogue.SetMiscProfile(0, 2, 29, false, "2023-02-29", newFruit));
+ExpectInvalid(() => catalogue.SetMiscProfile(0, 2, 29, false, "2024-01-01", 65535));
+Check(cataloguePlayer.Data.SequenceEqual(miscBefore), "invalid calendar dates and fruit reject the entire profile edit");
+catalogue.SetMiscProfile(0, 2, 29, false, "2024-02-29", newFruit);
+Check(cataloguePlayer.Birthday.ToString() == "02-29" && cataloguePlayer.ProfileBirthday.ToString() == "02-29"
+    && cataloguePlayer.ProfileTimestamp.ToString() == "2024-02-29" && !cataloguePlayer.ProfileIsMakeVillage, "birthday changes synchronize the passport and accept leap dates");
+var miscAfter = cataloguePlayer.Data.ToArray();
+catalogue.Undo(); Check(cataloguePlayer.Data.SequenceEqual(miscBefore), "all profile fields undo in one byte-exact step");
+catalogue.Redo(); Check(cataloguePlayer.Data.SequenceEqual(miscAfter), "profile redo restores all edited bytes");
+catalogue.SetMiscProfile(0, 2, 29, false, "", newFruit);
+Check(cataloguePlayer.ProfileTimestamp.IsEmpty, "empty profile date clears the date using the native empty value");
+catalogue.Undo();
+catalogue.SetMiscProfile(0, 2, 29, false, "0001-01-01", newFruit);
+Check(cataloguePlayer.ProfileTimestamp.ToString() == "0001-01-01", "minimum valid calendar date does not become the empty-date sentinel");
+catalogue.Undo();
+catalogue.SetCollection(0, "collection", lastCollection, !oldCollected);
+Check(catalogueSave.Main.Data.SequenceEqual(catalogueMain) && catalogueSave.Players[1].Personal.Data.SequenceEqual(catalogueOther),
+    "catalogue and profile edits are isolated to the selected player");
+catalogue.Save(); var catalogueReload = new HorizonSave(provider);
+Check(catalogueReload.Players[0].Personal.Birthday.ToString() == "02-29"
+    && catalogueReload.Players[0].Personal.ProfileTimestamp.ToString() == "2024-02-29"
+    && FlagUtil.GetFlag(catalogueReload.Players[0].Personal.Data, collectOffset, lastCollection) == !oldCollected
+    && !catalogueReload.GetInvalidHashes().Any(), "catalogue and profile changes survive encrypted save/reload with valid hashes");
+
+var oldCatalogue = new WorkspaceSession(originalSave);
+var oldCatalogueBefore = originalPersonal.Data.ToArray();
+var oldRemakeLast = originalPersonal.Offsets.MaxRemakeBitFlag - 1;
+var oldRemakeFlag = FlagUtil.GetFlag(originalPersonal.Data, originalPersonal.Offsets.ItemRemakeCollectBit, oldRemakeLast);
+oldCatalogue.SetCollection(0, "remakes", oldRemakeLast, !oldRemakeFlag);
+oldCatalogue.SetMiscProfile(0, 12, 31, true, "2024-12-31", GameLists.Fruits[0]);
+Check(originalPersonal.Birthday.ToString() == "12-31" && originalPersonal.ProfileBirthday.ToString() == "12-31"
+    && FlagUtil.GetFlag(originalPersonal.Data, originalPersonal.Offsets.ItemRemakeCollectBit, oldRemakeLast) == !oldRemakeFlag,
+    "original save format uses its own catalogue and profile offsets");
+oldCatalogue.Undo(); oldCatalogue.Undo();
+Check(originalPersonal.Data.SequenceEqual(oldCatalogueBefore), "original catalogue and profile undo preserve every personal byte");
+oldCatalogue.Redo(); oldCatalogue.Redo(); oldCatalogue.Save();
+var oldCatalogueReload = new HorizonSave(originalProvider);
+Check(oldCatalogueReload.Players[0].Personal.ProfileTimestamp.ToString() == "2024-12-31" && !oldCatalogueReload.GetInvalidHashes().Any(),
+    "original catalogue and profile edits survive encrypted reload with valid hashes");
 Console.WriteLine("All workspace integration checks passed.");
 if (args.Length == 2 && args[0] == "--fixture") provider.Export(args[1]);
 

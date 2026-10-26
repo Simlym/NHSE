@@ -6,6 +6,8 @@ using NHSE.Core;
 using NHSE.WinForms;
 using NHSE.Villagers;
 
+if (args.Length == 1 && args[0] == "--images-only") { ImageLibraryChecks.Run(); return; }
+
 // All files below are synthetic and remain in memory. No user save is touched.
 var provider = new MemoryProvider();
 var revision = new FileHeaderInfo { Major = 0x80009, Minor = 0x80085, Unk1 = 2, Unk2 = 2, SaveRevision = 30 };
@@ -1162,6 +1164,7 @@ Check(oldCatalogueReload.Players[0].Personal.ProfileTimestamp.ToString() == "202
     "original catalogue and profile edits survive encrypted reload with valid hashes");
 IslandRecordsChecks.Run(provider, originalProvider);
 UtilityChecks.Run(provider, originalProvider);
+ImageLibraryChecks.Run();
 Console.WriteLine("All workspace integration checks passed.");
 if (args.Length == 2 && args[0] == "--fixture") provider.Export(args[1]);
 

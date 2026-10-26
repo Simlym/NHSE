@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { defineAsyncComponent, computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
   ArrowRight,
   Check,
@@ -9,6 +9,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   FolderOpen,
+  Download,
   Globe2,
   HelpCircle,
   LayoutDashboard,
@@ -33,23 +34,12 @@ import {
 } from '@lucide/vue';
 import { languages, language, setLanguage, t, hasText } from './i18n';
 import VillagerPicker from './VillagerPicker.vue';
-import ResidentsPage from './ResidentsPage.vue';
-import IslandPage from './IslandPage.vue';
-import IslandRecordsPage from './IslandRecordsPage.vue';
-import SettingsPage from './SettingsPage.vue';
-import UtilityTools from './UtilityTools.vue';
-import ProgressPage from './ProgressPage.vue';
-import MiscProfile from './MiscProfile.vue';
-import HousingPage from './HousingPage.vue';
-import MuseumPage from './MuseumPage.vue';
-import AdvancedPage from './AdvancedPage.vue';
-import ConsolePage from './ConsolePage.vue';
-import DesignPage from './DesignPage.vue';
 import { editableTarget } from './gridSelection';
-import MapPage from './MapPage.vue';
 import InventoryGrid from './InventoryGrid.vue';
 import {
   listenState,
+  listenImageLibrary,
+  type ImageLibraryState,
   native,
   request,
   type MapData,
@@ -74,6 +64,21 @@ import {
   type Player,
   type State,
 } from './bridge';
+
+const ResidentsPage = defineAsyncComponent(() => import('./ResidentsPage.vue'));
+const IslandPage = defineAsyncComponent(() => import('./IslandPage.vue'));
+const IslandRecordsPage = defineAsyncComponent(() => import('./IslandRecordsPage.vue'));
+const SettingsPage = defineAsyncComponent(() => import('./SettingsPage.vue'));
+const UtilityTools = defineAsyncComponent(() => import('./UtilityTools.vue'));
+const ImageLibraryTools = defineAsyncComponent(() => import('./ImageLibraryTools.vue'));
+const ProgressPage = defineAsyncComponent(() => import('./ProgressPage.vue'));
+const MiscProfile = defineAsyncComponent(() => import('./MiscProfile.vue'));
+const HousingPage = defineAsyncComponent(() => import('./HousingPage.vue'));
+const MuseumPage = defineAsyncComponent(() => import('./MuseumPage.vue'));
+const AdvancedPage = defineAsyncComponent(() => import('./AdvancedPage.vue'));
+const ConsolePage = defineAsyncComponent(() => import('./ConsolePage.vue'));
+const DesignPage = defineAsyncComponent(() => import('./DesignPage.vue'));
+const MapPage = defineAsyncComponent(() => import('./MapPage.vue'));
 
 function stepText(number: number, suffix: 'Title' | 'Body') {
   return t(('step' + number + suffix) as Parameters<typeof t>[0]);
@@ -157,6 +162,8 @@ const fields = ref({
   poki: null as number | null,
 });
 const settingsPage = ref<InstanceType<typeof SettingsPage> | null>(null);
+const imageLibrary = ref<ImageLibraryState | null>(null);
+const imagesRunning = computed(() => ['downloading', 'extracting', 'installing', 'cancelling'].includes(imageLibrary.value?.phase ?? ''));
 const utilityHashes = ref<UtilityHashes | null>(null);
 const playerForm = ref<HTMLFormElement | null>(null);
 const miscProfile = ref<InstanceType<typeof MiscProfile> | null>(null);
@@ -272,6 +279,10 @@ async function run(action: () => Promise<void>) {
   } finally {
     busy.value = false;
   }
+}
+async function loadImageLibrary() { imageLibrary.value = await request<ImageLibraryState>('imageLibrary'); }
+async function imageCommand(name: string, payload: Record<string, unknown> = {}) {
+  return await run(async () => { imageLibrary.value = await request<ImageLibraryState>(name, payload); });
 }
 async function loadMap() {
   if (state.value.session) mapData.value = await request<MapData>('map', { target: { ...mapTarget.value } });
@@ -458,6 +469,7 @@ async function go(destination: Page) {
   if (destination === 'tools') utilityHashes.value = null;
   page.value = destination;
   if (destination === 'advancedEditor') advancedOrigin.value = null;
+  if (destination === 'tools' || destination === 'settings') await run(loadImageLibrary);
   if (destination === 'inventory') await run(() => loadInventory(0));
   if (destination === 'progress') await run(loadProgress);
   if (destination === 'housing') await run(loadHousing);
@@ -758,6 +770,7 @@ watch(
   },
 );
 listenState(accept);
+listenImageLibrary(data => { imageLibrary.value = data; });
 onMounted(async () => {
   window.addEventListener('keydown', keyboard);
   await run(async () => accept(await request<State>('bootstrap')));
@@ -836,6 +849,7 @@ onUnmounted(() => {
               <option value="dark">{{ t('dark') }}</option>
             </select></label
           >
+          <button v-if="imagesRunning" class="icon-button" :aria-label="t('imagesBusy')" :title="t('imagesBusy')" :disabled="busy" @click="go(state.session ? 'tools' : 'settings')"><Download :size="18" /></button>
           <button v-if="!state.villagerPicker" class="icon-button" :aria-label="t('settings')" :title="t('settings')" :disabled="busy" @click="go('settings')"><SlidersHorizontal :size="19" /></button>
           <button
             class="icon-button"
@@ -863,6 +877,7 @@ onUnmounted(() => {
       </div>
       <main v-if="page === 'settings'" class="workspace-content"><h1>{{ t('settings') }}</h1>
         <SettingsPage v-if="state.preferences" ref="settingsPage" :data="state.preferences" :busy="busy" :execute="(payload) => command('setPreferences', payload, 'preferencesSaved')" :back="() => go('overview')" />
+        <ImageLibraryTools :data="imageLibrary" :busy="busy" :execute="imageCommand" />
       </main>
       <main v-else-if="!state.session" class="home-content">
         <section class="welcome">
@@ -1228,7 +1243,7 @@ onUnmounted(() => {
             </aside>
           </div>
         </section>
-        <MapPage :clipboard="state.session?.clipboard ?? null" v-else-if="page === 'mapEditor'" ref="mapPage" :data="mapData" :busy="busy"
+        <MapPage :clipboard="state.session?.clipboard ?? null" v-else-if="page === 'mapEditor'" ref="mapPage" :dirty="state.session.dirty" :data="mapData" :busy="busy"
           :loading="mapNavigating" :execute="worldCommand" :navigate="navigateMap" :pick-item="() => showCatalog('map')" />
         <DesignPage
           v-else-if="page === 'designs'"
@@ -1279,6 +1294,7 @@ onUnmounted(() => {
         />
         <section v-else class="tools-page">
           <UtilityTools :players="state.session.players" :busy="busy" :hashes="utilityHashes" :execute="worldCommand" />
+          <ImageLibraryTools :data="imageLibrary" :busy="busy" :execute="imageCommand" />
           <h2>{{ t('toolsTitle') }}</h2>
           <p class="page-description">{{ t('toolsHint') }}</p>
           <div class="task-grid">

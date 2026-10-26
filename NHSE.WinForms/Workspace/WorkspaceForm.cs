@@ -119,7 +119,7 @@ public sealed partial class WorkspaceForm : Form
             // Yield so the page can paint its progress state before native dialogs / save work.
             await Task.Yield();
             if (IsDisposed) return;
-            object? data = Dispatch(command, payload, e);
+            object? data = command == "imageSourceSize" ? await ImageSourceSizeAsync(Int(payload, "source")) : Dispatch(command, payload, e);
             Reply(new { id, ok = true, data });
         }
         catch (Exception ex)
@@ -174,6 +174,9 @@ public sealed partial class WorkspaceForm : Form
     {
         switch (command)
         {
+            case "imageLibrary": return ImageLibraryState();
+            case "imageStart": return StartImageLibrary(Int(p, "source"));
+            case "imageCancel": return CancelImageLibrary();
             case "bootstrap":
                 var argument = StartupPath;
                 StartupPath = null;
@@ -540,10 +543,14 @@ public sealed partial class WorkspaceForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        try { if (!ConfirmLeave()) e.Cancel = true; }
+        try { if (!ImageCloseApproved && !ConfirmLeave()) e.Cancel = true; }
         catch (Exception ex) { e.Cancel = true; MessageBox.Show(this, ex.Message, WorkspaceText.Get("operationFailed")); }
         Program.SaveSettings();
-        if (!e.Cancel) DisconnectConsole();
+        if (!e.Cancel && ImageTask is { IsCompleted: false })
+        {
+            e.Cancel = true; Browser.Enabled = false; ImageCancellation?.Cancel(); _ = CloseAfterImagesAsync();
+        }
+        if (!e.Cancel) { DisconnectConsole(); ImageCancellation?.Dispose(); }
         base.OnFormClosing(e);
     }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { MousePointer2, Hand, Paintbrush, ZoomIn, ZoomOut, Maximize, Grid2X2, Layers, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Compass, SlidersHorizontal, Package, Building2, Mountain, Flag, Search } from '@lucide/vue';
 import { t } from './i18n';
 import type { MapData, MapTarget, ItemView, MapBrush, GridClipboardInfo, GridTarget } from './bridge';
@@ -7,10 +7,10 @@ import HousingFields from './HousingFields.vue';
 import MapTools from './MapTools.vue';
 import MapAdvanced from './MapAdvanced.vue';
 import GridToolbar from './GridToolbar.vue';
-import { useGridSelection, pointKey } from './gridSelection';
+import { useGridSelection, pointKey, editableTarget } from './gridSelection';
 import { buildingTypeName } from './mapBuildingLabels';
 const props = defineProps<{
-  data: MapData | null; busy: boolean; loading?: boolean; clipboard: GridClipboardInfo | null;
+  data: MapData | null; dirty?: boolean; busy: boolean; loading?: boolean; clipboard: GridClipboardInfo | null;
   execute: (command: string, payload?: Record<string, unknown>) => Promise<boolean>;
   navigate: (target: Partial<MapTarget>) => Promise<void>; pickItem: () => void;
 }>();
@@ -19,8 +19,17 @@ const modeIcons = [Mountain, Package, Building2, Grid2X2, Flag];
 const handTool = ref(false), showGrid = ref(true), showItems = ref(true), buildingSearch = ref('');
 const zoom = ref(1), canvasBaseSize = ref(480), canvasScroll = ref<HTMLElement | null>(null);
 let canvasObserver: ResizeObserver | null = null;
-const panning = ref(false);
-let panPointer: { id: number; element: HTMLElement; x: number; y: number; left: number; top: number } | null = null;
+const panning = ref(false), spaceHeld = ref(false), canvasHovered = ref(false);
+const camera = ref<{ x: number; y: number } | null>(null);
+const panMode = computed(() => handTool.value || spaceHeld.value);
+const canvasSize = computed(() => canvasBaseSize.value * zoom.value);
+const canvasOffset = computed(() => camera.value && props.data ? {
+  x: (props.data.target.acre % 9 - camera.value.x) * canvasSize.value,
+  y: (Math.floor(props.data.target.acre / 9) - camera.value.y) * canvasSize.value,
+} : { x: 0, y: 0 });
+let panAcre: number | null = null, skipCanvasClickUntil = 0;
+let panPointer: { id: number; element: HTMLElement; x: number; y: number; left: number; top: number;
+  camera: { x: number; y: number } | null; acre: number; size: number; moved: boolean } | null = null;
 watch(canvasScroll, element => {
   canvasObserver?.disconnect();
   if (!element) return;
@@ -28,6 +37,7 @@ watch(canvasScroll, element => {
   canvasObserver.observe(element);
 }, { flush: 'post' });
 async function setZoom(value: number) {
+  cancelPan();
   const element = canvasScroll.value, ratio = Math.max(1, Math.min(4, value)) / zoom.value;
   const x = element ? (element.scrollLeft + element.clientWidth / 2) * ratio - element.clientWidth / 2 : 0;
   const y = element ? (element.scrollTop + element.clientHeight / 2) * ratio - element.clientHeight / 2 : 0;
@@ -35,25 +45,91 @@ async function setZoom(value: number) {
   await nextTick();
   element?.scrollTo({ left: Math.max(0, x), top: Math.max(0, y) });
 }
-async function fitCanvas() { zoom.value = 1; await nextTick(); canvasScroll.value?.scrollTo({ left: 0, top: 0 }); }
+async function fitCanvas() { cancelPan(); camera.value = null; zoom.value = 1; await nextTick(); canvasScroll.value?.scrollTo({ left: 0, top: 0 }); }
 function canvasWheel(event: WheelEvent) { if (event.ctrlKey || event.metaKey) { event.preventDefault(); void setZoom(zoom.value + (event.deltaY < 0 ? .25 : -.25)); } }
 function startPan(event: PointerEvent) {
-  if (!handTool.value || event.button !== 0) return;
+  if (!panPointer) skipCanvasClickUntil = 0;
+  if ((!panMode.value && event.button !== 1) || ![0, 1].includes(event.button) || !props.data || props.busy || panPointer || strokeMeta.value || gridSelection.dragging.value) return;
   const element = canvasScroll.value;
   if (!element) return;
   event.preventDefault(); event.stopPropagation();
-  panPointer = { id: event.pointerId, element, x: event.clientX, y: event.clientY, left: element.scrollLeft, top: element.scrollTop };
-  panning.value = true; element.setPointerCapture(event.pointerId);
+  panPointer = { id: event.pointerId, element, x: event.clientX, y: event.clientY, left: element.scrollLeft, top: element.scrollTop,
+    camera: camera.value && { ...camera.value }, acre: props.data.target.acre, size: canvasSize.value, moved: false };
+  panning.value = true; element.focus({ preventScroll: true }); element.setPointerCapture(event.pointerId);
 }
 function movePan(event: PointerEvent) {
-  if (!panPointer || panPointer.id !== event.pointerId) return;
-  panPointer.element.scrollLeft = panPointer.left + panPointer.x - event.clientX;
-  panPointer.element.scrollTop = panPointer.top + panPointer.y - event.clientY;
+  const p = panPointer;
+  if (!p || p.id !== event.pointerId) return;
+  p.moved ||= Math.hypot(event.clientX - p.x, event.clientY - p.y) > 3;
+  const left = p.left + p.x - event.clientX, top = p.top + p.y - event.clientY;
+  p.element.scrollLeft = left; p.element.scrollTop = top;
+  const dx = left - p.element.scrollLeft, dy = top - p.element.scrollTop;
+  if (p.camera || dx || dy) camera.value = {
+    x: Math.max(0, Math.min(8, (p.camera?.x ?? p.acre % 9) + dx / p.size)),
+    y: Math.max(0, Math.min(7, (p.camera?.y ?? Math.floor(p.acre / 9)) + dy / p.size)),
+  };
 }
-function endPan() {
+function releasePan() {
   const pointer = panPointer; panPointer = null; panning.value = false;
+  if (pointer) skipCanvasClickUntil = performance.now() + 250;
   if (pointer?.element.hasPointerCapture(pointer.id)) pointer.element.releasePointerCapture(pointer.id);
+  return pointer;
 }
+function cancelPan() {
+  const p = releasePan();
+  if (p) { camera.value = p.camera; p.element.scrollTo({ left: p.left, top: p.top }); }
+}
+async function finishPan(event: PointerEvent) {
+  if (!panPointer || panPointer.id !== event.pointerId) return;
+  movePan(event);
+  const p = releasePan();
+  if (!p) return;
+  if (!p.moved) { camera.value = p.camera; p.element.scrollTo({ left: p.left, top: p.top }); return; }
+  const acre = camera.value ? Math.round(camera.value.y) * 9 + Math.round(camera.value.x) : p.acre;
+  if (acre !== p.acre) {
+    panAcre = acre;
+    try {
+      await props.navigate({ acre }); await nextTick();
+      if (props.data?.target.acre !== acre) { camera.value = p.camera; p.element.scrollTo({ left: p.left, top: p.top }); }
+    } finally { panAcre = null; }
+  }
+  if (!handTool.value) canvasScroll.value?.querySelector<HTMLElement>('.map-grid')?.focus({ preventScroll: true });
+}
+function canvasClick(event: MouseEvent) {
+  if (event.detail > 0 && (panning.value || performance.now() < skipCanvasClickUntil)) { event.preventDefault(); event.stopPropagation(); return; }
+  if (!camera.value || panMode.value || props.busy || !props.data || (event.target as Element).closest('.map-grid, .map-building-label')) return;
+  const viewport = canvasScroll.value?.querySelector<HTMLElement>('.map-viewport');
+  const box = viewport?.getBoundingClientRect();
+  if (!box || !viewport) return;
+  const x = props.data.target.acre % 9 + (event.clientX - box.left - viewport.clientLeft) / (box.width - 2 * viewport.clientLeft);
+  const y = Math.floor(props.data.target.acre / 9) + (event.clientY - box.top - viewport.clientTop) / (box.height - 2 * viewport.clientTop);
+  if (x < 0 || x >= 9 || y < 0 || y >= 8) return;
+  const acre = Math.floor(y) * 9 + Math.floor(x), size = props.data.gridSize;
+  if (acre !== props.data.target.acre) {
+    panAcre = acre;
+    void props.navigate({ acre, x: Math.floor((x % 1) * size), y: Math.floor((y % 1) * size) }).finally(() => { panAcre = null; });
+  }
+}
+function canvasKeyboard(event: KeyboardEvent) {
+  if (editableTarget(event.target) || document.querySelector('dialog[open]')) return;
+  if (event.key === 'Escape' && panPointer) { event.preventDefault(); event.stopPropagation(); cancelPan(); return; }
+  if (event.code === 'Space' && (canvasHovered.value || canvasScroll.value?.contains(event.target as Node))) {
+    event.preventDefault(); if (!strokeMeta.value && !gridSelection.dragging.value) spaceHeld.value = true; return;
+  }
+  if (event.ctrlKey || event.metaKey || event.altKey || panPointer || strokeMeta.value || gridSelection.dragging.value) return;
+  const key = event.key.toLowerCase();
+  if (['h', 'v', 'b'].includes(key)) {
+    if (key === 'b' && props.data?.target.mode !== 'terrain') return;
+    event.preventDefault(); setTool(key === 'h' ? 'pan' : key === 'b' ? 'brush' : 'select');
+  }
+}
+function canvasKeyup(event: KeyboardEvent) { if (event.code === 'Space') spaceHeld.value = false; }
+function canvasBlur() { spaceHeld.value = false; cancelPan(); }
+watch(() => [props.data?.target.acre, props.data?.target.mode], ([acre, mode], old) => {
+  if (mode !== old?.[1] || acre !== old?.[0] && acre !== panAcre) camera.value = null;
+});
+onMounted(() => { window.addEventListener('keydown', canvasKeyboard, true); window.addEventListener('keyup', canvasKeyup); window.addEventListener('blur', canvasBlur); });
+
 function moveAcre(dx: number, dy: number) {
   if (!props.data || props.busy) return;
   const x = Math.max(0, Math.min(8, props.data.target.acre % 9 + dx));
@@ -93,6 +169,7 @@ const primaryFields = computed(() => { const data = props.data; return data?.fie
 const advancedFields = computed(() => { const data = props.data; return data?.fields.filter(field => primaryKeys[data.target.mode] && !primaryKeys[data.target.mode]!.includes(field.key)) ?? []; });
 const brush = ref<MapBrush>({ enabled: false, radius: 1, randomVariation: false });
 function setTool(tool: 'select' | 'brush' | 'pan') {
+  cancelPan();
   handTool.value = tool === 'pan';
   if (tool !== 'pan') brush.value.enabled = tool === 'brush';
 }
@@ -205,7 +282,9 @@ const overviewAcre = ref<number | null>(null);
 const overviewOutline = ref<HTMLElement | null>(null);
 let overviewFrame = 0;
 let overviewPointer: { element: HTMLElement; id: number; box: DOMRect; offsetX: number; offsetY: number; x: number; y: number } | null = null;
-const displayedAcre = computed(() => overviewAcre.value ?? props.data?.target.acre ?? 0);
+const displayedAcre = computed(() => overviewAcre.value ?? (camera.value ? Math.round(camera.value.y) * 9 + Math.round(camera.value.x) : props.data?.target.acre ?? 0));
+const overviewPosition = computed(() => overviewAcre.value !== null ? { x: displayedAcre.value % 9, y: Math.floor(displayedAcre.value / 9) }
+  : camera.value ?? { x: displayedAcre.value % 9, y: Math.floor(displayedAcre.value / 9) });
 const acreName = computed(() => props.data?.acres.find(a => a.id === props.data?.target.acre)?.name ?? '');
 function paintOverview() {
   overviewFrame = 0;
@@ -244,8 +323,8 @@ function overviewCancel() {
   const pointer = overviewPointer;
   overviewPointer = null; overviewAcre.value = null;
   if (overviewOutline.value && props.data) {
-    overviewOutline.value.style.left = `${props.data.target.acre % 9 / 9 * 100}%`;
-    overviewOutline.value.style.top = `${Math.floor(props.data.target.acre / 9) / 8 * 100}%`;
+    overviewOutline.value.style.left = `${(camera.value?.x ?? props.data.target.acre % 9) / 9 * 100}%`;
+    overviewOutline.value.style.top = `${(camera.value?.y ?? Math.floor(props.data.target.acre / 9)) / 8 * 100}%`;
   }
   if (pointer?.element.hasPointerCapture(pointer.id)) pointer.element.releasePointerCapture(pointer.id);
 }
@@ -265,7 +344,7 @@ function overviewClick(event: MouseEvent) {
   // Pointer gestures commit on release; keyboard activation keeps the current acre.
   if (event.detail === 0 && !props.busy) void props.navigate({ acre: displayedAcre.value });
 }
-onBeforeUnmount(() => { overviewCancel(); endPan(); canvasObserver?.disconnect(); });
+onBeforeUnmount(() => { overviewCancel(); cancelPan(); canvasObserver?.disconnect(); window.removeEventListener('keydown', canvasKeyboard, true); window.removeEventListener('keyup', canvasKeyup); window.removeEventListener('blur', canvasBlur); });
 defineExpose({ applyPending, chooseItem });
 </script>
 <template>
@@ -286,7 +365,7 @@ defineExpose({ applyPending, chooseItem });
               @pointerdown="overviewDown" @pointermove="overviewMove" @pointerup="overviewUp" @pointercancel="overviewCancel" @lostpointercapture="overviewLostCapture"
               @keydown.esc.prevent.stop="overviewCancel" @dragstart.prevent>
               <img v-if="data.overview" :src="data.overview" alt="" draggable="false" />
-              <span ref="overviewOutline" class="acre-outline" :style="{ left: `${displayedAcre % 9 / 9 * 100}%`, top: `${Math.floor(displayedAcre / 9) / 8 * 100}%` }" />
+              <span ref="overviewOutline" class="acre-outline" :style="{ left: `${overviewPosition.x / 9 * 100}%`, top: `${overviewPosition.y / 8 * 100}%` }" />
             </button>
             <button v-for="pin in data.buildingPins ?? []" :key="pin.id" class="map-building-pin" :disabled="busy"
               :class="{ active: data.target.mode === 'buildings' && data.target.building === pin.id }"
@@ -322,9 +401,9 @@ defineExpose({ applyPending, chooseItem });
       <section class="map-canvas-panel map-panel">
         <div class="canvas-toolbar">
           <div class="canvas-tools" role="group" :aria-label="t('mapCanvasTools')">
-            <button :aria-pressed="!handTool && !brush.enabled" :disabled="selectionBusy" :title="t('mapSelectTool')" :aria-label="t('mapSelectTool')" @click="setTool('select')"><MousePointer2 :size="18" /><span>{{ t('mapSelectTool') }}</span></button>
-            <button v-if="data.target.mode === 'terrain'" :aria-pressed="!handTool && brush.enabled" :disabled="busy || !data.fields.length" :title="t('mapDragBrush')" :aria-label="t('mapDragBrush')" @click="setTool('brush')"><Paintbrush :size="18" /></button>
-            <button :aria-pressed="handTool" :title="t('mapPanTool')" :aria-label="t('mapPanTool')" @click="setTool('pan')"><Hand :size="18" /></button>
+            <button :aria-pressed="!handTool && !brush.enabled" :disabled="selectionBusy" :title="`${t('mapSelectTool')} · V`" :aria-label="t('mapSelectTool')" @click="setTool('select')"><MousePointer2 :size="18" /><span>{{ t('mapSelectTool') }}</span></button>
+            <button v-if="data.target.mode === 'terrain'" :aria-pressed="!handTool && brush.enabled" :disabled="busy || !data.fields.length" :title="`${t('mapDragBrush')} · B`" :aria-label="t('mapDragBrush')" @click="setTool('brush')"><Paintbrush :size="18" /></button>
+            <button :aria-pressed="handTool" :title="`${t('mapPanTool')} · H`" :aria-label="t('mapPanTool')" @click="setTool('pan')"><Hand :size="18" /><span>{{ t('mapPanTool') }}</span></button>
           </div>
           <div class="canvas-display-tools">
             <button :aria-pressed="showGrid" :title="t('mapShowGrid')" :aria-label="t('mapShowGrid')" @click="showGrid = !showGrid"><Grid2X2 :size="17" /></button>
@@ -337,10 +416,11 @@ defineExpose({ applyPending, chooseItem });
             <button :title="t('mapFitView')" :aria-label="t('mapFitView')" @click="fitCanvas"><Maximize :size="17" /></button>
           </div>
         </div>
-        <div ref="canvasScroll" class="map-canvas-scroll" :class="{ 'hand-tool': handTool, panning }"
-          @pointerdown.capture="startPan" @pointermove="movePan" @pointerup="endPan" @pointercancel="endPan" @lostpointercapture="endPan" @wheel="canvasWheel" @keydown.esc="endPan">
+        <div ref="canvasScroll" class="map-canvas-scroll" :class="{ 'hand-tool': panMode, panning }" tabindex="0"
+          @pointerenter="canvasHovered = true" @pointerleave="canvasHovered = false" @pointerdown.capture="startPan" @pointermove="movePan" @pointerup="finishPan" @pointercancel="cancelPan" @lostpointercapture="cancelPan" @click.capture="canvasClick" @auxclick.prevent @wheel="canvasWheel">
           <div class="map-canvas-stage">
-            <div class="map-viewport" :style="{ width: `${canvasBaseSize * zoom}px`, height: `${canvasBaseSize * zoom}px` }">
+            <div v-if="camera && data.overview" class="map-pan-preview" aria-hidden="true"><img :src="data.overview" draggable="false" :style="{ width: `${canvasSize * 9}px`, height: `${canvasSize * 8}px`, left: `calc(50% - ${(camera.x + .5) * canvasSize}px)`, top: `calc(50% - ${(camera.y + .5) * canvasSize}px)` }" /></div>
+            <div class="map-viewport" :style="{ width: `${canvasSize}px`, height: `${canvasSize}px`, transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px)` }">
               <img v-if="data.viewport" :src="data.viewport" alt="" draggable="false" />
               <img v-if="data.itemImage" v-show="showItems" class="map-item-layer" :src="data.itemImage" alt="" draggable="false" />
               <div v-show="showGrid" class="map-grid-lines" :style="{ '--grid-size': ['terrain', 'items'].includes(data.target.mode) ? data.gridSize : 32 }" />
@@ -360,12 +440,12 @@ defineExpose({ applyPending, chooseItem });
             </div>
           </div>
         </div>
-        <div class="canvas-status"><span v-if="['terrain', 'items'].includes(data.target.mode)">X {{ data.target.x }} · Y {{ data.target.y }}</span><span v-else>{{ acreName }}</span><span :class="{ 'loading-view': loading }">{{ loading ? t('mapLoadingView') : t(handTool ? 'mapPanCanvasHint' : brush.enabled ? 'mapBrushCanvasHint' : 'mapCanvasHint') }}</span></div>
+        <div class="canvas-status"><span v-if="['terrain', 'items'].includes(data.target.mode)">X {{ data.target.x }} · Y {{ data.target.y }}</span><span v-else>{{ acreName }}</span><span :class="{ 'loading-view': loading }">{{ loading ? t('mapLoadingView') : t(panMode || panning ? 'mapPanCanvasHint' : brush.enabled ? 'mapBrushCanvasHint' : 'mapCanvasHint') }}</span></div>
         <GridToolbar v-if="['terrain', 'items'].includes(data.target.mode)" :count="gridSelection.selected.value.length" :clipboard="clipboard" :kind="data.target.mode === 'terrain' ? 'terrain' : 'items'" :busy="busy || !!strokeMeta || gridSelection.dragging.value" :action="gridAction" :clear="gridSelection.clear" />
       </section>
 
       <aside class="map-inspector map-panel">
-        <div class="panel-heading"><SlidersHorizontal :size="16" /><h2>{{ t('mapProperties') }}</h2><span class="draft-badge" :class="{ pending }">{{ t(pending ? 'mapDraftPending' : 'mapDraftApplied') }}</span></div>
+        <div class="panel-heading"><SlidersHorizontal :size="16" /><h2>{{ t('mapProperties') }}</h2><span class="draft-badge" :class="{ pending }">{{ t(pending ? 'mapDraftPending' : dirty ? 'mapDraftApplied' : 'saved') }}</span></div>
         <div class="inspector-scroll">
           <div class="selection-card">
             <img v-if="draftItem?.image" :src="draftItem.image" alt="" />
@@ -449,7 +529,9 @@ h3 { font-size: 12px; margin: 0; }
 .canvas-display-tools { margin-right: auto; }
 .canvas-zoom output { min-width: 37px; font-size: 10px; text-align: center; font-variant-numeric: tabular-nums; color: var(--muted); }
 .map-canvas-scroll { flex: 1; min-height: 220px; overflow: auto; background-color: var(--canvas); background-image: radial-gradient(var(--line-strong) .7px, transparent .7px); background-size: 14px 14px; overscroll-behavior: contain; }
-.map-canvas-stage { display: flex; align-items: center; justify-content: center; width: max-content; min-width: 100%; min-height: 100%; padding: 24px; box-sizing: border-box; }
+.map-canvas-stage { position: relative; overflow: clip; display: flex; align-items: center; justify-content: center; width: max-content; min-width: 100%; min-height: 100%; padding: 24px; box-sizing: border-box; }
+.map-pan-preview { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.map-pan-preview img { position: absolute; max-width: none; image-rendering: pixelated; }
 .map-viewport { position: relative; flex: 0 0 auto; border: 1px solid #929a91; isolation: isolate; background: #ffffed; box-shadow: 0 6px 24px #182b1814; }
 .map-viewport img { display: block; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
 .map-viewport img, .map-grid, .map-grid-lines { position: absolute; inset: 0; }

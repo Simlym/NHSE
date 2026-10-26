@@ -142,12 +142,15 @@ declare global {
 export const native = !!window.chrome?.webview;
 let sequence = 0;
 const pending = new Map<string, { resolve(value: unknown): void; reject(reason: Error): void }>();
+let onImageLibrary: (state: ImageLibraryState) => void = () => {};
+export function listenImageLibrary(listener: (state: ImageLibraryState) => void) { onImageLibrary = listener; }
 export let onState: (state: State) => void = () => {};
 export function listenState(listener: (state: State) => void) {
   onState = listener;
 }
 window.chrome?.webview?.addEventListener('message', (event) => {
   const response = event.data;
+  if (response.eventName === 'imageLibrary') { onImageLibrary(response.data as unknown as ImageLibraryState); return; }
   if (response.eventName === 'state') {
     onState(response.data);
     return;
@@ -282,3 +285,9 @@ export interface WorkspacePreferences {
   host: string; port: number; consolePrompted: boolean; pouchOffset: string; genericOffset: string;
 }
 export interface UtilityHashes { dirty: boolean; issues: { file: string; region: string }[] }
+
+export interface ImageLibraryState {
+  sources: { id: number; name: string; url: string }[]; source: number; installed: number; size: number | null;
+  phase: 'idle' | 'downloading' | 'extracting' | 'installing' | 'complete' | 'failed' | 'cancelled' | 'cancelling';
+  received: number; total: number | null; files: number; fileCount: number; error: string | null;
+}

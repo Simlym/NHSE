@@ -25,6 +25,7 @@
     <Compile Include="..\NHSE.WinForms\Workspace\WorkspaceIslandRecords.cs" Link="WorkspaceIslandRecords.cs" />
     <Compile Include="..\NHSE.WinForms\Workspace\WorkspacePreferences.cs" Link="WorkspacePreferences.cs" />
     <Compile Include="..\NHSE.WinForms\Workspace\WorkspaceUtility.cs" Link="WorkspaceUtility.cs" />
+    <Compile Include="..\NHSE.WinForms\Workspace\WorkspaceImageLibrary.cs" Link="WorkspaceImageLibrary.cs" />
     <Compile Include="..\NHSE.WinForms\Workspace\WorkspaceWorld.cs" Link="WorkspaceWorld.cs" />
   </ItemGroup>
 </Project>

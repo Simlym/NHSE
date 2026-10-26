@@ -11,6 +11,13 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
       savedRevision = 0;
     let preferences = { lastFilePath: 'C:\\Example\\Save', automaticBackup: true, backupPrompted: true,
       language: 'zhs', theme: 'system', host: '127.0.0.1', port: 6000, consolePrompted: false, pouchOffset: '00001000', genericOffset: '00000000' };
+    let imageState = { sources: [{ id: 0, name: 'github.com/example/images', url: 'https://example.test/images.zip' }], source: 0, installed: 2, size: null as number | null,
+      phase: 'idle', received: 0, total: null as number | null, files: 0, fileCount: 0, error: null as string | null };
+    Object.assign(window, { nhseImageEmit: (phase: string, error: string | null = null) => {
+      imageState = { ...imageState, phase, error, received: phase === 'downloading' ? 1048576 : imageState.received, files: phase === 'complete' ? 10 : imageState.files,
+        fileCount: phase === 'complete' ? 10 : imageState.fileCount, installed: phase === 'complete' ? 10 : imageState.installed };
+      queueMicrotask(() => listeners.forEach(fn => fn({ data: { eventName: 'imageLibrary', data: structuredClone(imageState) } })));
+    } });
     const avatar =
       'data:image/svg+xml,' +
       encodeURIComponent(
@@ -585,6 +592,9 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
               remember();
               mapRecords[mapKey(p.target as Record<string, unknown>)] = { ...(p.values as Record<string, number>) };
             }
+            if (message.command === 'imageSourceSize') imageState = { ...imageState, size: 2097152 };
+            if (message.command === 'imageStart') imageState = { ...imageState, phase: 'downloading', received: 0, total: (window as unknown as { nhseImagesUnknownTotal?: boolean }).nhseImagesUnknownTotal ? null : 2097152, error: null };
+            if (message.command === 'imageCancel') imageState = { ...imageState, phase: 'cancelled' };
             if (['setPreferences', 'theme', 'language'].includes(message.command)) {
               const controls = window as unknown as { nhsePreferencesErrorNext?: boolean };
               if (controls.nhsePreferencesErrorNext) { controls.nhsePreferencesErrorNext = false;
@@ -855,6 +865,8 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
               };
             } else if (message.command === 'advancedData') {
               data = advanced(p.target as AdvancedTarget);
+            } else if (['imageLibrary', 'imageStart', 'imageCancel', 'imageSourceSize'].includes(message.command)) {
+              data = structuredClone(imageState);
             } else if (message.command === 'verifyHashes') {
               data = { dirty: revision !== savedRevision, issues: revision !== savedRevision ? [{ file: 'main.dat', region: '0x100: (0x104-0x200)' }] : [] };
             } else if (message.command === 'islandRecords') {

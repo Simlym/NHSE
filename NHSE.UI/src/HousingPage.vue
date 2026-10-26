@@ -143,6 +143,10 @@ async function applyPending() {
   if (!(await applyFields())) return false;
   return !pendingTile.value || (await applyTile());
 }
+async function extraHousingFile(name: string) {
+  if (!props.data || props.busy || !(await applyPending())) return;
+  await props.execute(name, { kind: props.data.kind, index: props.data.index });
+}
 async function housingFile(importFile: boolean, roomOnly: boolean) {
   if (!props.data || props.busy || !(await applyPending())) return;
   await props.execute(importFile ? 'housingImport' : 'housingExport', {
@@ -200,6 +204,9 @@ defineExpose({ applyPending, chooseItem });
         <div class="form-actions">
           <button class="button" :disabled="busy" @click="housingFile(true, false)">{{ t('housingImportHouse') }}</button>
           <button class="button" :disabled="busy" @click="housingFile(false, false)">{{ t('housingExportHouse') }}</button>
+          <button class="button" :disabled="busy" @click="extraHousingFile('housingExportAll')">{{ t('housingExportAll') }}</button>
+          <button v-if="data.kind === 'playerHouses'" class="button" :disabled="busy" @click="extraHousingFile('housingImportFlags')">{{ t('housingImportFlags') }}</button>
+          <button v-if="data.kind === 'playerHouses'" class="button" :disabled="busy" @click="extraHousingFile('housingExportFlags')">{{ t('housingExportFlags') }}</button>
           <button v-if="data.room" class="button" :disabled="busy" @click="housingFile(true, true)">{{ t('housingImportRoom') }}</button>
           <button v-if="data.room" class="button" :disabled="busy" @click="housingFile(false, true)">{{ t('housingExportRoom') }}</button>
         </div>

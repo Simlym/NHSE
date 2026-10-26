@@ -63,6 +63,8 @@ export interface IslandSettings {
   tourWeatherSeed: number;
 }
 export interface State {
+  preferences?: WorkspacePreferences;
+  theme?: string;
   language: string;
   recent: string;
   session: Session | null;
@@ -274,3 +276,9 @@ export interface IslandRecordsData {
   section: IslandRecordSection; index: number; entries: { index: number; body: string; date: string }[];
   fields: IslandRecordField[];
 }
+
+export interface WorkspacePreferences {
+  lastFilePath: string; automaticBackup: boolean; backupPrompted: boolean; language: string; theme: string;
+  host: string; port: number; consolePrompted: boolean; pouchOffset: string; genericOffset: string;
+}
+export interface UtilityHashes { dirty: boolean; issues: { file: string; region: string }[] }

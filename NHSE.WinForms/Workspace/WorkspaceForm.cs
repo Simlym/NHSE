@@ -125,7 +125,7 @@ public sealed partial class WorkspaceForm : Form
         catch (Exception ex)
         {
             if (id is not null)
-                Reply(new { id, ok = false, error = ex.Message is "villagerHouseMissing" or "roomPlacementBlocked" or "designFileSize" or "designCapacity" or "designNoFiles" or "recordDateInvalid" or "recordHexInvalid" or "recordFloatInvalid" ? ex.Message : ex is ArgumentException ? "invalidRequest" : "operationFailed", detail = ex.Message });
+                Reply(new { id, ok = false, error = ex.Message is "villagerHouseMissing" or "roomPlacementBlocked" or "designFileSize" or "designCapacity" or "designNoFiles" or "recordDateInvalid" or "recordHexInvalid" or "recordFloatInvalid" or "preferencesInvalid" or "utilityFileSize" or "utilityEncryptedFolder" or "utilityPhotoMissing" ? ex.Message : ex is ArgumentException ? "invalidRequest" : "operationFailed", detail = ex.Message });
         }
         finally { if (claimed) HandlingMessage = false; }
     }
@@ -139,7 +139,7 @@ public sealed partial class WorkspaceForm : Form
     private object State()
     {
         if (Session is not null) Text = Session.SaveFile.GetSaveTitle("NHSE");
-        return new { language = GameInfo.CurrentLanguage, recent = Program.Settings.LastFilePath, session = Session?.Snapshot(PlayerAvatar, VillagerImage), fullScreen = FullScreen,
+        return new { preferences = Preferences(), theme = Preferences().Theme, language = GameInfo.CurrentLanguage, recent = Program.Settings.LastFilePath, session = Session?.Snapshot(PlayerAvatar, VillagerImage), fullScreen = FullScreen,
             villagerPicker = PickerResidents is null ? null : new { index = PickerInitialIndex,
                 residents = PickerResidents.Select((v, i) => new { index = i, id = v.InternalName, name = GameInfo.Strings.GetVillager(v.InternalName), image = VillagerImage(v.InternalName), empty = v.Species >= (byte)VillagerSpecies.non }).ToArray() } };
     }
@@ -182,8 +182,16 @@ public sealed partial class WorkspaceForm : Form
                 return State();
             case "consoleState": case "consoleConnect": case "consoleDisconnect": case "consoleRead": case "consoleWrite": case "consolePocketRead": case "consolePocketWrite":
                 return ConsoleCommand(command, p);
+            case "setPreferences":
+                SavePreferences(p.Deserialize<WorkspacePreferences>(Json) ?? throw new ArgumentException("invalidRequest")); return State();
+            case "theme": SavePreferences(Preferences() with { Theme = Str(p, "theme") }, false); return State();
+            case "verifyHashes": return RequireSession().VerifyHashes();
+            case "utilityExportDecrypted": case "utilityImportDecrypted": DecryptedFiles(command == "utilityImportDecrypted"); return State();
+            case "utilityExportPhoto": ExportPlayerPhoto(Int(p, "player")); return State();
+            case "housingExportAll": ExportAllHouses(Str(p, "kind")); return State();
+            case "housingImportFlags": case "housingExportFlags": HouseFlagsFile(Int(p, "index"), command == "housingImportFlags"); return State();
             case "language":
-                WorkspaceText.SetLanguage(Str(p, "language"));
+                SavePreferences(Preferences() with { Language = Str(p, "language") }, false);
                 return State();
             case "villagerCatalog":
                 var villagers = WorkspaceVillagers.Search(Str(p, "query"), Int(p, "species"), Int(p, "personality"), Int(p, "page"));

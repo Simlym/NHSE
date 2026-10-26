@@ -75,14 +75,19 @@ public sealed class ApplicationSettings
     {
         try
         {
-            var json = JsonSerializer.Serialize(this, JsonOptions);
-            File.WriteAllText(path, json);
+            SaveChecked(path);
         }
         catch
         {
             // Silently fail if we can't save settings
         }
     }
+    // The workspace reports persistence failures; existing callers keep their best-effort Save behavior.
+    public void SaveChecked(string path)
+    {
+        WorkspacePreferences.WriteConfiguration(path, JsonSerializer.Serialize(this, JsonOptions));
+    }
+
 }
 
 /// <summary>

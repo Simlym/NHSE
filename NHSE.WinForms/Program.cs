@@ -55,6 +55,7 @@ internal static class Program
     private static void Main() => Application.Run(new WorkspaceForm());
 
     public static void SaveSettings() => Settings.Save(PathConfig);
+    public static void SaveSettingsChecked(ApplicationSettings settings) => settings.SaveChecked(PathConfig);
 
 
 #if !DEBUG

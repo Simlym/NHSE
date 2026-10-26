@@ -9,6 +9,8 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
       revision = 0,
       nextRevision = 0,
       savedRevision = 0;
+    let preferences = { lastFilePath: 'C:\\Example\\Save', automaticBackup: true, backupPrompted: true,
+      language: 'zhs', theme: 'system', host: '127.0.0.1', port: 6000, consolePrompted: false, pouchOffset: '00001000', genericOffset: '00000000' };
     const avatar =
       'data:image/svg+xml,' +
       encodeURIComponent(
@@ -427,8 +429,10 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
             ],
           }
         : null,
+      preferences: structuredClone({ ...preferences, language: locale }),
+      theme: preferences.theme,
       language: locale,
-      recent: 'C:\\Example\\Save',
+      recent: preferences.lastFilePath,
       fullScreen: false,
       session: opened
         ? {
@@ -581,7 +585,16 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
               remember();
               mapRecords[mapKey(p.target as Record<string, unknown>)] = { ...(p.values as Record<string, number>) };
             }
-            if (message.command === 'language') locale = String(p.language);
+            if (['setPreferences', 'theme', 'language'].includes(message.command)) {
+              const controls = window as unknown as { nhsePreferencesErrorNext?: boolean };
+              if (controls.nhsePreferencesErrorNext) { controls.nhsePreferencesErrorNext = false;
+                queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error: 'operationFailed' } }))); return;
+              }
+              if (message.command === 'theme') preferences.theme = String(p.theme);
+              else if (message.command === 'setPreferences') { Object.assign(preferences, p); preferences.pouchOffset = preferences.pouchOffset.toUpperCase().padStart(8, '0'); preferences.genericOffset = preferences.genericOffset.toUpperCase().padStart(8, '0'); locale = preferences.language; }
+              consoleState.host = preferences.host; consoleState.port = preferences.port;
+            }
+            if (message.command === 'language') { locale = String(p.language); preferences.language = locale; }
             if (message.command === 'open' || message.command === 'openRecent') { opened = true; gridClipboard = null; }
             if (message.command === 'islandRecords') {
               const controls = window as unknown as { nhseRecordNavigationErrorNext?: boolean };
@@ -589,6 +602,14 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
                 controls.nhseRecordNavigationErrorNext = false;
                 queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error: 'operationFailed' } }))); return;
               }
+            }
+            if (['housingImportFlags', 'utilityImportDecrypted'].includes(message.command)) {
+              const controls = window as unknown as { nhseUtilityCancelNext?: boolean; nhseUtilityErrorNext?: boolean };
+              if (controls.nhseUtilityErrorNext) { controls.nhseUtilityErrorNext = false;
+                queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error: 'utilityFileSize' } }))); return;
+              }
+              if (controls.nhseUtilityCancelNext) controls.nhseUtilityCancelNext = false;
+              else { remember(); if (message.command === 'housingImportFlags') housingRecords.houses.playerHouses![Number(p.index)]!['EventFlag.127'] = -32768; else item.quantity = 25; }
             }
             if (message.command === 'setIslandRecords') {
               const doc = islandRecords(String(p.section), Number(p.index));
@@ -834,6 +855,8 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
               };
             } else if (message.command === 'advancedData') {
               data = advanced(p.target as AdvancedTarget);
+            } else if (message.command === 'verifyHashes') {
+              data = { dirty: revision !== savedRevision, issues: revision !== savedRevision ? [{ file: 'main.dat', region: '0x100: (0x104-0x200)' }] : [] };
             } else if (message.command === 'islandRecords') {
               data = islandRecords(String(p.section), Number(p.index));
             } else if (message.command === 'museum') {

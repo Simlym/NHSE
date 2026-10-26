@@ -36,6 +36,8 @@ import VillagerPicker from './VillagerPicker.vue';
 import ResidentsPage from './ResidentsPage.vue';
 import IslandPage from './IslandPage.vue';
 import IslandRecordsPage from './IslandRecordsPage.vue';
+import SettingsPage from './SettingsPage.vue';
+import UtilityTools from './UtilityTools.vue';
 import ProgressPage from './ProgressPage.vue';
 import MiscProfile from './MiscProfile.vue';
 import HousingPage from './HousingPage.vue';
@@ -57,6 +59,7 @@ import {
   type HousingData,
   type MuseumData,
   type IslandRecordsData,
+  type UtilityHashes,
   type IslandRecordSection,
   type AdvancedData,
   type ConsoleState,
@@ -84,6 +87,7 @@ type Page =
   | 'island'
   | 'islandRecords'
   | 'tools'
+  | 'settings'
   | 'progress'
   | 'housing'
   | 'designs'
@@ -152,6 +156,8 @@ const fields = ref({
   hotelTickets: null as number | null,
   poki: null as number | null,
 });
+const settingsPage = ref<InstanceType<typeof SettingsPage> | null>(null);
+const utilityHashes = ref<UtilityHashes | null>(null);
 const playerForm = ref<HTMLFormElement | null>(null);
 const miscProfile = ref<InstanceType<typeof MiscProfile> | null>(null);
 const residentsPage = ref<InstanceType<typeof ResidentsPage> | null>(null);
@@ -230,6 +236,7 @@ function syncFields(player?: Player) {
 function accept(next: State) {
   const previousPlayer = currentPlayer.value;
   state.value = next;
+  if (['system', 'light', 'dark'].includes(next.theme ?? '')) theme.value = next.theme!;
   setLanguage(next.language);
   localStorage.setItem('nhse.language', language.value);
   if (!next.session?.players.some((p) => p.index === playerIndex.value))
@@ -418,6 +425,7 @@ async function command(
   return await run(async () => {
     accept(await request<State>(name, payload));
     // Reopening a save may change the library capacity (50 vs 100 slots).
+    if (['open', 'openRecent', 'closeSave', 'utilityImportDecrypted', 'undo', 'redo', 'save', 'legacy', 'tool'].includes(name)) utilityHashes.value = null;
     if (['open', 'openRecent', 'closeSave'].includes(name))
     {
       designTarget.value = { ...designTarget.value, index: 0 };
@@ -434,6 +442,11 @@ async function command(
     if (success) toast(success);
   });
 }
+async function changePreference(event: Event, key: 'language' | 'theme') {
+  const input = event.target as HTMLSelectElement;
+  try { await command(key, { [key]: input.value }); }
+  finally { input.value = key === 'language' ? language.value : theme.value; }
+}
 async function open(kind: string) {
   await command('open', { kind });
   if (state.value.session) page.value = 'overview';
@@ -442,6 +455,7 @@ async function go(destination: Page) {
   if (busy.value) return;
   if (page.value === 'player' && profilePending.value && !(await applyProfile())) return;
   if (!(await applyWorldDrafts())) return;
+  if (destination === 'tools') utilityHashes.value = null;
   page.value = destination;
   if (destination === 'advancedEditor') advancedOrigin.value = null;
   if (destination === 'inventory') await run(() => loadInventory(0));
@@ -470,6 +484,7 @@ async function save() {
   await command('save', {}, 'saveSuccess');
 }
 async function applyWorldDrafts() {
+  if (page.value === 'settings' && settingsPage.value && !(await settingsPage.value.applyPending())) return false;
   if (page.value === 'islandRecords' && islandRecordsPage.value && !(await islandRecordsPage.value.applyPending())) return false;
   if (page.value === 'player' && miscProfile.value && !(await miscProfile.value.applyPending())) return false;
   if (page.value === 'advancedEditor' && advancedPage.value && !(await advancedPage.value.applyPending())) return false;
@@ -493,6 +508,7 @@ async function worldCommand(name: string, payload: Record<string, unknown> = {})
       islandRecordsData.value = data; islandRecordsTarget.value = { section, index: 0 }; page.value = 'islandRecords';
     });
   }
+  if (name === 'verifyHashes') return await run(async () => { utilityHashes.value = await request<UtilityHashes>(name); });
   if (name === 'advanced') return await openAdvanced(payload as Partial<AdvancedTarget>);
   if (name === 'tool' && payload.tool === 'museum') { await go('museum'); return page.value === 'museum'; }
   if (name === 'copyGrid') return await command(name, payload, 'gridCopied');
@@ -546,7 +562,7 @@ async function worldCommand(name: string, payload: Record<string, unknown> = {})
   return await command(
     name,
     { player: playerIndex.value, ...payload },
-    ['legacy', 'tool', 'nativeMap', 'mapImport', 'mapExport', 'mapPng', 'designImport', 'designExport', 'designPng', 'housingImport', 'housingExport', 'museumImport', 'museumExport', 'advancedImport', 'advancedExport'].includes(name) ? undefined : 'applied',
+    ['legacy', 'tool', 'nativeMap', 'mapImport', 'mapExport', 'mapPng', 'designImport', 'designExport', 'designPng', 'housingImport', 'housingExport', 'museumImport', 'museumExport', 'advancedImport', 'advancedExport', 'housingExportAll', 'housingImportFlags', 'housingExportFlags', 'utilityExportDecrypted', 'utilityImportDecrypted', 'utilityExportPhoto'].includes(name) ? undefined : 'applied',
   );
 }
 function chooseSlot(item: ItemView) {
@@ -665,6 +681,7 @@ function keyboard(event: KeyboardEvent) {
     void command('fullScreen');
     return;
   }
+  if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 's' && page.value === 'settings') { event.preventDefault(); void settingsPage.value?.applyPending(); return; }
   if (!(event.ctrlKey || event.metaKey) || !state.value.session || event.altKey) return;
   if (event.key.toLowerCase() === 's') {
     event.preventDefault();
@@ -806,19 +823,20 @@ onUnmounted(() => {
             ><select
               :value="language"
               :disabled="busy"
-              @change="command('language', { language: ($event.target as HTMLSelectElement).value })"
+              @change="changePreference($event, 'language')"
             >
               <option v-for="[id, name] in languages" :key="id" :value="id">{{ name }}</option>
             </select></label
           >
           <label class="icon-select theme-select"
             ><SunMoon :size="17" /><span class="sr-only">{{ t('theme') }}</span
-            ><select v-model="theme">
+            ><select :value="theme" :disabled="busy" @change="changePreference($event, 'theme')">
               <option value="system">{{ t('system') }}</option>
               <option value="light">{{ t('light') }}</option>
               <option value="dark">{{ t('dark') }}</option>
             </select></label
           >
+          <button v-if="!state.villagerPicker" class="icon-button" :aria-label="t('settings')" :title="t('settings')" :disabled="busy" @click="go('settings')"><SlidersHorizontal :size="19" /></button>
           <button
             class="icon-button"
             :aria-label="state.fullScreen ? t('exitFullScreen') : t('fullScreen')"
@@ -843,7 +861,10 @@ onUnmounted(() => {
           <X :size="18" />
         </button>
       </div>
-      <main v-if="!state.session" class="home-content">
+      <main v-if="page === 'settings'" class="workspace-content"><h1>{{ t('settings') }}</h1>
+        <SettingsPage v-if="state.preferences" ref="settingsPage" :data="state.preferences" :busy="busy" :execute="(payload) => command('setPreferences', payload, 'preferencesSaved')" :back="() => go('overview')" />
+      </main>
+      <main v-else-if="!state.session" class="home-content">
         <section class="welcome">
           <div class="welcome-copy">
             <div class="eyebrow"><span></span>{{ t('homeEyebrow') }}</div>
@@ -1257,6 +1278,7 @@ onUnmounted(() => {
           :execute="worldCommand"
         />
         <section v-else class="tools-page">
+          <UtilityTools :players="state.session.players" :busy="busy" :hashes="utilityHashes" :execute="worldCommand" />
           <h2>{{ t('toolsTitle') }}</h2>
           <p class="page-description">{{ t('toolsHint') }}</p>
           <div class="task-grid">
@@ -1273,7 +1295,7 @@ onUnmounted(() => {
                 tool.id === 'villagers'
                   ? go('villagers')
                   : tool.id === 'map'
-                    ? go('island')
+                    ? go('mapEditor')
                     : worldCommand('legacy', { section: tool.id })
               "
             >

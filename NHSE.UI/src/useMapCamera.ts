@@ -61,6 +61,8 @@ export function useMapCamera(options: {
     if (!view || epoch !== mountedEpoch || view.scope !== options.scope()) return;
     options.zoom.value = view.zoom; options.camera.value = view.camera && { ...view.camera };
     await nextTick();
+    // Restore scroll after the container's initial ResizeObserver measurement has reached layout.
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     if (epoch === mountedEpoch) options.element.value?.scrollTo({ left: view.left, top: view.top });
   }
   return { setZoom, fitCanvas, canvasWheel, rememberView, restoreView };

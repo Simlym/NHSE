@@ -66,3 +66,22 @@ test('island overview uses a read-only modal and keyboard acre navigation', asyn
   await expect(dialog).not.toBeVisible(); await expect(map.getByRole('combobox', { name: '分区', exact: true })).toHaveValue('11');
   expect(await payloads(page, 'editMap')).toHaveLength(0);
 });
+test('returning to the map restores the same zoom and world view, and reopening clears session view state', async ({ page }) => {
+  const map = await openMap(page);
+  await map.getByRole('button', { name: '放大画布', exact: true }).click();
+  await map.getByRole('button', { name: '放大画布', exact: true }).click();
+  const center = () => page.locator('.map-canvas-scroll').evaluate(element => {
+    const frame = element.getBoundingClientRect(), viewport = element.querySelector<HTMLElement>('.map-viewport')!, box = viewport.getBoundingClientRect();
+    return { x: (frame.left + element.clientWidth / 2 - box.left - viewport.clientLeft) / viewport.clientWidth, y: (frame.top + element.clientHeight / 2 - box.top - viewport.clientTop) / viewport.clientHeight };
+  });
+  const before = await center();
+  await page.locator('.sidebar nav').getByRole('button', { name: '岛屿概览', exact: true }).click();
+  await page.locator('.sidebar nav').getByRole('button', { name: '地图与建筑', exact: true }).click();
+  await expect(map.locator('.canvas-zoom output')).toHaveText('150%');
+  await expect.poll(async () => Math.abs((await center()).x - before.x)).toBeLessThan(.02);
+  await expect.poll(async () => Math.abs((await center()).y - before.y)).toBeLessThan(.02);
+  await page.getByRole('button', { name: '关闭存档', exact: true }).click();
+  await page.getByRole('button', { name: '打开存档', exact: true }).click();
+  await page.locator('.sidebar nav').getByRole('button', { name: '地图与建筑', exact: true }).click();
+  await expect(map.locator('.canvas-zoom output')).toHaveText('100%');
+});

@@ -15,6 +15,7 @@ export function useGridSelection(options: {
   let anchor: GridPoint | null = null, start: GridPoint | null = null;
   let pointerId = -1, grid: HTMLElement | null = null, before: GridPoint[] = [];
   let additive = false, toggle = false, last: GridPoint | null = null, skipClickUntil = 0;
+  let cancelledClick = false;
   let queued: { name: 'copyGrid' | 'pasteGrid' | 'delete' | 'rotate'; scope: string }[] = [];
   let flushing = false;
   const actionBusy = () => options.actionBusy?.() ?? options.busy();
@@ -61,6 +62,7 @@ export function useGridSelection(options: {
   function keysBefore() { return new Set(before.map(pointKey)); }
   function down(event: PointerEvent) {
     if (options.busy() || dragging.value || event.button !== 0) return;
+    cancelledClick = false;
     grid = event.currentTarget as HTMLElement;
     const point = at(event); if (!point) { grid = null; return; }
     event.preventDefault();
@@ -77,7 +79,10 @@ export function useGridSelection(options: {
     dragging.value = false; grid = null; pointerId = -1; start = null; last = null;
     if (element?.hasPointerCapture(id)) element.releasePointerCapture(id);
   }
-  function cancel() { if (dragging.value) selected.value = before.map(p => ({ ...p })); release(); }
+  function cancel() {
+    if (dragging.value) { selected.value = before.map(p => ({ ...p })); cancelledClick = true; }
+    release();
+  }
   async function up(event: PointerEvent) {
     if (!dragging.value || event.pointerId !== pointerId) return;
     const point = at(event); if (point) preview(point);
@@ -87,6 +92,8 @@ export function useGridSelection(options: {
     if (active) await options.activate({ ...active });
   }
   async function click(event: MouseEvent, point: GridPoint) {
+    // A cancelled gesture must not turn its later mouse release into a fresh selection.
+    if (event.detail > 0 && cancelledClick) { cancelledClick = false; return; }
     if (options.busy() || (event.detail > 0 && performance.now() < skipClickUntil)) return;
     if (event.shiftKey && anchor) selected.value = rectangle(anchor, point);
     else if (event.ctrlKey || event.metaKey) selected.value = keys.value.has(pointKey(point)) ? selected.value.filter(p => pointKey(p) !== pointKey(point)) : [...selected.value, { ...point }];

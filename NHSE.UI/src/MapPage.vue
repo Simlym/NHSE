@@ -26,6 +26,7 @@ const showNavigator = ref(true), showInspector = ref(true);
 function toggleFocus() { const focus = showNavigator.value || showInspector.value; showNavigator.value = !focus; showInspector.value = !focus; }
 const zoom = ref(1), canvasBaseSize = ref(480), canvasScroll = ref<HTMLElement | null>(null);
 let canvasObserver: ResizeObserver | null = null;
+let canvasResizeFrame = 0;
 const panning = ref(false), spaceHeld = ref(false), canvasHovered = ref(false);
 const camera = ref<{ x: number; y: number } | null>(null);
 const panMode = computed(() => handTool.value || spaceHeld.value);
@@ -39,8 +40,14 @@ let panPointer: { id: number; element: HTMLElement; x: number; y: number; left: 
   camera: { x: number; y: number } | null; acre: number; size: number; moved: boolean } | null = null;
 watch(canvasScroll, element => {
   canvasObserver?.disconnect();
+  cancelAnimationFrame(canvasResizeFrame);
   if (!element) return;
-  canvasObserver = new ResizeObserver(() => { canvasBaseSize.value = Math.max(160, Math.min(element.clientWidth, element.clientHeight) - 48); });
+  canvasObserver = new ResizeObserver(() => {
+    cancelAnimationFrame(canvasResizeFrame);
+    canvasResizeFrame = requestAnimationFrame(() => {
+      if (element.isConnected) canvasBaseSize.value = Math.max(160, Math.min(element.clientWidth, element.clientHeight) - 48);
+    });
+  });
   canvasObserver.observe(element);
 }, { flush: 'post' });
 const { setZoom, fitCanvas, canvasWheel, rememberView, restoreView } = useMapCamera({
@@ -476,7 +483,7 @@ function overviewClick(event: MouseEvent) {
   // Pointer gestures commit on release; keyboard activation keeps the current acre.
   if (event.detail === 0 && !props.busy) void props.navigate({ acre: displayedAcre.value });
 }
-onBeforeUnmount(() => { closePastePreview(false); overviewCancel(); cancelPan(); rememberView(); canvasObserver?.disconnect(); window.removeEventListener('keydown', canvasKeyboard, true); window.removeEventListener('keyup', canvasKeyup); window.removeEventListener('blur', canvasBlur); });
+onBeforeUnmount(() => { closePastePreview(false); overviewCancel(); cancelPan(); rememberView(); canvasObserver?.disconnect(); cancelAnimationFrame(canvasResizeFrame); window.removeEventListener('keydown', canvasKeyboard, true); window.removeEventListener('keyup', canvasKeyup); window.removeEventListener('blur', canvasBlur); });
 defineExpose({ applyPending, chooseItem, hasPending, resetDraft });
 </script>
 <template>

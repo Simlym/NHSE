@@ -4,6 +4,8 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
   await page.addInitScript(({ picker, mapImages }) => {
     const messages: string[] = [];
     const listeners: ((event: { data: unknown }) => void)[] = [];
+    let sessionGeneration = 0;
+    let currentAction: { command: string; scope: string } | null = null, nextAction: { command: string; scope: string } | null = null;
     let opened = false,
       locale = 'zhs',
       revision = 0,
@@ -368,10 +370,15 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
         fieldObjects: [{ id: 60000, name: 'Tree' }],
         fields: names.map(name => ({ key: 'Map.' + name, value: values['Map.' + name] ?? 0, type: 'number', min: name === 'Bit' ? -128 : 0, max: 65535, options: name === 'UnitModel' ? [{ id: 0, name: 'Base' }, { id: 21, name: 'River8A' }, { id: 17, name: 'River5B' }, { id: 11, name: 'River3B' }, { id: 12, name: 'River3C' }, { id: 20, name: 'River7A' }, { id: 42, name: 'Cliff5B' }, { id: 33, name: 'Cliff3B' }, { id: 34, name: 'Cliff3C' }, { id: 45, name: 'Cliff7A' }] : null })),
         parameters: ['ItemId', 'SystemParam', 'AdditionalParam', 'FreeParam', 'Rotation', 'RawValue', 'IsDropped', 'ExtensionX', 'IsRoot'].map(key => ({ key, type: ['IsDropped', 'IsRoot'].includes(key) ? 'boolean' : 'number', min: key === 'FreeParam' ? '-2147483648' : '0', max: key === 'RawValue' ? '18446744073709551615' : '65535', writable: !['ExtensionX', 'IsRoot'].includes(key) })),
-        cells: Array.from({ length: gridSize ** 2 }, (_, i) => ({ x: i % gridSize, y: Math.floor(i / gridSize), relativeX: i % gridSize, relativeY: Math.floor(i / gridSize), valid: true, extension: false, rootX: 0, rootY: 0, name: '' })),
+        cells: Array.from({ length: gridSize ** 2 }, (_, i) => {
+          const x = i % gridSize, y = Math.floor(i / gridSize), cell = mapRecords[mapKey({ ...target, x, y })];
+          return { x, y, relativeX: x, relativeY: y, valid: true, extension: false, rootX: x, rootY: y,
+            name: mode === 'items' && cell && cell['Map.ItemId'] !== undefined && cell['Map.ItemId'] !== 65534 ? '物品 ' + cell['Map.ItemId'] : '' };
+        }),
         overview: mapImages?.overview ?? avatar, viewport: mapImages?.viewport ?? avatar, itemImage: mapImages?.itemImage ?? null, active: mode === 'items' ? (mapFlags[mapKey(target)] ?? false) : null };
     };
     type Snapshot = {
+      action: typeof currentAction;
       islandRecordStore: typeof islandRecordStore;
       advancedRecords: typeof advancedRecords;
       museumRecords: typeof museumRecords;
@@ -393,6 +400,7 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
       redo: Snapshot[] = [];
     const capture = (): Snapshot =>
       structuredClone({
+        action: currentAction,
         islandRecordStore,
         advancedRecords,
         museumRecords,
@@ -411,6 +419,7 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
         mapFlags,
       });
     const restore = (value: Snapshot) => {
+      currentAction = value.action;
       islandRecordStore = value.islandRecordStore;
       advancedRecords = value.advancedRecords;
       museumRecords = value.museumRecords;
@@ -430,6 +439,7 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
     };
     const remember = () => {
       history.push(capture());
+      currentAction = nextAction;
       redo.length = 0;
       revision = ++nextRevision;
     };
@@ -450,6 +460,9 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
       fullScreen: false,
       session: opened
         ? {
+            id: 'session-' + sessionGeneration,
+            undoAction: history.length ? currentAction : null,
+            redoAction: redo.at(-1)?.action ?? null,
             title: 'NHSE - Test',
             island: players[0]!.island,
             dirty: revision !== savedRevision,
@@ -474,6 +487,10 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
               structuredClone(message),
             );
             const p = message.payload;
+            const scopeTarget = (p.target ?? p) as Record<string, unknown>;
+            const scopes = ['player', 'resident', 'acre', 'index', 'room', 'layer'].filter(key => Number.isInteger(scopeTarget[key])).map(key => `${key}=${scopeTarget[key]}`);
+            if (Array.isArray(p.selection)) scopes.push(`cells=${p.selection.length}`);
+            nextAction = { command: message.command, scope: scopes.join(';') };
             let data: unknown;
             if (['setAdvanced', 'advancedTextBatch', 'advancedImport', 'residentBatch'].includes(message.command)) {
               const controls = window as unknown as { nhseAdvancedCancelNext?: boolean; nhseAdvancedErrorNext?: string };
@@ -531,6 +548,49 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
                   museumRecords.entries.forEach((entry, index) => { entry.index = index; });
                 } else for (const entry of museumRecords.entries.slice(1, 5)) Object.assign(entry, { name: '木材', date: '2024-03-01', player: 0, item: { itemId: 1000, systemParam: 0, additionalParam: 0, freeParam: 0 } });
               }
+            }
+            if (['previewMoveMap', 'previewPlaceMap', 'moveMap', 'placeMap'].includes(message.command)) {
+              const target = p.target as Record<string, unknown>, gridTarget = { kind: 'mapItems', map: target };
+              const moving = message.command.endsWith('MoveMap') || message.command === 'moveMap';
+              const source = moving ? (p.selection as GridPoint[]).filter(point => gridRead(gridTarget, point).itemId !== 65534) : [];
+              const anchor = p.anchor as GridPoint | undefined;
+              const minimum = source.length ? { x: Math.min(...source.map(point => point.x)), y: Math.min(...source.map(point => point.y)) } : { x: 0, y: 0 };
+              const entries = moving ? source.map(point => ({ x: anchor!.x + point.x - minimum.x, y: anchor!.y + point.y - minimum.y, values: gridRead(gridTarget, point) }))
+                : [{ x: Number(target.x), y: Number(target.y), values: p.current as Record<string, number> }];
+              const conflicts = entries.filter(entry => entry.x < 0 || entry.x >= 32 || entry.y < 0 || entry.y >= 32 || p.noOverwrite && gridRead(gridTarget, entry).itemId !== 65534 && !source.some(point => point.x === entry.x && point.y === entry.y)).map(({ x, y }) => ({ x, y }));
+              const controls = window as unknown as { nhseInteractionPreviewNext?: { valid: boolean; error?: string; placements: number; changedCells: number; replacedItems: number; cells: GridPoint[]; conflicts?: GridPoint[] }; nhseDelayInteractionPreview?: number };
+              const result = controls.nhseInteractionPreviewNext ?? { valid: conflicts.length === 0 && entries.length > 0, error: conflicts.length ? 'roomPlacementBlocked' : entries.length ? null : 'gridEmptyCopy', placements: entries.length, changedCells: conflicts.length ? 0 : entries.length + source.length, replacedItems: 0,
+                cells: conflicts.length ? [] : [...source, ...entries.map(({ x, y }) => ({ x, y }))], placedCells: conflicts.length ? [] : entries.map(({ x, y }) => ({ x, y })), clearedCells: conflicts.length ? [] : source, conflicts };
+              if (message.command.startsWith('preview')) {
+                controls.nhseInteractionPreviewNext = undefined;
+                const response = structuredClone({ id: message.id, ok: true, data: result });
+                const delay = controls.nhseDelayInteractionPreview ?? 0; controls.nhseDelayInteractionPreview = undefined;
+                if (delay) setTimeout(() => listeners.forEach(fn => fn({ data: response })), delay);
+                else queueMicrotask(() => listeners.forEach(fn => fn({ data: response })));
+                return;
+              }
+              if (!result.valid) { queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: false, error: result.error } }))); return; }
+              remember();
+              for (const point of source) gridWrite(gridTarget, point, { itemId: 65534, systemParam: 0, additionalParam: 0, freeParam: 0 });
+              for (const entry of entries) gridWrite(gridTarget, entry, entry.values);
+            }
+            if (message.command === 'mapBrushMask') {
+              const masks = Array.from({ length: 8 }, (_, i) => {
+                const radius = i + 1, offsets: GridPoint[] = [];
+                for (let x = -radius; x < radius; x++) for (let y = -radius; y < radius; y++) {
+                  if (radius === 1 ? x === 0 && y === 0 : x * x + y * y < radius * radius / 2) offsets.push({ x, y });
+                }
+                return { radius, offsets };
+              });
+              queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: true, data: masks } })));
+              return;
+            }
+            if (['previewBatchMap', 'previewMapParameters', 'previewReplaceMapMatches'].includes(message.command)) {
+              const controls = window as unknown as { nhseBatchPreviewNext?: { valid: boolean; error?: string; placements: number; changedCells: number; replacedItems: number; cells: GridPoint[] } };
+              const preview = controls.nhseBatchPreviewNext ?? { valid: true, placements: 2, changedCells: 2, replacedItems: 1, cells: [{ x: 1, y: 1 }, { x: 2, y: 1 }], conflicts: [] };
+              controls.nhseBatchPreviewNext = undefined;
+              queueMicrotask(() => listeners.forEach(fn => fn({ data: { id: message.id, ok: true, data: structuredClone(preview) } })));
+              return;
             }
             if (message.command === 'previewGridPaste') {
               const target = p.target as GridTarget, selection = p.selection as GridPoint[], anchor = p.anchor as GridPoint;
@@ -632,7 +692,7 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
               consoleState.host = preferences.host; consoleState.port = preferences.port;
             }
             if (message.command === 'language') { locale = String(p.language); preferences.language = locale; }
-            if (message.command === 'open' || message.command === 'openRecent') { opened = true; gridClipboard = null; }
+            if (message.command === 'open' || message.command === 'openRecent') { opened = true; sessionGeneration++; gridClipboard = null; }
             if (message.command === 'islandRecords') {
               const controls = window as unknown as { nhseRecordNavigationErrorNext?: boolean };
               if (controls.nhseRecordNavigationErrorNext) {
@@ -835,7 +895,6 @@ export async function mockHost(page: Page, picker = false, mapImages?: { overvie
               remember();
               Object.assign(
                 islandSettings,
-                turnips,
                 Object.fromEntries(Object.entries(p).filter(([key]) => key !== 'player')),
               );
             }

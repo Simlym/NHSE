@@ -88,20 +88,36 @@ internal sealed partial class WorkspaceSession
     }
     private MapEditCount ApplyMapRootEdits(MapTarget target, LayerFieldItem layer, List<(int X, int Y, Item Before, Item After)> edits, int requested)
     {
+        var prepared = PrepareMapRootEdits(target, layer, edits, requested);
+        prepared.Plan.Commit(); return prepared.Count;
+    }
+    private (GridPastePlan Plan, MapEditCount Count) PrepareMapRootEdits(MapTarget target, LayerFieldItem layer, List<(int X, int Y, Item Before, Item After)> edits, int requested)
+    {
+        var before = layer.Tiles.Select(item => item.RawValue).ToArray();
         edits = edits.Where(e => e.Before.RawValue != e.After.RawValue).ToList();
         foreach (var e in edits) ValidateMapItem(e.After);
         foreach (var e in edits) { ClearMapOwnedExtensions(layer, e.X, e.Y, e.Before); layer.GetTile(e.X, e.Y).Delete(); }
         foreach (var e in edits)
         {
             if (e.After.IsNone) continue;
-            if (layer.IsOccupied(e.After, e.X, e.Y) != PlacedItemPermission.NoCollision) throw new ArgumentException("roomPlacementBlocked");
+            if (layer.IsOccupied(e.After, e.X, e.Y) != PlacedItemPermission.NoCollision) throw new GridPlacementException(PlacementConflicts(layer, e.After, e.X, e.Y));
             layer.SetExtensionTiles(e.After, e.X, e.Y);
             layer.GetTile(e.X, e.Y).CopyFrom(e.After);
         }
-        CommitMapItems(target, layer);
-        return new(requested, edits.Count);
+        var preview = ItemLayerPreview(new("mapItems", target), layer, before, requested, edits.Count);
+        return (new(preview, () => CommitMapItems(target, layer)), new(requested, edits.Count));
     }
     public MapEditCount EditMapParameters(MapTarget target, bool whole, MapEditRule[] filters, MapEditRule[] changes)
+    {
+        var prepared = PrepareMapParameters(target, whole, filters, changes);
+        prepared.Plan.Commit(); return prepared.Count;
+    }
+    public GridPastePreview PreviewMapParameters(MapTarget target, bool whole, MapEditRule[] filters, MapEditRule[] changes)
+    {
+        try { return PrepareMapParameters(target, whole, filters, changes).Plan.Preview; }
+        catch (ArgumentException error) { return PreviewFailure(new("mapItems", target), error); }
+    }
+    private (GridPastePlan Plan, MapEditCount Count) PrepareMapParameters(MapTarget target, bool whole, MapEditRule[] filters, MapEditRule[] changes)
     {
         if (filters.Length > 32 || changes.Length is < 1 or > 32) throw new ArgumentException("mapInvalidRule");
         var f = filters.Select(r => CheckMapRule(r, false)).ToArray();
@@ -119,9 +135,19 @@ internal sealed partial class WorkspaceSession
             foreach (var (p, value) in c) p.SetValue(next, value);
             edits.Add((root.X, root.Y, new(root.Item.RawValue), next));
         }
-        return ApplyMapRootEdits(target, layer, edits, roots.Count);
+        return PrepareMapRootEdits(target, layer, edits, roots.Count);
     }
     public MapEditCount ReplaceMapMatches(MapTarget target, bool whole, RoomItem replacement, bool remove)
+    {
+        var prepared = PrepareReplaceMapMatches(target, whole, replacement, remove);
+        prepared.Plan.Commit(); return prepared.Count;
+    }
+    public GridPastePreview PreviewReplaceMapMatches(MapTarget target, bool whole, RoomItem replacement, bool remove)
+    {
+        try { return PrepareReplaceMapMatches(target, whole, replacement, remove).Plan.Preview; }
+        catch (ArgumentException error) { return PreviewFailure(new("mapItems", target), error); }
+    }
+    private (GridPastePlan Plan, MapEditCount Count) PrepareReplaceMapMatches(MapTarget target, bool whole, RoomItem replacement, bool remove)
     {
         var layer = MapItemLayer(target);
         var (x, y) = MapCoordinates(target, target.X, target.Y);
@@ -138,7 +164,7 @@ internal sealed partial class WorkspaceSession
         if (!selected.IsRoot) throw new ArgumentException("mapInvalidItem");
         var next = remove ? new Item(Item.NONE) : replacement.ToItem();
         var roots = MapRoots(target, whole, layer).Where(r => r.Item.RawValue == selected.RawValue).ToList();
-        return ApplyMapRootEdits(target, layer, roots.Select(r => (r.X, r.Y, new Item(r.Item.RawValue), new Item(next.RawValue))).ToList(), roots.Count);
+        return PrepareMapRootEdits(target, layer, roots.Select(r => (r.X, r.Y, new Item(r.Item.RawValue), new Item(next.RawValue))).ToList(), roots.Count);
     }
     public MapEditCount SpawnMapItems(MapTarget target, MapSpawnOptions options, RoomItem current, byte[]? file = null)
     {

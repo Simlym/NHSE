@@ -154,6 +154,17 @@ internal sealed partial class WorkspaceSession
         CommitMapPatches([MapPatch(offset, bytes)]);
     }
 
+    internal sealed record MapBrushMask(int Radius, MapPoint[] Offsets);
+    private static MapPoint[] BrushOffsets(int radius)
+    {
+        if (radius is < 1 or > 8) throw new ArgumentException("invalidRequest");
+        var offsets = new List<MapPoint>();
+        for (var dx = -radius; dx < radius; dx++) for (var dy = -radius; dy < radius; dy++)
+            if (radius == 1 ? dx == 0 && dy == 0 : dx * dx + dy * dy < radius * radius / 2) offsets.Add(new(dx, dy));
+        return offsets.ToArray();
+    }
+    public static MapBrushMask[] MapBrushMasks() => Enumerable.Range(1, 8).Select(radius => new MapBrushMask(radius, BrushOffsets(radius))).ToArray();
+
     public void PaintMap(MapTarget target, int radius, bool randomVariation, Dictionary<string, JsonElement> values)
         => PaintMapStroke(target, radius, randomVariation, values, [new(target.X, target.Y)]);
 
@@ -178,10 +189,9 @@ internal sealed partial class WorkspaceSession
         {
             var (cx, cy) = MapCoordinates(target, point.X, point.Y);
             if (!TerrainConfig.IsCoordinateValidRelative(cx, cy)) throw new ArgumentException("mapInvalidAcre");
-            for (var dx = -radius; dx < radius; dx++) for (var dy = -radius; dy < radius; dy++)
+            foreach (var offset in BrushOffsets(radius))
             {
-                if (radius == 1 ? dx != 0 || dy != 0 : dx * dx + dy * dy >= radius * radius / 2) continue;
-                var x = cx + dx; var y = cy + dy;
+                var x = cx + offset.X; var y = cy + offset.Y;
                 if (!TerrainConfig.IsCoordinateValidRelative(x, y) || !painted.Add((x, y))) continue;
                 var tile = layer.GetTile(x, y); tile.CopyFrom(template);
                 if (randomVariation && template.UnitModel is TerrainUnitModel.Cliff5B or TerrainUnitModel.River5B) tile.Variation = (ushort)Random.Shared.Next(4);
@@ -191,6 +201,13 @@ internal sealed partial class WorkspaceSession
     }
 
     public void BatchMap(MapTarget target, string operation, bool whole, bool interiorOnly, Dictionary<string, JsonElement> values)
+        => PrepareBatchMap(target, operation, whole, interiorOnly, values).Commit();
+    public GridPastePreview PreviewBatchMap(MapTarget target, string operation, bool whole, bool interiorOnly, Dictionary<string, JsonElement> values)
+    {
+        try { return PrepareBatchMap(target, operation, whole, interiorOnly, values).Preview; }
+        catch (ArgumentException error) { return PreviewFailure(new(target.Mode == "items" ? "mapItems" : "terrain", target), error); }
+    }
+    private GridPastePlan PrepareBatchMap(MapTarget target, string operation, bool whole, bool interiorOnly, Dictionary<string, JsonElement> values)
     {
         CheckMapTarget(target, MapMarkerCount);
         var m = SaveFile.Main;
@@ -199,8 +216,10 @@ internal sealed partial class WorkspaceSession
             if (!whole || values.Count != 0) throw new ArgumentException("invalidRequest");
             var bytes = new byte[MapMarkerCount * 2];
             for (var i = 0; i < bytes.Length; i += 2) BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(i), MainSave.MapDesignNone);
-            CommitMapPatches([MapPatch(m.Offsets.MyDesignMap, bytes)]);
-            return;
+            var before = m.Data.Slice(m.Offsets.MyDesignMap, bytes.Length).ToArray();
+            var changes = Enumerable.Range(0, MapMarkerCount).Count(i => !before.AsSpan(i * 2, 2).SequenceEqual(bytes.AsSpan(i * 2, 2)));
+            return new(new(true, null, MapMarkerCount, changes, 0, [], [], [], []),
+                () => CommitMapPatches([MapPatch(m.Offsets.MyDesignMap, bytes)]));
         }
         if (target.Mode == "terrain")
         {
@@ -209,6 +228,7 @@ internal sealed partial class WorkspaceSession
             foreach (var (key, value) in values)
                 if (!schema.ContainsKey(key) || !value.TryGetInt64(out var n) || n is < 0 or > ushort.MaxValue) throw new ArgumentException("invalidRequest");
             var layer = new LayerTerrain(m.GetTerrainTiles(), m.GetAcreBytes());
+            var before = layer.DumpAll();
             // The chosen tile supplies any fields not explicitly provided in the draft.
             var (sx, sy) = MapCoordinates(target, target.X, target.Y);
             if (!TerrainConfig.IsCoordinateValidRelative(sx, sy)) throw new ArgumentException("mapInvalidAcre");
@@ -220,22 +240,31 @@ internal sealed partial class WorkspaceSession
             }
             var (x, y) = whole ? (0, 0) : MapAcreOrigin(target, "terrain");
             var width = whole ? 112 : 16; var height = whole ? 96 : 16;
+            var requested = 0;
             for (var tx = x; tx < x + width; tx++) for (var ty = y; ty < y + height; ty++)
             {
                 if (interiorOnly && (tx < 16 || tx >= 96 || ty < 16 || ty >= 80)) continue;
+                requested++;
                 var tile = layer.GetTile(tx, ty);
                 if (operation == "zeroElevation") tile.Elevation = 0;
                 else if (operation == "setRoad") tile.CopyRoadFrom(template);
                 else tile.CopyFrom(template);
             }
-            CommitMapPatches([MapPatch(m.Offsets.LandMakingMap, layer.DumpAll())]);
-            return;
+            var after = layer.DumpAll();
+            var gridTarget = new GridTarget("terrain", target);
+            var changed = Enumerable.Range(0, layer.Tiles.Length)
+                .Where(i => !before.AsSpan(i * TerrainTile.SIZE, TerrainTile.SIZE).SequenceEqual(after.AsSpan(i * TerrainTile.SIZE, TerrainTile.SIZE)))
+                .Select(i => GridPreviewCoordinate(gridTarget, i / layer.TileInfo.TotalHeight, i % layer.TileInfo.TotalHeight)).ToArray();
+            return new(new(true, null, requested, changed.Length, 0, changed, [], changed, []),
+                () => CommitMapPatches([MapPatch(m.Offsets.LandMakingMap, after)]));
         }
         if (target.Mode != "items" || values.Count != 0) throw new ArgumentException("invalidRequest");
         var items = new LayerFieldItem(target.Layer == 0 ? m.GetFieldItemLayer0() : m.GetFieldItemLayer1(), m.FieldItemAcreWidth, 6);
+        var beforeItems = items.Tiles.Select(item => item.RawValue).ToArray();
         var (xmin, ymin) = whole ? (0, 0) : MapAcreOrigin(target, "items");
         var w = whole ? m.FieldItemAcreWidth * 32 : 32; var h = whole ? 192 : 32;
-        if (operation is "waterFlowers" or "waterAllFlowers") items.WaterAllFlowers(xmin, ymin, w, h, operation == "waterAllFlowers");
+        var matchedItems = 0;
+        if (operation is "waterFlowers" or "waterAllFlowers") matchedItems = items.WaterAllFlowers(xmin, ymin, w, h, operation == "waterAllFlowers");
         else
         {
             bool Match(Item item) => operation switch {
@@ -266,6 +295,7 @@ internal sealed partial class WorkspaceSession
                 if (item.IsExtension && (!root.IsRoot || root.ItemId != item.ExtensionItemId)) continue;
                 if (!root.IsNone && Match(root)) roots.Add((rx, ry));
             }
+            matchedItems = roots.Count;
             foreach (var (x, y) in roots)
             {
                 var root = items.GetTile(x, y);
@@ -275,6 +305,8 @@ internal sealed partial class WorkspaceSession
             if (operation == "removeAll")
                 for (var x = xmin; x < xmin + w; x++) for (var y = ymin; y < ymin + h; y++) items.GetTile(x, y).Delete();
         }
-        CommitMapPatches([MapPatch(m.Offsets.FieldItem + target.Layer * items.Tiles.Length * Item.SIZE, items.DumpAll())]);
+        var rootsChanged = Enumerable.Range(0, items.Tiles.Length).Count(i => beforeItems[i] != items.Tiles[i].RawValue && !new Item(beforeItems[i]).IsNone && !new Item(beforeItems[i]).IsExtension);
+        var preview = ItemLayerPreview(new("mapItems", target), items, beforeItems, matchedItems, rootsChanged);
+        return new(preview, () => CommitMapPatches([MapPatch(m.Offsets.FieldItem + target.Layer * items.Tiles.Length * Item.SIZE, items.DumpAll())]));
     }
 }

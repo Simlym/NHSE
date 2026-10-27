@@ -19,7 +19,7 @@ async function applyPending() {
   return success;
 }
 function reset() { fields.value = { ...props.data }; }
-defineExpose({ applyPending });
+defineExpose({ applyPending, hasPending: () => pending.value, resetDraft: reset });
 </script>
 <template>
   <section class="settings-page">

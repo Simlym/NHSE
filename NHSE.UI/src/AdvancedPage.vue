@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, shallowRef, watch } from 'vue';
 import { t } from './i18n';
+import { useSessionView } from './sessionViewMemory';
 import { housingLabel } from './housingLabels';
 import AdvancedFieldInput from './AdvancedFieldInput.vue';
 import type { AdvancedData, AdvancedTarget, Player, Resident, ItemView } from './bridge';
@@ -129,7 +130,9 @@ async function file(importFile: boolean, all: boolean) {
 function chooseItem(item: ItemView) {
   for (const [key, value] of Object.entries({ ItemId: item.itemId, SystemParam: 0, AdditionalParam: 0, FreeParam: 0 })) if (key in fields.value) fields.value[key] = String(value);
 }
-defineExpose({ applyPending, chooseItem });
+function resetDraft() { fields.value = stored(); validation.value = ''; }
+defineExpose({ applyPending, chooseItem, hasPending: () => pending.value, resetDraft });
+useSessionView(() => `advanced:${props.data?.target.kind}:${props.data?.target.player}:${props.data?.target.resident}:${props.data?.target.container}`, [query, fieldQuery, page], () => form.value?.closest<HTMLElement>('.advanced-page') ?? null);
 </script>
 <template>
   <section v-if="data" class="advanced-page">

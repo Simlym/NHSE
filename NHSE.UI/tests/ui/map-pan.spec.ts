@@ -25,7 +25,7 @@ for (const width of [1180, 800, 390]) test(`main canvas pans across acres at fit
   await page.mouse.up(); await expect(acre(page)).toHaveValue('11');
   await expect(page.locator('.map-canvas-scroll')).not.toHaveClass(/panning/);
   expect(await messages(page, 'editMap')).toHaveLength(0); expect(await messages(page, 'paintMapStroke')).toHaveLength(0);
-  await page.getByRole('button', { name: '适应窗口', exact: true }).click();
+  await page.getByRole('button', { name: '适应当前分区', exact: true }).click();
   await expect(page.locator('.map-viewport')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
 });
 
@@ -37,7 +37,7 @@ test('space and middle-button gestures pan temporarily, preserve brush mode and 
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.keyboard.down('Space'); await begin(page, -size * .65, 0); await page.keyboard.up('Space'); await page.mouse.up();
   await expect(acre(page)).toHaveValue('11'); await expect(page.locator('.map-brush input[type=checkbox]').first()).toBeChecked();
-  await page.getByRole('button', { name: '适应窗口', exact: true }).click();
+  await page.getByRole('button', { name: '适应当前分区', exact: true }).click();
   await begin(page, size * .65, 0, 'middle'); await page.mouse.up({ button: 'middle' }); await expect(acre(page)).toHaveValue('10');
   expect(await messages(page, 'paintMapStroke')).toHaveLength(0); expect(await messages(page, 'editMap')).toHaveLength(0);
   const input = page.locator('.map-property-form input').first(); await input.focus(); await page.keyboard.type('h');

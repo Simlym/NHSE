@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, shallowRef, watch } from 'vue';
-import type { MapData, MapEditRule } from './bridge';
+import { request, type MapData, type MapEditRule, type GridPastePreview } from './bridge';
+import MapImpactReview from './MapImpactReview.vue';
 import { t } from './i18n';
 import { housingLabel } from './housingLabels';
 const props = defineProps<{
@@ -21,15 +22,29 @@ function field(key: string) { return parameters.value.find(p => p.key === key); 
 function changeKey(rule: MapEditRule) { rule.value = field(rule.key)?.type === 'boolean' ? 'false' : '0'; }
 function current() { return { itemId: Number(props.values['Map.ItemId']), systemParam: Number(props.values['Map.SystemParam']), additionalParam: Number(props.values['Map.AdditionalParam']), freeParam: Number(props.values['Map.FreeParam']) }; }
 const confirmation = shallowRef<{ command: string; payload: Record<string, unknown>; label: string; detail: string } | null>(null);
+const impact = shallowRef<GridPastePreview | null>(null), checkingImpact = ref(false);
+const previewCommands: Record<string, string> = { editMapParameters: 'previewMapParameters', replaceMapMatches: 'previewReplaceMapMatches' };
+let impactToken = 0;
 async function ask(command: string, payload: Record<string, unknown>, label: string, detail: string) {
   if (props.busy || !props.validate()) return;
   const section = command === 'spawnMap' ? '.map-spawn' : command === 'editMapParameters' ? '.map-parameters' : null;
   if (section && !Array.from(form.value?.querySelectorAll<HTMLInputElement | HTMLSelectElement>(`${section} input, ${section} select`) ?? []).every(input => input.reportValidity())) return;
   confirmation.value = { command, payload, label, detail };
+  const token = ++impactToken, previewCommand = previewCommands[command];
+  impact.value = null; checkingImpact.value = !!previewCommand;
   await nextTick(); dialog.value?.showModal();
+  if (previewCommand) {
+    try { const result = await request<GridPastePreview>(previewCommand, payload); if (token === impactToken) impact.value = result; }
+    catch (error) { if (token === impactToken) impact.value = { valid: false, error: error instanceof Error ? error.message : 'invalidRequest', placements: 0, changedCells: 0, replacedItems: 0, cells: [] }; }
+    finally { if (token === impactToken) checkingImpact.value = false; }
+  }
 }
-function cancel() { dialog.value?.close(); confirmation.value = null; }
-async function confirm() { const operation = confirmation.value; cancel(); if (operation && await props.execute(operation.command, operation.payload)) emit('applied'); }
+function cancel() { ++impactToken; dialog.value?.close(); confirmation.value = null; checkingImpact.value = false; impact.value = null; }
+async function confirm() {
+  const operation = confirmation.value;
+  if (checkingImpact.value || operation && previewCommands[operation.command] && (!impact.value?.valid || !impact.value.changedCells)) return;
+  cancel(); if (operation && await props.execute(operation.command, operation.payload)) emit('applied');
+}
 function scope() { return `${t('mapScopeNames').split('|')[whole.value ? 1 : 0]} · ${t('mapLayer')} ${props.data.target.layer}`; }
 async function spawn() {
   await ask('spawnMap', { target: { ...props.data.target }, options: { source: source.value, arrangement: arrangement.value, count: count.value, recipeMin: recipeMin.value, recipeMax: recipeMax.value }, current: current() }, t('mapSpawn'), `${t('mapSpawnSources').split('|')[['current', 'recipes', 'alphabetical', 'nhi'].indexOf(source.value)]} × ${count.value} · ${t('mapArrangeNames').split('|')[['square', 'horizontal', 'vertical'].indexOf(arrangement.value)]} · X ${props.data.target.x} Y ${props.data.target.y} · ${t('mapLayer')} ${props.data.target.layer}`);
@@ -87,7 +102,7 @@ async function batch() { await ask('editMapParameters', { target: { ...props.dat
         <button type="button" :disabled="busy || !batchText.trim()" @click="ask('mapTextBatch', { target: { ...data.target }, whole, text: batchText }, t('advancedTextBatch'), scope())">{{ t('mapRunBatch') }}</button>
       </details>
     </form>
-    <dialog v-if="confirmation" ref="dialog" class="modal" :aria-label="t('mapConfirmTitle')" @cancel.prevent="cancel"><h2>{{ confirmation.label }}</h2><p>{{ confirmation.detail }}</p><p>{{ t('mapParameterHint') }}</p><div class="form-actions"><button class="button" @click="cancel">{{ t('cancel') }}</button><button class="button primary" @click="confirm">{{ t('apply') }}</button></div></dialog>
+    <dialog v-if="confirmation" ref="dialog" class="modal" :aria-label="t('mapConfirmTitle')" @cancel.prevent="cancel"><h2>{{ confirmation.label }}</h2><p>{{ confirmation.detail }}</p><p>{{ t('mapParameterHint') }}</p><MapImpactReview v-if="previewCommands[confirmation.command]" :preview="impact" :loading="checkingImpact" /><div class="form-actions"><button class="button" @click="cancel">{{ t('cancel') }}</button><button class="button primary" :disabled="checkingImpact || !!previewCommands[confirmation.command] && (!impact?.valid || !impact.changedCells)" @click="confirm">{{ t('apply') }}</button></div></dialog>
   </section>
 </template>
 <style scoped>

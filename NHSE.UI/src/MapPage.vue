@@ -8,6 +8,10 @@ import MapTools from './MapTools.vue';
 import MapAdvanced from './MapAdvanced.vue';
 import GridToolbar from './GridToolbar.vue';
 import MapPastePreview from './MapPastePreview.vue';
+import MapPlacementTools from './MapPlacementTools.vue';
+import { useMapPlacement } from './useMapPlacement';
+import MapOverviewDialog from './MapOverviewDialog.vue';
+import { useMapCamera } from './useMapCamera';
 import { useGridSelection, pointKey, editableTarget } from './gridSelection';
 import { buildingTypeName } from './mapBuildingLabels';
 const props = defineProps<{
@@ -18,6 +22,8 @@ const props = defineProps<{
 const modes: MapTarget['mode'][] = ['terrain', 'items', 'buildings', 'acres', 'markers'];
 const modeIcons = [Mountain, Package, Building2, Grid2X2, Flag];
 const handTool = ref(false), showGrid = ref(true), showItems = ref(true), buildingSearch = ref('');
+const showNavigator = ref(true), showInspector = ref(true);
+function toggleFocus() { const focus = showNavigator.value || showInspector.value; showNavigator.value = !focus; showInspector.value = !focus; }
 const zoom = ref(1), canvasBaseSize = ref(480), canvasScroll = ref<HTMLElement | null>(null);
 let canvasObserver: ResizeObserver | null = null;
 const panning = ref(false), spaceHeld = ref(false), canvasHovered = ref(false);
@@ -37,22 +43,18 @@ watch(canvasScroll, element => {
   canvasObserver = new ResizeObserver(() => { canvasBaseSize.value = Math.max(160, Math.min(element.clientWidth, element.clientHeight) - 48); });
   canvasObserver.observe(element);
 }, { flush: 'post' });
-async function setZoom(value: number) {
-  cancelPan();
-  const element = canvasScroll.value, ratio = Math.max(1, Math.min(4, value)) / zoom.value;
-  const x = element ? (element.scrollLeft + element.clientWidth / 2) * ratio - element.clientWidth / 2 : 0;
-  const y = element ? (element.scrollTop + element.clientHeight / 2) * ratio - element.clientHeight / 2 : 0;
-  zoom.value = Math.max(1, Math.min(4, value));
-  await nextTick();
-  element?.scrollTo({ left: Math.max(0, x), top: Math.max(0, y) });
-}
-async function fitCanvas() { cancelPan(); camera.value = null; zoom.value = 1; await nextTick(); canvasScroll.value?.scrollTo({ left: 0, top: 0 }); }
-function canvasWheel(event: WheelEvent) { if (event.ctrlKey || event.metaKey) { event.preventDefault(); void setZoom(zoom.value + (event.deltaY < 0 ? .25 : -.25)); } }
+const { setZoom, fitCanvas, canvasWheel, rememberView, restoreView } = useMapCamera({
+  element: canvasScroll, zoom, baseSize: canvasBaseSize, camera,
+  acre: () => props.data?.target.acre ?? 0,
+  scope: () => JSON.stringify([props.data?.target.mode, props.data?.target.acre, props.data?.target.layer]),
+  cancelPan, interactionBusy: () => !!strokeMeta.value || gridSelection.dragging.value,
+});
 function startPan(event: PointerEvent) {
   if (!panPointer) skipCanvasClickUntil = 0;
   if ((!panMode.value && event.button !== 1) || ![0, 1].includes(event.button) || !props.data || props.busy || panPointer || strokeMeta.value || gridSelection.dragging.value) return;
   const element = canvasScroll.value;
   if (!element) return;
+  placement.cancelGesture();
   event.preventDefault(); event.stopPropagation();
   panPointer = { id: event.pointerId, element, x: event.clientX, y: event.clientY, left: element.scrollLeft, top: element.scrollTop,
     camera: camera.value && { ...camera.value }, acre: props.data.target.acre, size: canvasSize.value, moved: false };
@@ -113,6 +115,7 @@ function canvasClick(event: MouseEvent) {
 }
 function canvasKeyboard(event: KeyboardEvent) {
   if (editableTarget(event.target) || document.querySelector('dialog[open]')) return;
+  if (placement.keydown(event)) return;
   if (event.key === 'Escape' && panPointer) { event.preventDefault(); event.stopPropagation(); cancelPan(); return; }
   if (event.key === 'Escape' && pasteOpen.value) { event.preventDefault(); event.stopPropagation(); closePastePreview(); return; }
   if (event.code === 'Space' && (canvasHovered.value || canvasScroll.value?.contains(event.target as Node))) {
@@ -130,7 +133,7 @@ function canvasBlur() { spaceHeld.value = false; cancelPan(); }
 watch(() => [props.data?.target.acre, props.data?.target.mode], ([acre, mode], old) => {
   if (mode !== old?.[1] || acre !== old?.[0] && acre !== panAcre) camera.value = null;
 });
-onMounted(() => { window.addEventListener('keydown', canvasKeyboard, true); window.addEventListener('keyup', canvasKeyup); window.addEventListener('blur', canvasBlur); });
+onMounted(() => { void restoreView(); void loadBrushMasks(); window.addEventListener('keydown', canvasKeyboard, true); window.addEventListener('keyup', canvasKeyup); window.addEventListener('blur', canvasBlur); });
 
 function moveAcre(dx: number, dy: number) {
   if (!props.data || props.busy) return;
@@ -160,7 +163,11 @@ const visibleBuildings = computed(() => props.data?.buildingPins?.filter(pin =>
 const form = ref<HTMLFormElement | null>(null);
 const autoExtensions = ref(true), noOverwrite = ref(true), snapFieldItems = ref(true);
 const stored = () => Object.fromEntries((props.data?.fields ?? []).map(f => [f.key, f.value]));
-const fields = ref(stored());
+const brush = ref<MapBrush>({ enabled: false, radius: 1, randomVariation: false });
+const selectedDraft = ref(stored()), brushTemplate = ref<Record<string, number | boolean | string> | null>(null);
+const brushEditing = computed(() => brush.value.enabled && props.data?.target.mode === 'terrain');
+const fields = computed({ get: () => brushEditing.value ? brushTemplate.value ?? selectedDraft.value : selectedDraft.value,
+  set: value => { if (brushEditing.value) brushTemplate.value = value; else selectedDraft.value = value; } });
 const draftItem = shallowRef<ItemView | null>(null);
 const currentCell = computed(() => props.data?.cells.find(cell => cell.x === props.data?.target.x && cell.y === props.data?.target.y));
 const selectionName = computed(() => props.data?.target.mode === 'buildings'
@@ -169,9 +176,8 @@ const selectionName = computed(() => props.data?.target.mode === 'buildings'
 const primaryKeys: Record<string, string[]> = { terrain: ['Map.Elevation', 'Map.UnitModel', 'Map.LandMakingAngle', 'Map.UnitModelRoad', 'Map.LandMakingAngleRoad'], items: ['Map.ItemId', 'Map.FreeParam'], buildings: ['Map.BuildingType', 'Map.X', 'Map.Y', 'Map.Angle'] };
 const primaryFields = computed(() => { const data = props.data; return data?.fields.filter(field => !primaryKeys[data.target.mode] || primaryKeys[data.target.mode]!.includes(field.key)) ?? []; });
 const advancedFields = computed(() => { const data = props.data; return data?.fields.filter(field => primaryKeys[data.target.mode] && !primaryKeys[data.target.mode]!.includes(field.key)) ?? []; });
-const brush = ref<MapBrush>({ enabled: false, radius: 1, randomVariation: false });
 function setTool(tool: 'select' | 'brush' | 'pan') {
-  cancelPan();
+  placement.cancel(); cancelPan();
   if (tool !== 'select') closePastePreview(false);
   handTool.value = tool === 'pan';
   if (tool !== 'pan') brush.value.enabled = tool === 'brush';
@@ -182,7 +188,26 @@ const strokePoints = ref<{ x: number; y: number }[]>([]);
 const strokeMeta = shallowRef<{ target: MapTarget; radius: number; randomVariation: boolean; values: Record<string, number | boolean | string> } | null>(null);
 let pointerGrid: HTMLElement | null = null, pointerId = -1;
 let lastPoint: { x: number; y: number } | null = null;
-const strokeKeys = computed(() => new Set(strokePoints.value.map(p => `${p.x},${p.y}`)));
+const brushMasks = shallowRef<{ radius: number; offsets: { x: number; y: number }[] }[]>([]);
+const brushMaskLoading = ref(true), brushMaskError = ref(false), brushHover = ref<{ x: number; y: number } | null>(null);
+async function loadBrushMasks() {
+  try { brushMasks.value = await request('mapBrushMask'); }
+  catch { brushMaskError.value = true; }
+  finally { brushMaskLoading.value = false; }
+}
+const brushFootprint = computed(() => {
+  if (!brushEditing.value || panMode.value || props.busy) return [];
+  const centers = strokeMeta.value ? strokePoints.value : brushHover.value ? [brushHover.value] : [];
+  const offsets = brushMasks.value.find(mask => mask.radius === (strokeMeta.value?.radius ?? brush.value.radius))?.offsets ?? [];
+  return [...new Map(centers.flatMap(point => offsets.map(offset => ({ x: point.x + offset.x, y: point.y + offset.y }))).map(point => [pointKey(point), point])).values()];
+});
+const brushKeys = computed(() => {
+  const valid = new Set(props.data?.cells.filter(cell => cell.valid).map(pointKey));
+  return new Set(brushFootprint.value.filter(point => valid.has(pointKey(point))).map(pointKey));
+});
+const strokeKeys = computed(() => strokeMeta.value ? brushKeys.value : new Set<string>());
+const hoverBrushKeys = computed(() => !strokeMeta.value ? brushKeys.value : new Set<string>());
+const brushOutside = computed(() => brushFootprint.value.filter(point => point.x < 0 || point.y < 0 || point.x >= 16 || point.y >= 16).length);
 const selectionBusy = computed(() => props.busy && !props.loading);
 const gridSelection = useGridSelection({
   cells: () => props.data?.cells.filter(c => c.valid).map(c => ({ x: c.x, y: c.y })) ?? [],
@@ -199,14 +224,41 @@ function gridPayload() {
   const anchor = selection.length > 1 ? { x: Math.min(...selection.map(p => p.x)), y: Math.min(...selection.map(p => p.y)) } : { x: props.data.target.x, y: props.data.target.y };
   return { target, selection, anchor, noOverwrite: noOverwrite.value };
 }
+const placement = useMapPlacement({
+  data: () => props.data, viewport: () => canvasScroll.value?.querySelector<HTMLElement>('.map-viewport') ?? null,
+  selection: () => gridSelection.selected.value, values: () => fields.value, busy: () => props.busy,
+  hasPending: () => selectedDraftPending.value, noOverwrite: () => noOverwrite.value, snapFieldItems: () => snapFieldItems.value,
+  execute: props.execute,
+  onModeChange: mode => { if (mode !== 'select') { cancelPan(); handTool.value = false; brush.value.enabled = false; closePastePreview(false); } },
+  onCommitted: resetDraft,
+});
+function placementUp(event: PointerEvent) {
+  if (!placement.dragging.value) return false;
+  skipCanvasClickUntil = performance.now() + 250; void placement.up(event); return true;
+}
+function canvasPointerMove(event: PointerEvent) { if (panPointer) movePan(event); else placement.move(event); }
+function canvasPointerUp(event: PointerEvent) { if (!placementUp(event)) void finishPan(event); }
+function canvasPointerCancel() { placement.cancelGesture(); cancelPan(); }
 const pasteOpen = ref(false), pasteLoading = ref(false), pastePreview = shallowRef<GridPastePreview | null>(null);
 let pasteToken = 0, pasteTimer: ReturnType<typeof setTimeout> | undefined, pasteNeedsReveal = false;
 const pasteKeys = computed(() => new Set(pasteLoading.value ? [] : pastePreview.value?.cells.map(pointKey) ?? []));
+const pasteConflictKeys = computed(() => new Set(pasteLoading.value ? [] : pastePreview.value?.conflicts?.map(pointKey) ?? []));
+const pastePlacedKeys = computed(() => new Set(pasteLoading.value ? [] : pastePreview.value?.placedCells?.map(pointKey) ?? []));
+const pasteClearedKeys = computed(() => new Set(pasteLoading.value ? [] : pastePreview.value?.clearedCells?.map(pointKey) ?? []));
+async function locatePasteConflict() {
+  const point = pastePreview.value?.conflicts?.[0], data = props.data;
+  if (!point || !data) return;
+  camera.value = { x: Math.max(0, Math.min(8, data.target.acre % 9 + (point.x + .5) / data.gridSize - .5)), y: Math.max(0, Math.min(7, Math.floor(data.target.acre / 9) + (point.y + .5) / data.gridSize - .5)) };
+  await nextTick();
+  const el = canvasScroll.value;
+  el?.scrollTo({ left: (el.scrollWidth - el.clientWidth) / 2, top: (el.scrollHeight - el.clientHeight) / 2 }); focusGrid();
+}
 const pasteOutside = computed(() => pastePreview.value?.cells.filter(p => p.x < 0 || p.y < 0 || p.x >= (props.data?.gridSize ?? 0) || p.y >= (props.data?.gridSize ?? 0)).length ?? 0);
 function focusGrid() { canvasScroll.value?.querySelector<HTMLElement>('.map-grid')?.focus({ preventScroll: true }); }
 async function revealPastePreview() {
   await nextTick();
-  canvasScroll.value?.parentElement?.querySelector('.map-paste-preview')?.scrollIntoView({ block: 'nearest' });
+  const panel = canvasScroll.value?.parentElement?.querySelector<HTMLElement>('.map-paste-preview');
+  if (panel) panel.scrollTop = 0;
 }
 function closePastePreview(focus = true) {
   ++pasteToken; clearTimeout(pasteTimer); pasteNeedsReveal = false; pasteOpen.value = false; pasteLoading.value = false; pastePreview.value = null;
@@ -252,13 +304,20 @@ async function gridAction(name: 'copyGrid' | 'pasteGrid' | 'delete' | 'rotate') 
   if (success && name !== 'copyGrid' && !brush.value.enabled) fields.value = stored();
 }
 function gridPointerDown(event: PointerEvent) {
+  if (placement.down(event)) return;
   pasteNeedsReveal = false;
   if (brush.value.enabled && !event.ctrlKey && !event.metaKey && !event.shiftKey) startStroke(event);
   else gridSelection.down(event);
 }
-function gridPointerMove(event: PointerEvent) { if (gridSelection.dragging.value) gridSelection.move(event); else moveStroke(event); }
-function gridPointerUp(event: PointerEvent) { if (gridSelection.dragging.value) void gridSelection.up(event); else void endStroke(event); }
-function cancelGridPointer() { gridSelection.cancel(); cancelStroke(); }
+function gridPointerMove(event: PointerEvent) {
+  if (placement.move(event)) { event.stopPropagation(); return; }
+  const grid = event.currentTarget as HTMLElement, box = grid.getBoundingClientRect();
+  const x = Math.floor((event.clientX - box.left) / box.width * 16), y = Math.floor((event.clientY - box.top) / box.height * 16);
+  brushHover.value = x >= 0 && y >= 0 && x < 16 && y < 16 ? { x, y } : null;
+  if (gridSelection.dragging.value) gridSelection.move(event); else moveStroke(event); }
+function gridPointerUp(event: PointerEvent) { if (placementUp(event)) { event.stopPropagation(); return; } if (gridSelection.dragging.value) void gridSelection.up(event); else void endStroke(event); }
+function cancelGridPointer() { placement.cancelGesture(); gridSelection.cancel(); cancelStroke(); }
+function gridLostCapture(event: PointerEvent) { placement.lostCapture(event); gridSelection.cancel(); cancelStroke(); }
 function gridKeydown(event: KeyboardEvent) {
   if (event.key.startsWith('Arrow')) pasteNeedsReveal = false;
   if (pasteOpen.value && event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); event.stopPropagation(); if (!event.repeat) void confirmPaste(); return; }
@@ -291,7 +350,7 @@ function collect(event: PointerEvent) {
   lastPoint = point;
 }
 function startStroke(event: PointerEvent) {
-  if (!brush.value.enabled || props.data?.target.mode !== 'terrain' || props.busy || event.button !== 0 || strokeMeta.value || !Number.isInteger(brush.value.radius) || brush.value.radius < 1 || brush.value.radius > 8 || !form.value?.reportValidity()) return;
+  if (!brush.value.enabled || props.data?.target.mode !== 'terrain' || props.busy || brushMaskLoading.value || brushMaskError.value || event.button !== 0 || strokeMeta.value || !Number.isInteger(brush.value.radius) || brush.value.radius < 1 || brush.value.radius > 8 || !form.value?.reportValidity()) return;
   event.preventDefault();
   pointerGrid = event.currentTarget as HTMLElement; pointerId = event.pointerId;
   if (!gridPoint(event)) { pointerGrid = null; return; }
@@ -314,23 +373,39 @@ async function endStroke(event: PointerEvent) {
   if (!strokeMeta.value || event.pointerId !== pointerId) return;
   collect(event);
   const payload = { ...strokeMeta.value, points: strokePoints.value.map(p => ({ ...p })) };
+  const coversCurrent = brushKeys.value.has(pointKey({ x: props.data?.target.x ?? 0, y: props.data?.target.y ?? 0 }));
   cancelStroke();
-  if (payload.points.length) await props.execute('paintMapStroke', payload);
+  if (payload.points.length && await props.execute('paintMapStroke', payload) && coversCurrent) resetDraft();
 }
 function preset(values: Record<string, number>) { fields.value = { ...fields.value, ...values }; }
-watch(() => brush.value.enabled, enabled => { if (!enabled) { cancelStroke(); fields.value = stored(); } });
+watch(() => brush.value.enabled, enabled => {
+  if (enabled && !brushTemplate.value) brushTemplate.value = { ...selectedDraft.value };
+  if (!enabled) { cancelStroke(); brushHover.value = null; }
+}, { flush: 'sync' });
+const selectedDraftPending = computed(() => JSON.stringify(selectedDraft.value) !== JSON.stringify(stored()));
 const pending = computed(() => JSON.stringify(fields.value) !== JSON.stringify(stored()));
+let lastStored = JSON.stringify(stored()), lastTarget = JSON.stringify(props.data?.target);
 watch(() => JSON.stringify([props.data?.target, stored()]), () => {
+  const target = JSON.stringify(props.data?.target), clean = JSON.stringify(selectedDraft.value) === lastStored;
+  if (target !== lastTarget || clean) selectedDraft.value = stored();
+  lastStored = JSON.stringify(stored()); lastTarget = target;
   if (props.data?.target.mode !== 'terrain') brush.value.enabled = false;
-  if (!brush.value.enabled) fields.value = stored();
 });
-async function edit(action = 'apply') {
+function resetDraft() { selectedDraft.value = stored(); draftItem.value = null; }
+function hasPending() { return selectedDraftPending.value; }
+async function edit(action = 'apply', values = fields.value) {
   if (!props.data || !form.value?.reportValidity()) return false;
-  return await props.execute('editMap', { target: { ...props.data.target }, values: { ...fields.value }, action,
+  const success = await props.execute('editMap', { target: { ...props.data.target }, values: { ...values }, action,
     autoExtensions: autoExtensions.value, noOverwrite: noOverwrite.value, snapFieldItems: snapFieldItems.value });
+  if (success) resetDraft();
+  return success;
 }
-async function applyPending() { if (strokeMeta.value || gridSelection.dragging.value) return false; return (brush.value.enabled && props.data?.target.mode === 'terrain') || !pending.value || await edit(); }
+async function applyPending() {
+  if (strokeMeta.value || gridSelection.dragging.value) return false;
+  return !selectedDraftPending.value || await edit('apply', selectedDraft.value);
+}
 function chooseItem(item: ItemView) {
+  if (placement.mode.value === 'stamp') { placement.setTemplate({ itemId: item.itemId, systemParam: 0, additionalParam: 0, freeParam: 0 }); return; }
   draftItem.value = item;
   fields.value = { 'Map.ItemId': item.itemId, 'Map.SystemParam': 0, 'Map.AdditionalParam': 0, 'Map.FreeParam': 0 };
 }
@@ -401,8 +476,8 @@ function overviewClick(event: MouseEvent) {
   // Pointer gestures commit on release; keyboard activation keeps the current acre.
   if (event.detail === 0 && !props.busy) void props.navigate({ acre: displayedAcre.value });
 }
-onBeforeUnmount(() => { closePastePreview(false); overviewCancel(); cancelPan(); canvasObserver?.disconnect(); window.removeEventListener('keydown', canvasKeyboard, true); window.removeEventListener('keyup', canvasKeyup); window.removeEventListener('blur', canvasBlur); });
-defineExpose({ applyPending, chooseItem });
+onBeforeUnmount(() => { closePastePreview(false); overviewCancel(); cancelPan(); rememberView(); canvasObserver?.disconnect(); window.removeEventListener('keydown', canvasKeyboard, true); window.removeEventListener('keyup', canvasKeyup); window.removeEventListener('blur', canvasBlur); });
+defineExpose({ applyPending, chooseItem, hasPending, resetDraft });
 </script>
 <template>
   <section v-if="data" class="map-page">
@@ -411,9 +486,14 @@ defineExpose({ applyPending, chooseItem });
         <button v-for="(mode, i) in modes" :key="mode" :disabled="busy" :aria-pressed="data.target.mode === mode"
           @click="navigate({ mode, x: 0, y: 0 })"><component :is="modeIcons[i]" :size="16" />{{ t('mapModes').split('|')[i] }}</button>
       </div>
-      <button class="original-editor" :disabled="busy" :title="t('mapAdvanced')" @click="execute('nativeMap')"><SlidersHorizontal :size="15" />{{ t('mapOriginalEditor') }}</button>
+      <div class="map-layout-tools">
+        <button :aria-pressed="showNavigator" :aria-label="t('mapToggleNavigator')" :title="t('mapToggleNavigator')" @click="showNavigator = !showNavigator"><Compass :size="16" /></button>
+        <button :aria-pressed="showInspector" :aria-label="t('mapToggleInspector')" :title="t('mapToggleInspector')" @click="showInspector = !showInspector"><SlidersHorizontal :size="16" /></button>
+        <button :aria-pressed="!showNavigator && !showInspector" @click="toggleFocus"><Maximize :size="16" />{{ t('mapFocusMode') }}</button>
+        <button class="original-editor" :disabled="busy" :title="t('mapAdvanced')" @click="execute('nativeMap')">{{ t('mapOriginalEditor') }}</button>
+      </div>
     </header>
-    <div class="map-workspace">
+    <div class="map-workspace" :class="{ 'navigator-collapsed': !showNavigator, 'inspector-collapsed': !showInspector }">
       <aside class="map-navigator map-panel">
         <div class="panel-heading"><Compass :size="16" /><h2>{{ t('mapNavigator') }}</h2></div>
         <div class="navigator-content">
@@ -458,9 +538,13 @@ defineExpose({ applyPending, chooseItem });
       <section class="map-canvas-panel map-panel">
         <div class="canvas-toolbar">
           <div class="canvas-tools" role="group" :aria-label="t('mapCanvasTools')">
-            <button :aria-pressed="!handTool && !brush.enabled" :disabled="selectionBusy" :title="`${t('mapSelectTool')} · V`" :aria-label="t('mapSelectTool')" @click="setTool('select')"><MousePointer2 :size="18" /><span>{{ t('mapSelectTool') }}</span></button>
+            <button :aria-pressed="!handTool && !brush.enabled && placement.mode.value === 'select'" :disabled="selectionBusy" :title="`${t('mapSelectTool')} · V`" :aria-label="t('mapSelectTool')" @click="setTool('select')"><MousePointer2 :size="18" /><span>{{ t('mapSelectTool') }}</span></button>
             <button v-if="data.target.mode === 'terrain'" :aria-pressed="!handTool && brush.enabled" :disabled="busy || !data.fields.length" :title="`${t('mapDragBrush')} · B`" :aria-label="t('mapDragBrush')" @click="setTool('brush')"><Paintbrush :size="18" /></button>
             <button :aria-pressed="handTool" :title="`${t('mapPanTool')} · H`" :aria-label="t('mapPanTool')" @click="setTool('pan')"><Hand :size="18" /><span>{{ t('mapPanTool') }}</span></button>
+          </div>
+          <div v-if="data.target.mode === 'items'" class="canvas-direct-tools">
+            <button :aria-pressed="placement.mode.value === 'move'" :disabled="busy || selectedDraftPending" :title="t('mapMoveHint')" @click="placement.setMode('move')">{{ t('mapMoveObjects') }}</button>
+            <button :aria-pressed="placement.mode.value === 'stamp'" :disabled="busy || selectedDraftPending" :title="t('mapStampHint')" @click="placement.setMode('stamp')">{{ t('mapStampObjects') }}</button>
           </div>
           <div class="canvas-display-tools">
             <button :aria-pressed="showGrid" :title="t('mapShowGrid')" :aria-label="t('mapShowGrid')" @click="showGrid = !showGrid"><Grid2X2 :size="17" /></button>
@@ -471,13 +555,15 @@ defineExpose({ applyPending, chooseItem });
             <output>{{ Math.round(zoom * 100) }}%</output>
             <button :disabled="zoom >= 4" :aria-label="t('mapZoomIn')" @click="setZoom(zoom + .25)"><ZoomIn :size="17" /></button>
             <button :title="t('mapFitView')" :aria-label="t('mapFitView')" @click="fitCanvas"><Maximize :size="17" /></button>
+            <MapOverviewDialog :overview="data.overview" :acre="data.target.acre" :acres="data.acres" :busy="busy" :navigate="navigate" />
           </div>
         </div>
         <div ref="canvasScroll" class="map-canvas-scroll" :class="{ 'hand-tool': panMode, panning }" tabindex="0"
-          @pointerenter="canvasHovered = true" @pointerleave="canvasHovered = false" @pointerdown.capture="startPan" @pointermove="movePan" @pointerup="finishPan" @pointercancel="cancelPan" @lostpointercapture="cancelPan" @click.capture="canvasClick" @auxclick.prevent @wheel="canvasWheel">
+          @pointerenter="canvasHovered = true" @pointerleave="canvasHovered = false" @pointerdown.capture="startPan" @pointermove="canvasPointerMove" @pointerup="canvasPointerUp" @pointercancel="canvasPointerCancel" @lostpointercapture="placement.lostCapture($event); cancelPan()" @click.capture="canvasClick" @auxclick.prevent @wheel="canvasWheel">
           <div class="map-canvas-stage">
             <div v-if="camera && data.overview" class="map-pan-preview" aria-hidden="true"><img :src="data.overview" draggable="false" :style="{ width: `${canvasSize * 9}px`, height: `${canvasSize * 8}px`, left: `calc(50% - ${(camera.x + .5) * canvasSize}px)`, top: `calc(50% - ${(camera.y + .5) * canvasSize}px)` }" /></div>
             <div class="map-viewport" :style="{ width: `${canvasSize}px`, height: `${canvasSize}px`, transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px)` }">
+              <span class="edit-acre-label" :title="t('mapBoundaryHint')">{{ acreName }} · {{ t('mapEditAcre') }}</span>
               <img v-if="data.viewport" :src="data.viewport" alt="" draggable="false" />
               <img v-if="data.itemImage" v-show="showItems" class="map-item-layer" :src="data.itemImage" alt="" draggable="false" />
               <div v-show="showGrid" class="map-grid-lines" :style="{ '--grid-size': ['terrain', 'items'].includes(data.target.mode) ? data.gridSize : 32 }" />
@@ -485,30 +571,38 @@ defineExpose({ applyPending, chooseItem });
                 class="map-building-label" :class="{ 'map-building-number': data.target.building !== pin.id }" :disabled="busy" :aria-pressed="data.target.building === pin.id"
                 :aria-label="`${pin.id + 1} · ${buildingName(pin)}`"
                 :style="{ left: data.target.building === pin.id ? `clamp(32.5%, ${pin.x % 32 / 32 * 100}%, 67.5%)` : `${pin.x % 32 / 32 * 100}%`, top: `clamp(1rem, ${pin.y % 32 / 32 * 100}%, calc(100% - 1rem))` }"
-                @click="selectBuilding(pin)">{{ data.target.building === pin.id ? `${pin.id + 1} · ${buildingName(pin)}` : pin.id + 1 }}</button>
+                @pointerdown="data.target.building === pin.id && !panMode && placement.down($event)" @click="selectBuilding(pin)">{{ data.target.building === pin.id ? `${pin.id + 1} · ${buildingName(pin)}` : pin.id + 1 }}</button>
+              <div v-if="placement.buildingGhost.value" class="building-drag-ghost" :style="{ left: `${(placement.buildingGhost.value.x - data.target.acre % 9 * 32) / 32 * 100}%`, top: `${(placement.buildingGhost.value.y - Math.floor(data.target.acre / 9) * 32) / 32 * 100}%` }">{{ selectionName }}</div>
               <div v-if="['terrain', 'items'].includes(data.target.mode)" class="map-grid" tabindex="0" role="group" :aria-label="t('gridArea')" :class="{ 'brush-enabled': brush.enabled && data.target.mode === 'terrain' }"
-                @pointerdown="gridPointerDown" @pointermove="gridPointerMove" @pointerup="gridPointerUp" @pointercancel="cancelGridPointer" @lostpointercapture="cancelGridPointer" @keydown="gridKeydown"
-                :data-columns="data.gridSize" :data-rows="data.gridSize" :style="{ gridTemplateColumns: `repeat(${data.gridSize}, 1fr)` }">
+                @pointerdown="gridPointerDown" @pointermove="gridPointerMove" @pointerleave="brushHover = null; placement.leave()" @pointerup="gridPointerUp" @pointercancel="cancelGridPointer" @lostpointercapture="gridLostCapture" @keydown="gridKeydown"
+                :aria-busy="brushEditing && brushMaskLoading" :data-columns="data.gridSize" :data-rows="data.gridSize" :style="{ gridTemplateColumns: `repeat(${data.gridSize}, 1fr)` }">
                 <button tabindex="-1" :aria-pressed="gridSelection.keys.value.has(pointKey(cell))" v-for="cell in data.cells" :key="`${cell.x},${cell.y}`" :disabled="selectionBusy || !cell.valid"
                   :aria-label="`${cell.x}, ${cell.y}${cell.name ? ' · ' + cell.name : ''}`" :title="`${cell.relativeX}, ${cell.relativeY} ${cell.name}`"
-                  :class="{ selected: gridSelection.selected.value.length === 1 && gridSelection.keys.value.has(pointKey(cell)), occupied: !!cell.name, extension: cell.extension, 'stroke-preview': strokeKeys.has(`${cell.x},${cell.y}`), 'paste-preview': pasteKeys.has(pointKey(cell)), 'multi-selected': gridSelection.keys.value.has(pointKey(cell)) }"
-                  @click="!brush.enabled && !handTool && gridSelection.click($event, cell)" />
+                  :class="{ selected: gridSelection.selected.value.length === 1 && gridSelection.keys.value.has(pointKey(cell)), occupied: !!cell.name, extension: cell.extension, 'stroke-preview': strokeKeys.has(`${cell.x},${cell.y}`), 'brush-hover': hoverBrushKeys.has(pointKey(cell)), 'paste-preview': pasteKeys.has(pointKey(cell)), 'paste-conflict': pasteConflictKeys.has(pointKey(cell)), 'paste-placed': pastePlacedKeys.has(pointKey(cell)), 'paste-cleared': pasteClearedKeys.has(pointKey(cell)), 'placement-preview': placement.placedKeys.value.has(pointKey(cell)), 'placement-conflict': placement.conflictKeys.value.has(pointKey(cell)), 'placement-cleared': placement.clearedKeys.value.has(pointKey(cell)), 'multi-selected': gridSelection.keys.value.has(pointKey(cell)) }"
+                  @click="placement.mode.value === 'select' && !brush.enabled && !handTool && gridSelection.click($event, cell)" />
               </div>
             </div>
           </div>
         </div>
-        <div class="canvas-status"><span v-if="['terrain', 'items'].includes(data.target.mode)">X {{ data.target.x }} · Y {{ data.target.y }}</span><span v-else>{{ acreName }}</span><span :class="{ 'loading-view': loading }">{{ loading ? t('mapLoadingView') : t(panMode || panning ? 'mapPanCanvasHint' : brush.enabled ? 'mapBrushCanvasHint' : 'mapCanvasHint') }}</span></div>
-        <GridToolbar v-if="['terrain', 'items'].includes(data.target.mode)" :count="gridSelection.selected.value.length" :clipboard="clipboard" :kind="data.target.mode === 'terrain' ? 'terrain' : 'items'" :busy="busy || !!strokeMeta || gridSelection.dragging.value" :action="gridAction" :clear="gridSelection.clear" />
-        <MapPastePreview v-if="pasteOpen" :preview="pastePreview" :loading="pasteLoading" :busy="busy" :outside="pasteOutside" :pending="pending" :confirm="confirmPaste" :cancel="closePastePreview" />
+        <div class="canvas-status"><span v-if="['terrain', 'items'].includes(data.target.mode)">{{ acreName }} · <span>X {{ data.target.x }} · Y {{ data.target.y }}</span><template v-if="currentCell?.valid"> · {{ t('mapIslandCoordinate') }} {{ currentCell.relativeX }}, {{ currentCell.relativeY }}</template></span><span v-else>{{ acreName }}</span><span :class="{ 'loading-view': loading }">{{ loading ? t('mapLoadingView') : t(panMode || panning ? 'mapPanCanvasHint' : brush.enabled ? 'mapBrushCanvasHint' : 'mapCanvasHint') }}</span></div>
+        <GridToolbar v-if="['terrain', 'items'].includes(data.target.mode)" :count="gridSelection.selected.value.length" :clipboard="clipboard" :kind="data.target.mode === 'terrain' ? 'terrain' : 'items'" :busy="busy || !!strokeMeta || gridSelection.dragging.value" :action="gridAction" :clear="gridSelection.clear" :preview-paste="true" />
+        <MapPastePreview v-if="pasteOpen" :preview="pastePreview" :loading="pasteLoading" :busy="busy" :outside="pasteOutside" :pending="pending" :confirm="confirmPaste" :cancel="closePastePreview" :locate-conflict="locatePasteConflict" />
       </section>
 
       <aside class="map-inspector map-panel">
-        <div class="panel-heading"><SlidersHorizontal :size="16" /><h2>{{ t('mapProperties') }}</h2><span class="draft-badge" :class="{ pending }">{{ t(pending ? 'mapDraftPending' : dirty ? 'mapDraftApplied' : 'saved') }}</span></div>
+        <div class="panel-heading"><SlidersHorizontal :size="16" /><h2>{{ t('mapProperties') }}</h2><span class="draft-badge" :class="{ pending }">{{ t(brushEditing ? 'mapBrushTemplate' : selectedDraftPending ? 'mapDraftPending' : dirty ? 'mapDraftApplied' : 'saved') }}</span></div>
         <div class="inspector-scroll">
           <div class="selection-card">
             <img v-if="draftItem?.image" :src="draftItem.image" alt="" />
             <div v-else class="selection-symbol"><component :is="modeIcons[modes.indexOf(data.target.mode)]" :size="22" /></div>
-            <div><span>{{ t('mapCurrentSelection') }}</span><strong>{{ selectionName }}</strong></div>
+            <div><span>{{ brushEditing ? t('mapBrushTemplate') : gridSelection.selected.value.length > 1 ? `${t('mapCurrentSelection')} · ${t('gridSelected').replace('{0}', String(gridSelection.selected.value.length))}` : t('mapCurrentCell') }}</span><strong>{{ selectionName }}</strong></div>
+          </div>
+          <div v-if="brushEditing" class="brush-template-status">
+            <p>{{ t('mapTemplateHint') }}</p>
+            <p v-if="selectedDraftPending">{{ t('mapSelectedDraftHint') }}</p>
+            <p v-if="brushMaskLoading" role="status">{{ t('mapBrushMaskLoading') }}</p>
+            <p v-if="brushMaskError" role="alert">{{ t('mapBrushMaskError') }}</p>
+            <p v-if="brushOutside">{{ t('mapBrushOutside').replace('{0}', String(brushOutside)) }}</p>
           </div>
           <form v-if="data.fields.length" id="map-property-form" ref="form" class="map-property-form" @submit.prevent="edit()">
             <div class="property-fields">
@@ -525,10 +619,11 @@ defineExpose({ applyPending, chooseItem });
             </div>
           </form>
           <p v-else class="map-outside">{{ t('mapOutside') }}</p>
-          <MapTools v-model:brush="brush" @preset="preset" :data="data" :busy="busy" :values="fields" :execute="execute" :apply-pending="applyPending" :navigate="navigate" :validate="() => !form || form.reportValidity()" />
+          <MapPlacementTools v-if="data.target.mode === 'items'" :mode="placement.mode.value" :busy="busy || placement.committing.value" :pending="selectedDraftPending" :checking="placement.checking.value" :preview="placement.preview.value" :rotation="(placement.template.value?.systemParam ?? 0) & 3" :set-mode="placement.setMode" :pick-item="pickItem" :use-current-item="placement.useCurrentItem" :cancel="placement.cancel" />
+          <MapTools v-model:brush="brush" @preset="preset" @painted="resetDraft" :data="data" :busy="busy" :values="fields" :execute="execute" :apply-pending="applyPending" :navigate="navigate" :validate="() => !form || form.reportValidity()" />
           <MapAdvanced @applied="fields = stored()" :data="data" :values="fields" :busy="busy" :execute="execute" :validate="() => !form || form.reportValidity()" />
         </div>
-        <div v-if="data.fields.length" class="map-actions"><button type="submit" form="map-property-form" class="primary-action" :disabled="busy || !pending">{{ t(data.target.mode === 'items' || data.target.mode === 'buildings' ? 'mapReplaceSelected' : 'apply') }}</button><button v-if="['terrain', 'items'].includes(data.target.mode)" type="button" :disabled="busy" @click="edit('delete')">{{ t('mapClear') }}</button><button v-if="data.target.mode === 'terrain'" type="button" :disabled="busy" @click="edit('rotate')">{{ t('mapRotate') }}</button></div>
+        <div v-if="data.fields.length" class="map-actions"><button type="submit" form="map-property-form" class="primary-action" :disabled="busy || !pending">{{ t(brushEditing ? 'mapApplyTemplate' : data.target.mode === 'items' || data.target.mode === 'buildings' ? 'mapReplaceSelected' : 'apply') }}</button><button v-if="selectedDraftPending" type="button" :disabled="busy" @click="resetDraft">{{ t('mapResetDraft') }}</button><button v-if="['terrain', 'items'].includes(data.target.mode)" type="button" :disabled="busy" @click="edit('delete')">{{ t('mapClear') }}</button><button v-if="data.target.mode === 'terrain'" type="button" :disabled="busy" @click="edit('rotate')">{{ t('mapRotate') }}</button></div>
       </aside>
     </div>
   </section>
@@ -578,7 +673,7 @@ h3 { font-size: 12px; margin: 0; }
 .map-legend span { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 10px; }
 .map-legend i { width: 9px; height: 9px; border-radius: 2px; }
 .legend-0 { background: #63a86a; }.legend-1 { background: #80d7c3; }.legend-2 { background: #ee8bc3; }.legend-3 { background: #e7bb41; }
-.map-canvas-panel { display: flex; flex-direction: column; min-height: 0; }
+.map-canvas-panel { position: relative; display: flex; flex-direction: column; min-height: 0; }
 .canvas-toolbar { display: flex; gap: 8px; align-items: center; padding: 9px 10px; border-bottom: 1px solid var(--line); flex-shrink: 0; flex-wrap: wrap; }
 .canvas-tools, .canvas-display-tools, .canvas-zoom { display: flex; align-items: center; gap: 3px; }
 .canvas-toolbar button { border-color: transparent; padding: 6px; min-width: 30px; min-height: 30px; background: transparent; font-size: 11px; }
@@ -586,11 +681,11 @@ h3 { font-size: 12px; margin: 0; }
 .canvas-tools { padding-right: 6px; border-right: 1px solid var(--line); }
 .canvas-display-tools { margin-right: auto; }
 .canvas-zoom output { min-width: 37px; font-size: 10px; text-align: center; font-variant-numeric: tabular-nums; color: var(--muted); }
-.map-canvas-scroll { flex: 1; min-height: 220px; overflow: auto; background-color: var(--canvas); background-image: radial-gradient(var(--line-strong) .7px, transparent .7px); background-size: 14px 14px; overscroll-behavior: contain; }
+.map-canvas-scroll { scrollbar-gutter: stable; flex: 1; min-height: 220px; overflow: auto; background-color: var(--canvas); background-image: radial-gradient(var(--line-strong) .7px, transparent .7px); background-size: 14px 14px; overscroll-behavior: contain; }
 .map-canvas-stage { position: relative; overflow: clip; display: flex; align-items: center; justify-content: center; width: max-content; min-width: 100%; min-height: 100%; padding: 24px; box-sizing: border-box; }
 .map-pan-preview { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.map-pan-preview img { position: absolute; max-width: none; image-rendering: pixelated; }
-.map-viewport { position: relative; flex: 0 0 auto; border: 1px solid #929a91; isolation: isolate; background: #ffffed; box-shadow: 0 6px 24px #182b1814; }
+.map-pan-preview img { opacity: .65; position: absolute; max-width: none; image-rendering: pixelated; }
+.map-viewport { position: relative; flex: 0 0 auto; border: 1px solid #548c73; outline: 1px dashed #548c7380; outline-offset: 2px; isolation: isolate; background: #ffffed; box-shadow: 0 6px 24px #182b1814; }
 .map-viewport img { display: block; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
 .map-viewport img, .map-grid, .map-grid-lines { position: absolute; inset: 0; }
 .map-grid-lines { pointer-events: none; background-image: linear-gradient(to right, #4b554b70 1px, transparent 1px), linear-gradient(to bottom, #4b554b70 1px, transparent 1px); background-size: calc(100% / var(--grid-size)) calc(100% / var(--grid-size)); }
@@ -603,8 +698,12 @@ h3 { font-size: 12px; margin: 0; }
 .map-grid button:hover:not(:disabled) { box-shadow: inset 0 0 0 1px #176cbb; background: #ffffff25; }
 .map-grid button.selected { outline: 2px solid #ed651c; outline-offset: -2px; background: #ffb52b30; z-index: 1; }
 .map-grid.brush-enabled { cursor: crosshair; }
+.map-grid button.brush-hover { background: #36acfa38; box-shadow: inset 0 0 0 1px #278aca; }
 .map-grid button.stroke-preview { background: #36acfa80; }
 .map-grid button.paste-preview { background: #f3ba4080; box-shadow: inset 0 0 0 1px #a66a00; }
+.map-grid button.paste-placed { background: #f3ba4080; }
+.map-grid button.paste-cleared { background: repeating-linear-gradient(135deg, #637b8870 0 2px, transparent 2px 5px); }
+.map-grid button.paste-conflict { background: repeating-linear-gradient(45deg, #d4474070 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 2px #bd2626; }
 .hand-tool, .hand-tool * { cursor: grab !important; touch-action: none; }
 .hand-tool.panning, .hand-tool.panning * { cursor: grabbing !important; }
 .canvas-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; font-size: 10px; color: var(--muted); border-top: 1px solid var(--line); }
@@ -688,4 +787,28 @@ summary { cursor: pointer; color: var(--ink); font-weight: 550; }
 :global(.map-workspace-page .workspace-heading h1) { font-size: 22px; }
 :global(.map-workspace-page .workspace-heading .eyebrow) { font-size: 10px; margin-bottom: 3px; }
 @media (max-width: 900px) { :global(.workspace-content.map-workspace-page) { overflow-y: auto; padding: 14px; }.map-page { flex: 0 0 auto; } }
+.map-layout-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.map-canvas-panel > :deep(.map-paste-preview) { position: absolute; inset-inline: 10px; bottom: 10px; max-height: calc(100% - 70px); overflow-y: auto; z-index: 6; box-shadow: 0 5px 28px #15271c30; }
+.edit-acre-label { position: absolute; left: 0; top: 0; transform: translateY(-100%); color: var(--green); background: var(--surface); font-size: 10px; padding: 3px 5px; pointer-events: none; white-space: nowrap; z-index: 3; }
+.brush-template-status { padding: 8px 14px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; line-height: 1.6; }
+.navigator-collapsed > .map-navigator, .inspector-collapsed > .map-inspector { display: none; }
+.map-workspace.navigator-collapsed { grid-template-columns: minmax(0, 1fr) 300px; }
+.navigator-collapsed > .map-canvas-panel { grid-column: 1; grid-row: 1; }
+.navigator-collapsed > .map-inspector { grid-column: 2; grid-row: 1; }
+.map-workspace.inspector-collapsed { grid-template-columns: 200px minmax(0, 1fr); }
+.inspector-collapsed > .map-navigator { grid-column: 1; grid-row: 1; }
+.inspector-collapsed > .map-canvas-panel { grid-column: 2; grid-row: 1; }
+.map-workspace.navigator-collapsed.inspector-collapsed { grid-template-columns: minmax(0, 1fr); }
+.navigator-collapsed.inspector-collapsed > .map-canvas-panel { grid-column: 1; }
+@container (max-width: 1120px) {
+  .map-workspace.inspector-collapsed:not(.navigator-collapsed) { grid-template-columns: minmax(0, 1fr) 200px; }
+  .inspector-collapsed:not(.navigator-collapsed) > .map-navigator { grid-column: 2; grid-row: 1; }
+  .inspector-collapsed:not(.navigator-collapsed) > .map-canvas-panel { grid-column: 1; grid-row: 1; }
+}
+.canvas-direct-tools { display: flex; gap: 4px; }
+.canvas-direct-tools button { font-size: 10px; padding: 6px; }
+.building-drag-ghost { position: absolute; z-index: 4; pointer-events: none; transform: translate(-50%, -50%); padding: .35rem; border: 2px dashed var(--green); background: var(--surface); opacity: .8; white-space: nowrap; font-size: .75rem; }
+.map-grid button.placement-preview { background: #f3ba4080; box-shadow: inset 0 0 0 1px #a66a00; }
+.map-grid button.placement-conflict { background: repeating-linear-gradient(45deg, #d4474070 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 2px #bd2626; }
+.map-grid button.placement-cleared { background: repeating-linear-gradient(135deg, #637b8870 0 2px, transparent 2px 5px); }
 </style>

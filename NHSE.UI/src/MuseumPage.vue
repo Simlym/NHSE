@@ -45,7 +45,7 @@ async function clearEntry() {
   await props.execute('setMuseumEntry', { index: selected.value, date: '', donor: 0, item: { itemId: 65534, systemParam: 0, additionalParam: 0, freeParam: 0 } });
 }
 const actionLabel = (action: string) => t(action === 'import' ? 'museumImport' : action === 'giveAll' ? 'museumGiveAll' : 'museumSort');
-defineExpose({ applyPending, chooseItem });
+defineExpose({ applyPending, chooseItem, hasPending: () => pending.value || level.value !== props.data?.level, resetDraft: () => { fields.value = values(entry.value); level.value = props.data?.level ?? 0; } });
 </script>
 <template>
   <section v-if="data" class="museum-page">

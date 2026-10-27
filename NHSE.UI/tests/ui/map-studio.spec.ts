@@ -37,7 +37,7 @@ test('canvas zoom, hand panning and visibility controls preserve the map and sel
   await map.getByRole('button', { name: '选择格子', exact: true }).click();
   await map.locator('.map-grid button').nth(85).click();
   await expect(map.locator('.map-grid button.selected')).toHaveAttribute('aria-label', '5, 5');
-  await map.getByRole('button', { name: '适应窗口', exact: true }).click();
+  await map.getByRole('button', { name: '适应当前分区', exact: true }).click();
   await expect(map.locator('.canvas-zoom output')).toHaveText('100%');
   const fit = await scroll.evaluate(el => ({ left: el.scrollLeft, top: el.scrollTop, width: el.clientWidth, height: el.clientHeight, map: el.querySelector('.map-viewport')!.getBoundingClientRect().width }));
   expect(fit.left).toBe(0); expect(fit.top).toBe(0);

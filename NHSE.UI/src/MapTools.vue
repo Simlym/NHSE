@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, shallowRef, watch } from 'vue';
-import type { MapData, MapTarget, MapBrush } from './bridge';
+import { request, type MapData, type MapTarget, type MapBrush, type GridPastePreview } from './bridge';
+import MapImpactReview from './MapImpactReview.vue';
 import { t } from './i18n';
+import MapTerrainPreset from './MapTerrainPreset.vue';
 const props = defineProps<{
   data: MapData; busy: boolean; values: Record<string, number | boolean | string>;
   execute: (command: string, payload?: Record<string, unknown>) => Promise<boolean>;
@@ -10,7 +12,7 @@ const props = defineProps<{
   validate: () => boolean;
 }>();
 const brush = defineModel<MapBrush>('brush', { required: true });
-const emit = defineEmits<{ preset: [values: Record<string, number>] }>();
+const emit = defineEmits<{ preset: [values: Record<string, number>]; painted: [] }>();
 const family = ref('land'), corner = ref('round');
 function preset(index: number) {
   const water = family.value === 'water';
@@ -35,6 +37,8 @@ watch(() => props.data.target.mode, mode => {
 watch(resource, value => { if (!['items', 'terrain'].includes(value)) fileWhole.value = true; });
 const dialog = ref<HTMLDialogElement | null>(null);
 const confirmation = shallowRef<{ command: string; payload: Record<string, unknown>; label: string; scope: string } | null>(null);
+const impact = shallowRef<GridPastePreview | null>(null), checkingImpact = ref(false);
+let impactToken = 0;
 function operationName(value: string) {
   const index = itemOperations.indexOf(value);
   if (index >= 0) return t('mapItemOperations').split('|')[index]!;
@@ -44,12 +48,20 @@ function operationName(value: string) {
 async function ask(command: string, payload: Record<string, unknown>, label: string, all: boolean) {
   if (props.busy) return;
   confirmation.value = { command, payload, label, scope: `${t('mapScopeNames').split('|')[all ? 1 : 0]} · ${props.data.acres.find(a => a.id === props.data.target.acre)?.name} · ${t('mapLayer')} ${props.data.target.layer}${props.data.target.mode === 'terrain' && interiorOnly.value && command === 'batchMap' ? ' · ' + t('mapInteriorOnly') : ''}` };
+  const token = ++impactToken;
+  impact.value = null; checkingImpact.value = command === 'batchMap';
   await nextTick();
   dialog.value?.showModal();
+  if (command === 'batchMap') {
+    try { const result = await request<GridPastePreview>('previewBatchMap', payload); if (token === impactToken) impact.value = result; }
+    catch (error) { if (token === impactToken) impact.value = { valid: false, error: error instanceof Error ? error.message : 'invalidRequest', placements: 0, changedCells: 0, replacedItems: 0, cells: [] }; }
+    finally { if (token === impactToken) checkingImpact.value = false; }
+  }
 }
-function cancel() { dialog.value?.close(); confirmation.value = null; }
+function cancel() { ++impactToken; dialog.value?.close(); confirmation.value = null; checkingImpact.value = false; impact.value = null; }
 async function confirm() {
   const pending = confirmation.value;
+  if (checkingImpact.value || pending?.command === 'batchMap' && (!impact.value?.valid || !impact.value.changedCells)) return;
   cancel();
   if (pending) await props.execute(pending.command, pending.payload);
 }
@@ -61,8 +73,9 @@ async function batch() {
 }
 async function paint() {
   if (!props.validate() || !Number.isInteger(brush.value.radius) || brush.value.radius < 1 || brush.value.radius > 8) return;
-  await props.execute('paintMap', { target: { ...props.data.target }, radius: brush.value.radius,
+  const success = await props.execute('paintMap', { target: { ...props.data.target }, radius: brush.value.radius,
     randomVariation: brush.value.randomVariation, values: { ...props.values } });
+  if (success) emit('painted');
 }
 async function file(importing: boolean) {
   if (!(await props.applyPending())) return;
@@ -88,7 +101,7 @@ async function active(value: boolean) {
       <div class="tool-row brush-presets">
         <label>{{ t('mapPresetFamily') }}<select v-model="family" :disabled="busy"><option value="land">{{ t('mapPresetFamilies').split('|')[0] }}</option><option value="water">{{ t('mapPresetFamilies').split('|')[1] }}</option></select></label>
         <label>{{ t('mapPresetCorner') }}<select v-model="corner" :disabled="busy"><option v-for="(kind, i) in ['round', 'angle', 'inside']" :key="kind" :value="kind">{{ t('mapPresetCorners').split('|')[i] }}</option></select></label>
-        <div class="preset-grid"><button v-for="(arrow, i) in ['↖', '↑', '↗', '←', '●', '→', '↙', '↓', '↘']" :key="i" type="button" :aria-label="`${t('mapPresetTile')} ${i + 1}`" :disabled="busy" @click="preset(i)">{{ arrow }}</button></div>
+        <div class="preset-grid"><button v-for="(arrow, i) in ['↖', '↑', '↗', '←', '●', '→', '↙', '↓', '↘']" :key="i" type="button" :aria-label="`${t('mapPresetTile')} ${i + 1}`" :disabled="busy" @click="preset(i)"><MapTerrainPreset :index="i" :water="family === 'water'" :corner="corner" /><span aria-hidden="true">{{ arrow }}</span></button></div>
       </div>
       <div class="tool-row">
         <label>{{ t('mapBrushSize') }}<input v-model.number="brush.radius" type="number" min="1" max="8" step="1" :disabled="busy" /></label>
@@ -120,7 +133,8 @@ async function active(value: boolean) {
     </details>
     <dialog v-if="confirmation" ref="dialog" class="modal" :aria-label="t('mapConfirmTitle')" @cancel.prevent="cancel">
       <h2>{{ t('mapConfirmTitle') }}</h2><p>{{ confirmation.label }}</p><p>{{ confirmation.scope }}</p><p>{{ t('mapBatchHint') }}</p>
-      <div class="form-actions"><button class="button" @click="cancel">{{ t('cancel') }}</button><button class="button primary" @click="confirm">{{ t('apply') }}</button></div>
+      <MapImpactReview v-if="confirmation.command === 'batchMap'" :preview="impact" :loading="checkingImpact" />
+      <div class="form-actions"><button class="button" @click="cancel">{{ t('cancel') }}</button><button class="button primary" :disabled="checkingImpact || confirmation.command === 'batchMap' && (!impact?.valid || !impact.changedCells)" @click="confirm">{{ t('apply') }}</button></div>
     </dialog>
   </section>
 </template>
@@ -130,7 +144,8 @@ async function active(value: boolean) {
 label { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; min-width: 0; }
 button, select, input[type=number] { max-width: 100%; box-sizing: border-box; padding: .5rem; border: 1px solid var(--line-strong); border-radius: .5rem; color: inherit; background: var(--surface); }
 input[type=number] { width: 5rem; }
-.preset-grid { display: grid; grid-template-columns: repeat(3, 2.5rem); gap: .25rem; }
+.preset-grid { display: grid; grid-template-columns: repeat(3, 3.1rem); gap: .25rem; }
+.preset-grid button { padding: .25rem; display: grid; gap: 2px; justify-items: center; font-size: .75rem; }
 summary { cursor: pointer; font-weight: 600; }
 p { color: var(--muted); line-height: 1.5; }
 </style>

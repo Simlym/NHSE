@@ -29,7 +29,7 @@ async function applyPending() {
   validation.value = '';
   return await props.execute('setMiscProfile', { player: props.player, ...fields.value });
 }
-defineExpose({ applyPending });
+defineExpose({ applyPending, hasPending: () => pending.value, resetDraft: () => { fields.value = values(); validation.value = ''; } });
 </script>
 <template>
   <form ref="form" class="misc-profile player-card" aria-labelledby="misc-profile-title" @submit.prevent="applyPending">

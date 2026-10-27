@@ -2317,3 +2317,14 @@ h3 {
     margin-bottom: 30px;
   }
 }
+
+/* Session feedback stays readable without growing the footer on compact screens. */
+.history-description { min-width: 0; max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--muted); }
+.density-select select { max-width: 120px; }
+:root[data-density=comfortable] .button { min-height: 44px; font-size: 14px; }
+:root[data-density=comfortable] .sidebar nav button { min-height: 44px; font-size: 13px; }
+:root[data-density=comfortable] .map-page button { min-height: 36px; font-size: 12px; }
+:root[data-density=comfortable] .map-grid button { min-height: 0; }
+:root[data-density=comfortable] .map-page input, :root[data-density=comfortable] .map-page select { font-size: 14px; }
+@media(max-width: 900px) { .history-description { display: none; } .density-select select { max-width: 82px; } }
+@media(max-width: 560px) { .statusbar .save-actions { gap: 4px; flex-wrap: wrap; } .reset-page-draft { font-size: 11px; } .density-select { display: none; } }

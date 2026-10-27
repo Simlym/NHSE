@@ -42,7 +42,7 @@ async function applyPending() {
   return await props.execute('setIslandRecords', { section: props.data.section, index: props.data.index, values: { ...values.value } });
 }
 async function navigate(section: IslandRecordSection, index = 0) { if (await applyPending()) await props.navigate(section, index); }
-defineExpose({ applyPending });
+defineExpose({ applyPending, hasPending: () => pending.value, resetDraft: () => { values.value = stored(); validation.value = ''; } });
 </script>
 <template>
   <section v-if="data" class="island-records-page">

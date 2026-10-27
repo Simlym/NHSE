@@ -38,6 +38,8 @@ import {
 import { languages, language, setLanguage, t, hasText } from './i18n';
 import VillagerPicker from './VillagerPicker.vue';
 import { editableTarget } from './gridSelection';
+import { clearSessionViews } from './sessionViewMemory';
+import { clearMapCameraMemory } from './useMapCamera';
 import InventoryGrid from './InventoryGrid.vue';
 import {
   listenState,
@@ -203,6 +205,43 @@ const profilePending = computed(
       ([key, value]) => value !== (currentPlayer.value![key as keyof Player] ?? null),
     ),
 );
+type DraftEditor = { hasPending?: () => boolean; resetDraft?: () => void };
+const activeDraftEditor = computed<DraftEditor | null>(() => ({
+  settings: settingsPage.value, advancedEditor: advancedPage.value, housing: housingPage.value,
+  mapEditor: mapPage.value, museum: museumPage.value, islandRecords: islandRecordsPage.value,
+  progress: progressPage.value, villagers: residentsPage.value, island: islandPage.value,
+}[page.value as 'settings'] ?? null));
+const inventoryPending = computed(() => !!selected.value && (!!draftItem.value || quantity.value !== selected.value.quantity));
+const currentDraftPending = computed(() => !!activeDraftEditor.value?.hasPending?.() ||
+  (page.value === 'player' && (!!profilePending.value || !!miscProfile.value?.hasPending())) ||
+  (page.value === 'inventory' && inventoryPending.value));
+function resetCurrentDraft() {
+  activeDraftEditor.value?.resetDraft?.();
+  if (page.value === 'player') { syncFields(currentPlayer.value); miscProfile.value?.resetDraft(); }
+  if (page.value === 'inventory') { draftItem.value = null; quantity.value = selected.value?.quantity ?? 1; }
+}
+const density = ref(localStorage.getItem('nhse.density') === 'comfortable' ? 'comfortable' : 'compact');
+watch(density, value => { document.documentElement.dataset.density = value; localStorage.setItem('nhse.density', value); }, { immediate: true });
+function historyDescription(action?: { command: string; scope: string } | null) {
+  if (!action) return t('uiUndoUnknown');
+  const command = action.command;
+  const names = t('uiActionNames').split('|');
+  const index = command === 'setPlayer' || command === 'setMiscProfile' ? 0
+    : command === 'pasteGrid' ? 3 : command === 'editGrid' ? 4 : command === 'paintMap' || command === 'paintMapStroke' ? 5
+    : command === 'moveMap' ? 12 : command === 'placeMap' ? 13
+    : /Map|map/.test(command) ? 2 : /Room|Housing|housing|Fruit|Campsite/.test(command) ? 6
+    : /IslandRecords|Museum/.test(command) ? 7 : /Progress|Collection|Remake/.test(command) ? 8
+    : /Resident/.test(command) ? 9 : /Import/.test(command) ? 10 : /Advanced/.test(command) ? 11 : /Item|item|Inventory/.test(command) ? 1 : -1;
+  const scope = action.scope.split(';').filter(Boolean).map(part => {
+    const [key, raw] = part.split('='), n = Number(raw);
+    if (!Number.isInteger(n)) return '';
+    if (key === 'cells') return t('gridSelected').replace('{0}', String(n));
+    if (key === 'player') return `${t('player')} ${state.value.session?.players.find(player => player.index === n)?.name ?? '#' + n}`;
+    const labels: Record<string, string> = { acre: t('mapAcre'), resident: t('villagers'), index: t('slot'), room: t('housingRoom'), layer: t('mapLayer') };
+    return labels[key ?? ''] ? `${labels[key!]} ${n}` : '';
+  }).filter(Boolean).join(' · ');
+  return `${names[index] ?? t('uiUndoUnknown')}${scope ? ' · ' + scope : ''}`;
+}
 const balanceFields = ['wallet', 'bank', 'miles', 'earnedMiles'] as const;
 const navGroups = [
   { id: 'overview', label: null, items: [{ id: 'overview', icon: LayoutDashboard }] },
@@ -256,6 +295,7 @@ function syncFields(player?: Player) {
 }
 function accept(next: State) {
   const previousPlayer = currentPlayer.value;
+  if (state.value.session?.id !== next.session?.id || (!!state.value.session && !next.session)) { clearSessionViews(); clearMapCameraMemory(); }
   state.value = next;
   if (['system', 'light', 'dark'].includes(next.theme ?? '')) theme.value = next.theme!;
   setLanguage(next.language);
@@ -478,10 +518,12 @@ async function open(kind: string) {
 }
 async function go(destination: Page) {
   if (busy.value) return;
+  const hadDraft = currentDraftPending.value;
   if (page.value === 'player' && profilePending.value && !(await applyProfile())) return;
   if (!(await applyWorldDrafts())) return;
   if (destination === 'tools') utilityHashes.value = null;
   page.value = destination;
+  if (hadDraft) toast('uiDraftApplied');
   if (destination === 'advancedEditor') advancedOrigin.value = null;
   if (destination === 'tools' || destination === 'settings') await run(loadImageLibrary);
   if (destination === 'inventory') await run(() => loadInventory(0));
@@ -849,6 +891,7 @@ onUnmounted(() => {
           ><strong>{{ state.session ? state.session.island : t('home') }}</strong>
         </div>
         <div class="top-actions">
+
           <label class="icon-select"
             ><Globe2 :size="17" /><span class="sr-only">{{ t('language') }}</span
             ><select
@@ -867,6 +910,7 @@ onUnmounted(() => {
               <option value="dark">{{ t('dark') }}</option>
             </select></label
           >
+          <label class="icon-select density-select"><span class="sr-only">{{ t('uiDensity') }}</span><select v-model="density" :aria-label="t('uiDensity')"><option value="compact">{{ t('uiDensityNames').split('|')[0] }}</option><option value="comfortable">{{ t('uiDensityNames').split('|')[1] }}</option></select></label>
           <button v-if="imagesRunning" class="icon-button" :aria-label="t('imagesBusy')" :title="t('imagesBusy')" :disabled="busy" @click="go(state.session ? 'tools' : 'settings')"><Download :size="18" /></button>
           <button v-if="!state.villagerPicker" class="icon-button" :aria-label="t('settings')" :title="t('settings')" :disabled="busy" @click="go('settings')"><SlidersHorizontal :size="19" /></button>
           <button
@@ -1352,14 +1396,16 @@ onUnmounted(() => {
       <footer class="statusbar">
         <span v-if="busy" class="status-text"><span class="spinner"></span>{{ t('loading') }}</span
         ><span v-else class="status-text"
-          ><span class="status-dot" :class="{ changed: state.session?.dirty }"></span
-          >{{ state.session ? t(state.session.dirty ? 'dirty' : 'saved') : t('ready') }}</span
+          ><span class="status-dot" :class="{ changed: currentDraftPending || state.session?.dirty }"></span
+          >{{ currentDraftPending ? t('uiDraftPending') : state.session ? t(state.session.dirty ? 'dirty' : 'saved') : t('ready') }}</span
         ><template v-if="state.session"
           ><div class="save-actions">
+            <button v-if="currentDraftPending" class="button reset-page-draft" :disabled="busy" @click="resetCurrentDraft">{{ t('uiResetDraft') }}</button>
+            <span v-if="state.session.undoAction" class="history-description" :title="t('uiUndoAction').replace('{0}', historyDescription(state.session.undoAction))">{{ t('uiUndoAction').replace('{0}', historyDescription(state.session.undoAction)) }}</span>
             <button
               class="icon-button"
               :aria-label="t('undo')"
-              :title="`${t('undo')} · Ctrl+Z`"
+              :title="`${t('uiUndoAction').replace('{0}', historyDescription(state.session.undoAction))} · Ctrl+Z`"
               :disabled="busy || !state.session.canUndo"
               @click="command('undo')"
             >
@@ -1367,7 +1413,7 @@ onUnmounted(() => {
             ><button
               class="icon-button"
               :aria-label="t('redo')"
-              :title="`${t('redo')} · Ctrl+Y`"
+              :title="`${t('uiRedoAction').replace('{0}', historyDescription(state.session.redoAction))} · Ctrl+Y`"
               :disabled="busy || !state.session.canRedo"
               @click="command('redo')"
             >

@@ -24,7 +24,7 @@ async function applyPending() {
   if (!form.value?.reportValidity()) return false;
   return await props.execute('setTurnips', { ...fields.value, sellPrices: [...fields.value.sellPrices] });
 }
-defineExpose({ applyPending });
+defineExpose({ applyPending, hasPending: () => pending.value, resetDraft: () => { fields.value = copy(); } });
 </script>
 
 <template>

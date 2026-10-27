@@ -10,7 +10,31 @@ internal sealed partial class WorkspaceSession
     internal sealed record GridTarget(string Kind, MapTarget? Map = null, int House = 0, int Room = 0, int Layer = 0,
         int Player = 0, string Container = "pocket", int[]? Slots = null, int Columns = 10);
     internal sealed record GridClipboardInfo(string Kind, int Count, int Width, int Height);
-    internal sealed record GridPastePreview(bool Valid, string? Error, int Placements, int ChangedCells, int ReplacedItems, MapPoint[] Cells);
+    internal sealed record GridPastePreview(bool Valid, string? Error, int Placements, int ChangedCells, int ReplacedItems, MapPoint[] Cells,
+        MapPoint[]? Conflicts = null, MapPoint[]? PlacedCells = null, MapPoint[]? ClearedCells = null);
+    private sealed class GridPlacementException(MapPoint[] cells) : ArgumentException("roomPlacementBlocked")
+    {
+        public MapPoint[] Cells { get; } = cells;
+    }
+    private static MapPoint[] PlacementConflicts(LayerItem layer, Item item, int x, int y)
+    {
+        var (width, height) = GridItemSize(item);
+        var result = new List<MapPoint>();
+        for (var dx = 0; dx < width; dx++) for (var dy = 0; dy < height; dy++)
+            if (!layer.Contains(x + dx, y + dy) || !layer.GetTile(x + dx, y + dy).IsNone) result.Add(new(x + dx, y + dy));
+        return result.ToArray();
+    }
+    private GridPastePreview PreviewFailure(GridTarget target, ArgumentException error) => new(false, error.Message, 0, 0, 0, [],
+        error is GridPlacementException placement ? placement.Cells.Select(p => GridPreviewCoordinate(target, p.X, p.Y)).Distinct().ToArray() : []);
+    private GridPastePreview ItemLayerPreview(GridTarget target, LayerItem layer, ulong[] before, int placements, int replaced)
+    {
+        var changed = Enumerable.Range(0, layer.Tiles.Length).Where(i => layer.Tiles[i].RawValue != before[i]).ToArray();
+        MapPoint Coordinate(int index) => GridPreviewCoordinate(target, index / layer.TileInfo.TotalHeight, index % layer.TileInfo.TotalHeight);
+        var cells = changed.Select(Coordinate).OrderBy(p => p.Y).ThenBy(p => p.X).ToArray();
+        return new(true, null, placements, cells.Length, replaced, cells, [],
+            changed.Where(i => !layer.Tiles[i].IsNone).Select(Coordinate).ToArray(),
+            changed.Where(i => layer.Tiles[i].IsNone).Select(Coordinate).ToArray());
+    }
     private sealed record GridPastePlan(GridPastePreview Preview, Action Commit);
     private sealed record GridEntry(int X, int Y, byte[] Data);
     private sealed record GridClipboard(GridClipboardInfo Info, GridEntry[] Entries);
@@ -114,7 +138,7 @@ internal sealed partial class WorkspaceSession
     public GridPastePreview PreviewGridPaste(GridTarget target, MapPoint anchor, MapPoint[] selection, bool noOverwrite)
     {
         try { return PrepareGridPaste(target, anchor, selection, noOverwrite).Preview; }
-        catch (ArgumentException ex) { return new(false, ex.Message, 0, 0, 0, []); }
+        catch (ArgumentException ex) { return PreviewFailure(target, ex); }
     }
     private MapPoint GridPreviewCoordinate(GridTarget target, int x, int y)
     {
@@ -142,7 +166,7 @@ internal sealed partial class WorkspaceSession
             var before = terrain.DumpAll();
             foreach (var e in entries)
             {
-                if (!terrain.Contains(e.X, e.Y)) throw new ArgumentException("roomPlacementBlocked");
+                if (!terrain.Contains(e.X, e.Y)) throw new GridPlacementException([new(e.X, e.Y)]);
                 terrain.GetTile(e.X, e.Y).CopyFrom(TerrainTile.GetArray(e.Data)[0]);
             }
             var after = terrain.DumpAll();
@@ -150,7 +174,7 @@ internal sealed partial class WorkspaceSession
                 .Where(i => !before.AsSpan(i * TerrainTile.SIZE, TerrainTile.SIZE).SequenceEqual(after.AsSpan(i * TerrainTile.SIZE, TerrainTile.SIZE)))
                 .Select(i => GridPreviewCoordinate(target, i / terrain.TileInfo.TotalHeight, i % terrain.TileInfo.TotalHeight))
                 .OrderBy(p => p.Y).ThenBy(p => p.X).ToArray();
-            return new(new(true, null, entries.Count, changed.Length, 0, changed),
+            return new(new(true, null, entries.Count, changed.Length, 0, changed, [], changed, []),
                 () => CommitMapPatches([MapPatch(SaveFile.Main.Offsets.LandMakingMap, after)]));
         }
         var layer = grid!.Layer;
@@ -164,7 +188,7 @@ internal sealed partial class WorkspaceSession
             var item = Item.GetArray(entry.Data)[0]; ValidateMapItem(item);
             if (target.Kind == "roomItems" && !WorkspaceCatalog.Contains(item.ItemId)) throw new ArgumentException("gridRoomItem");
             var (w, h) = GridItemSize(item);
-            if (!layer.Contains(point.X, point.Y) || !layer.Contains(point.X + w - 1, point.Y + h - 1)) throw new ArgumentException("roomPlacementBlocked");
+            if (!layer.Contains(point.X, point.Y) || !layer.Contains(point.X + w - 1, point.Y + h - 1)) throw new GridPlacementException(PlacementConflicts(layer, item, point.X, point.Y));
             planned.Add((point, item));
             for (var x = 0; x < w; x++) for (var y = 0; y < h; y++) covered.Add(new(point.X + x, point.Y + y));
         }
@@ -180,13 +204,10 @@ internal sealed partial class WorkspaceSession
         foreach (var point in remove) ClearGridRoot(layer, point);
         foreach (var (point, item) in planned)
         {
-            if (layer.IsOccupied(item, point.X, point.Y) != PlacedItemPermission.NoCollision) throw new ArgumentException("roomPlacementBlocked");
+            if (layer.IsOccupied(item, point.X, point.Y) != PlacedItemPermission.NoCollision) throw new GridPlacementException(PlacementConflicts(layer, item, point.X, point.Y));
             layer.SetExtensionTiles(item, point.X, point.Y); layer.GetTile(point.X, point.Y).CopyFrom(item);
         }
-        var changedItems = Enumerable.Range(0, layer.Tiles.Length).Where(i => layer.Tiles[i].RawValue != beforeItems[i])
-            .Select(i => GridPreviewCoordinate(target, i / layer.TileInfo.TotalHeight, i % layer.TileInfo.TotalHeight))
-            .OrderBy(p => p.Y).ThenBy(p => p.X).ToArray();
-        return new(new(true, null, planned.Count, changedItems.Length, remove.Count, changedItems), grid.Save);
+        return new(ItemLayerPreview(target, layer, beforeItems, planned.Count, remove.Count), grid.Save);
     }
     public void EditGrid(GridTarget target, MapPoint[] selection, string operation)
     {
@@ -210,7 +231,7 @@ internal sealed partial class WorkspaceSession
         if (operation == "rotate") foreach (var (point, item) in changed)
         {
             item.Rotation = (item.Rotation + 1) & 3;
-            if (layer.IsOccupied(item, point.X, point.Y) != PlacedItemPermission.NoCollision) throw new ArgumentException("roomPlacementBlocked");
+            if (layer.IsOccupied(item, point.X, point.Y) != PlacedItemPermission.NoCollision) throw new GridPlacementException(PlacementConflicts(layer, item, point.X, point.Y));
             layer.SetExtensionTiles(item, point.X, point.Y); layer.GetTile(point.X, point.Y).CopyFrom(item);
         }
         grid.Save();

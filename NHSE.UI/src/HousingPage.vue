@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { t } from './i18n';
+import { useSessionView } from './sessionViewMemory';
 import type { HousingData, HousingTarget, HousingTile, ItemView, RoomItem, GridClipboardInfo, GridTarget } from './bridge';
 import HousingFields from './HousingFields.vue';
 import GridToolbar from './GridToolbar.vue';
@@ -171,7 +172,9 @@ function changeSelect(event: Event, field: 'index' | 'room' | 'layer') {
   input.value = String(field === 'index' ? (props.data?.index ?? 0) : (props.data?.room?.[field] ?? 0));
   void props.navigate({ [field]: value });
 }
-defineExpose({ applyPending, chooseItem });
+function resetDraft() { fields.value = stored(); item.value = { ...(selectedTile.value?.item ?? emptyItem()) }; }
+defineExpose({ applyPending, chooseItem, hasPending: () => !!pending.value || !!pendingTile.value, resetDraft });
+useSessionView(() => `housing:${props.player}:${props.data?.kind}:${props.data?.index}:${props.data?.room?.room}:${props.data?.room?.layer}`, [selected], () => form.value?.closest<HTMLElement>('.housing-page') ?? null);
 </script>
 
 <template>

@@ -51,7 +51,7 @@ async function openTool(tool: string) {
   }
   if (await applyPending()) await props.execute('tool', { tool });
 }
-defineExpose({ applyPending });
+defineExpose({ applyPending, hasPending: () => pending.value || !!turnipsEditor.value?.hasPending(), resetDraft: () => { fields.value = { ...props.settings }; turnipsEditor.value?.resetDraft(); } });
 </script>
 
 <template>

@@ -1163,9 +1163,12 @@ var oldCatalogueReload = new HorizonSave(originalProvider);
 Check(oldCatalogueReload.Players[0].Personal.ProfileTimestamp.ToString() == "2024-12-31" && !oldCatalogueReload.GetInvalidHashes().Any(),
     "original catalogue and profile edits survive encrypted reload with valid hashes");
 GridPreviewChecks.Run(provider);
+MapInteractionChecks.Run(provider);
+MapFeedbackChecks.Run(provider);
 IslandRecordsChecks.Run(provider, originalProvider);
 UtilityChecks.Run(provider, originalProvider);
 ImageLibraryChecks.Run();
+HistoryMetadataChecks.Run(provider);
 Console.WriteLine("All workspace integration checks passed.");
 if (args.Length == 2 && args[0] == "--fixture") provider.Export(args[1]);
 

@@ -119,7 +119,11 @@ public sealed partial class WorkspaceForm : Form
             // Yield so the page can paint its progress state before native dialogs / save work.
             await Task.Yield();
             if (IsDisposed) return;
-            object? data = command == "imageSourceSize" ? await ImageSourceSizeAsync(Int(payload, "source")) : Dispatch(command, payload, e);
+            var actionSession = Session;
+            actionSession?.SetActionContext(DescribeAction(command, payload));
+            object? data;
+            try { data = command == "imageSourceSize" ? await ImageSourceSizeAsync(Int(payload, "source")) : Dispatch(command, payload, e); }
+            finally { actionSession?.SetActionContext(null); }
             Reply(new { id, ok = true, data });
         }
         catch (Exception ex)
@@ -134,6 +138,16 @@ public sealed partial class WorkspaceForm : Form
     {
         if (!IsDisposed && Browser.CoreWebView2 is { } core)
             core.PostWebMessageAsJson(JsonSerializer.Serialize(value, Json));
+    }
+
+    private static WorkspaceSession.ActionInfo DescribeAction(string? command, JsonElement payload)
+    {
+        var scopes = new List<string>();
+        var target = payload.TryGetProperty("target", out var nested) && nested.ValueKind == JsonValueKind.Object ? nested : payload;
+        foreach (var key in new[] { "player", "resident", "acre", "index", "room", "layer" })
+            if (target.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var index)) scopes.Add($"{key}={index}");
+        if (payload.TryGetProperty("selection", out var selection) && selection.ValueKind == JsonValueKind.Array) scopes.Add($"cells={selection.GetArrayLength()}");
+        return new(command ?? "", string.Join(";", scopes));
     }
 
     private object State()
@@ -284,10 +298,40 @@ public sealed partial class WorkspaceForm : Form
             case "setMapActive":
                 RequireSession().SetMapActive(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), p.GetProperty("active").GetBoolean());
                 return State();
+            case "previewMoveMap":
+            case "moveMap":
+            {
+                var interactionTarget = p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest");
+                var selection = p.GetProperty("selection").Deserialize<WorkspaceSession.MapPoint[]>(Json) ?? throw new ArgumentException("invalidRequest");
+                var anchor = p.GetProperty("anchor").Deserialize<WorkspaceSession.MapPoint>(Json) ?? throw new ArgumentException("invalidRequest");
+                var snap = !p.TryGetProperty("snapFieldItems", out var snapValue) || snapValue.GetBoolean();
+                if (command == "previewMoveMap") return RequireSession().PreviewMoveMap(interactionTarget, selection, anchor, p.GetProperty("noOverwrite").GetBoolean(), snap);
+                RequireSession().MoveMap(interactionTarget, selection, anchor, p.GetProperty("noOverwrite").GetBoolean(), snap); return State();
+            }
+            case "previewPlaceMap":
+            case "placeMap":
+            {
+                var interactionTarget = p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest");
+                var current = p.GetProperty("current").Deserialize<WorkspaceSession.RoomItem>(Json) ?? throw new ArgumentException("invalidRequest");
+                var snap = !p.TryGetProperty("snapFieldItems", out var snapValue) || snapValue.GetBoolean();
+                if (command == "previewPlaceMap") return RequireSession().PreviewPlaceMap(interactionTarget, current, p.GetProperty("noOverwrite").GetBoolean(), snap);
+                RequireSession().PlaceMap(interactionTarget, current, p.GetProperty("noOverwrite").GetBoolean(), snap); return State();
+            }
             case "batchMap":
                 RequireSession().BatchMap(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), Str(p, "operation"),
                     p.GetProperty("whole").GetBoolean(), p.GetProperty("interiorOnly").GetBoolean(), p.GetProperty("values").Deserialize<Dictionary<string, JsonElement>>() ?? throw new ArgumentException("invalidRequest"));
                 return State();
+            case "mapBrushMask": return WorkspaceSession.MapBrushMasks();
+            case "previewBatchMap":
+                return RequireSession().PreviewBatchMap(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), Str(p, "operation"),
+                    p.GetProperty("whole").GetBoolean(), p.GetProperty("interiorOnly").GetBoolean(), p.GetProperty("values").Deserialize<Dictionary<string, JsonElement>>() ?? throw new ArgumentException("invalidRequest"));
+            case "previewMapParameters":
+                return RequireSession().PreviewMapParameters(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), p.GetProperty("whole").GetBoolean(),
+                    p.GetProperty("filters").Deserialize<WorkspaceSession.MapEditRule[]>(Json) ?? throw new ArgumentException("invalidRequest"),
+                    p.GetProperty("changes").Deserialize<WorkspaceSession.MapEditRule[]>(Json) ?? throw new ArgumentException("invalidRequest"));
+            case "previewReplaceMapMatches":
+                return RequireSession().PreviewReplaceMapMatches(p.GetProperty("target").Deserialize<WorkspaceSession.MapTarget>(Json) ?? throw new ArgumentException("invalidRequest"), p.GetProperty("whole").GetBoolean(),
+                    p.GetProperty("current").Deserialize<WorkspaceSession.RoomItem>(Json) ?? throw new ArgumentException("invalidRequest"), p.GetProperty("remove").GetBoolean());
             case "copyGrid":
             case "previewGridPaste":
             case "pasteGrid":

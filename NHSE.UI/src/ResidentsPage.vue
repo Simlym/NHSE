@@ -67,7 +67,7 @@ async function pick(choice: { index: number; id?: string }) {
 async function advanced() {
   if (await applyPending()) await props.execute('advanced', { kind: 'resident', resident: target.value, index: 0 });
 }
-defineExpose({ applyPending });
+defineExpose({ applyPending, hasPending: () => !!pending.value, resetDraft: () => { const v = resident.value; if (v) fields.value = { personality: v.personality, catchphrase: v.catchphrase, movingOut: v.movingOut }; } });
 </script>
 
 <template>

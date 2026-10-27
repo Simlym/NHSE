@@ -9,7 +9,11 @@ namespace NHSE.WinForms;
 internal sealed partial class WorkspaceSession(HorizonSave save)
 {
     public HorizonSave SaveFile { get; } = save;
-    private sealed record Change(Action Undo, Action Redo, long Before, long After);
+    internal sealed record ActionInfo(string Command, string Scope);
+    private sealed record Change(Action Undo, Action Redo, long Before, long After, ActionInfo? Description);
+    private readonly string SessionId = Guid.NewGuid().ToString("N");
+    private ActionInfo? CurrentAction;
+    public void SetActionContext(ActionInfo? action) => CurrentAction = action;
     private sealed record IdentityPatch(EncryptedFilePair File, int Offset, byte[] Before, byte[] After);
     private readonly Stack<Change> UndoStack = new();
     private readonly Stack<Change> RedoStack = new();
@@ -21,9 +25,12 @@ internal sealed partial class WorkspaceSession(HorizonSave save)
 
     public object Snapshot(Func<int, string?>? getAvatar = null, Func<string, string?>? getVillagerImage = null) => new
     {
+        id = SessionId,
         title = SaveFile.GetSaveTitle("NHSE"),
         island = SaveFile.Players[0].Personal.TownName,
         clipboard = GridBuffer?.Info, dirty = IsDirty, canUndo = UndoStack.Count != 0, canRedo = RedoStack.Count != 0,
+        undoAction = UndoStack.TryPeek(out var undo) ? undo.Description : null,
+        redoAction = RedoStack.TryPeek(out var redo) ? redo.Description : null,
         islandSettings = GetIslandSettings(),
         turnips = GetTurnips(),
         residents = GetResidents(getVillagerImage),
@@ -210,7 +217,7 @@ internal sealed partial class WorkspaceSession(HorizonSave save)
     private void Commit(Action undo, Action redo)
     {
         redo();
-        UndoStack.Push(new Change(undo, redo, Revision, ++NextRevision));
+        UndoStack.Push(new Change(undo, redo, Revision, ++NextRevision, CurrentAction));
         Revision = NextRevision;
         RedoStack.Clear();
     }

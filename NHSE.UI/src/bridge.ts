@@ -24,6 +24,9 @@ export interface Player {
   poki: number | null;
 }
 export interface Session {
+  id?: string;
+  undoAction?: { command: string; scope: string } | null;
+  redoAction?: { command: string; scope: string } | null;
   title: string;
   island: string;
   dirty: boolean;
@@ -272,6 +275,7 @@ export interface GridClipboardInfo { kind: 'items' | 'terrain'; count: number; w
 export interface GridPastePreview {
   valid: boolean; error?: string | null; placements: number; changedCells: number; replacedItems: number;
   cells: { x: number; y: number }[];
+  conflicts?: { x: number; y: number }[]; placedCells?: { x: number; y: number }[]; clearedCells?: { x: number; y: number }[];
 }
 
 export type IslandRecordSection = 'bulletin' | 'visitors';

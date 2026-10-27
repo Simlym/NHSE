@@ -115,7 +115,7 @@ async function confirm() {
   cancel();
   if (operation) await props.execute(operation.action === 'collectionBatch' ? 'collectionBatch' : 'progressBatch', { section: props.section, ...operation });
 }
-defineExpose({ applyPending });
+defineExpose({ applyPending, hasPending: () => !!pending.value, resetDraft: () => { fields.value = values(entry.value); } });
 </script>
 
 <template>

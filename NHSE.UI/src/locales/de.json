@@ -51,7 +51,7 @@
   "apply": "Änderungen übernehmen",
   "applied": "Änderungen übernommen. Speichere anschließend den Spielstand.",
   "saveSuccess": "Spielstand gespeichert.",
-  "inventoryHint": "Wähle einen Platz, um Gegenstände anzusehen oder auszutauschen. Änderungen lassen sich rückgängig machen.",
+  "inventoryHint": "Klicken für Details, doppelklicken zum Hinzufügen oder Ersetzen. Änderungen können rückgängig gemacht werden.",
   "pocket": "Taschen",
   "storage": "Hauslager",
   "searchInventory": "In diesem Inventar suchen",
@@ -635,5 +635,9 @@
   "mapUseCurrentItem": "Aktuellen Gegenstand verwenden",
   "mapStampHint": "Klicken platziert einen Gegenstand. R dreht die Vorlage, Esc beendet den Modus.",
   "mapMoveHint": "Ziehe ein belegtes Feld, um sein Objekt zu verschieben, oder ziehe innerhalb der Auswahl, um alle ausgewählten Objekte zu verschieben. Beim Loslassen wird geprüft und gemeinsam angewendet.",
-  "mapBuildingDragHint": "Ziehe die Beschriftung des ausgewählten Gebäudes, um es zu verschieben. Esc bricht ab."
+  "mapBuildingDragHint": "Ziehe die Beschriftung des ausgewählten Gebäudes, um es zu verschieben. Esc bricht ab.",
+  "inventoryAddItem": "Gegenstand hinzufügen",
+  "inventoryReplaceItem": "Gegenstand ersetzen",
+  "inventoryUpdateQuantity": "Menge aktualisieren",
+  "inventoryCatalogHint": "Die Auswahl wird sofort auf diesen Platz angewendet und kann rückgängig gemacht werden. Die bisherige Menge wird bis zum neuen Stapellimit übernommen."
 }

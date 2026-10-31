@@ -51,7 +51,7 @@
   "apply": "套用修改",
   "applied": "已套用修改，確認後請儲存存檔。",
   "saveSuccess": "存檔儲存成功。",
-  "inventoryHint": "點選格子查看或替換物品，已套用的修改支援復原。",
+  "inventoryHint": "按一下格子查看，按兩下新增或替換物品。修改立即生效，支援復原。",
   "pocket": "隨身口袋",
   "storage": "房屋收納",
   "searchInventory": "尋找口袋或倉庫中的物品",
@@ -635,5 +635,9 @@
   "mapUseCurrentItem": "使用目前物品",
   "mapStampHint": "點擊放置一個物品，R 旋轉範本，Esc 退出。",
   "mapMoveHint": "拖動占用格移動物品；在選取範圍內拖動可整體移動選取物品。放開後檢查並一次提交。",
-  "mapBuildingDragHint": "拖動已選建築的標籤移動建築，Esc 取消。"
+  "mapBuildingDragHint": "拖動已選建築的標籤移動建築，Esc 取消。",
+  "inventoryAddItem": "新增物品",
+  "inventoryReplaceItem": "替換物品",
+  "inventoryUpdateQuantity": "更新數量",
+  "inventoryCatalogHint": "選擇新物品後立即套用到此格，可復原。堆疊數量沿用原數量，不超過新物品上限。"
 }

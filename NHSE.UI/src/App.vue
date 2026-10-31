@@ -683,7 +683,8 @@ function chooseClothingGroup(id: string) {
   catalogSubcategory.value = id;
   void searchCatalog(0);
 }
-function chooseCatalog(item: ItemView) {
+async function chooseCatalog(item: ItemView) {
+  if (busy.value) return;
   if (catalogTarget === 'advanced') { advancedPage.value?.chooseItem(item); catalogOpen.value = false; return; }
   if (catalogTarget === 'museum') { museumPage.value?.chooseItem(item); catalogOpen.value = false; return; }
   if (catalogTarget === 'map') {
@@ -696,9 +697,15 @@ function chooseCatalog(item: ItemView) {
     catalogOpen.value = false;
     return;
   }
-  draftItem.value = item;
-  quantity.value = 1;
-  catalogOpen.value = false;
+  if (!selected.value) return;
+  const applied = await command('setItem', {
+    player: playerIndex.value,
+    container: container.value,
+    index: selected.value.index,
+    itemId: item.itemId,
+    quantity: Math.min(Math.max(1, selected.value.quantity), item.maxQuantity),
+  }, 'applied');
+  if (applied) catalogOpen.value = false;
 }
 async function applyItem() {
   if (!selected.value || !currentItem.value) return;
@@ -1009,7 +1016,7 @@ onUnmounted(() => {
           </div>
         </section>
       </main>
-      <main v-else class="workspace-content" :class="{ 'map-workspace-page': page === 'mapEditor' }">
+      <main v-else class="workspace-content" :class="{ 'map-workspace-page': page === 'mapEditor', 'player-workspace-page': page === 'player' }">
         <div class="workspace-heading">
           <div>
             <div class="eyebrow muted">{{ state.session.island }}</div>
@@ -1074,7 +1081,7 @@ onUnmounted(() => {
           </div>
         </section>
         <section v-else-if="page === 'player'" class="player-page">
-          <p class="page-description">{{ t('playerHint') }}</p>
+          <p class="page-description player-description">{{ t('playerHint') }}</p>
           <form ref="playerForm" class="balance-form" @submit.prevent="applyProfile">
             <section class="player-card player-identity" aria-labelledby="player-identity-title">
               <div class="form-section-title">
@@ -1180,7 +1187,7 @@ onUnmounted(() => {
             </section>
             <div class="form-actions player-actions">
               <p class="player-apply-help">{{ t('playerApplyHint') }}</p>
-              <button class="button primary" :disabled="busy">{{ t('apply') }}<Check :size="17" /></button
+              <button class="button primary" :disabled="busy || !profilePending">{{ t('apply') }}<Check :size="17" /></button
               ><button
                 type="button"
                 class="text-button"
@@ -1229,7 +1236,8 @@ onUnmounted(() => {
               /></label>
               <InventoryGrid :data="inventory" :player="playerIndex" :container="container"
                 :scope="JSON.stringify([page, query, inventory?.page, state.session?.title])" :busy="busy"
-                :selected="selected" :clipboard="state.session?.clipboard ?? null" :choose="chooseSlot" :execute="worldCommand" @clear="clearInventorySelection" />
+                :selected="selected" :clipboard="state.session?.clipboard ?? null" :choose="chooseSlot" :execute="worldCommand" @clear="clearInventorySelection"
+                @replace="item => { chooseSlot(item); showCatalog(); }" />
               <div v-if="inventory?.items.length === 0" class="empty-result">
                 {{ t('noResults') }}
               </div>
@@ -1261,7 +1269,7 @@ onUnmounted(() => {
                 <h3>{{ currentItem?.empty ? t('empty') : currentItem?.name }}</h3>
                 <p class="slot-position">{{ t('slot') }} {{ selected.index + 1 }}</p>
                 <button class="button choose-item" :disabled="busy" @click="showCatalog()">
-                  <Search :size="17" />{{ t('replace') }}
+                  <Plus v-if="selected.empty" :size="17" /><Search v-else :size="17" />{{ t(selected.empty ? 'inventoryAddItem' : 'inventoryReplaceItem') }}
                 </button>
                 <form v-if="currentItem && !currentItem.empty" @submit.prevent="applyItem">
                   <label class="quantity-field"
@@ -1276,8 +1284,8 @@ onUnmounted(() => {
                       :disabled="busy || currentItem.maxQuantity === 1"
                   /></label>
                   <p class="field-help">{{ currentItem.maxQuantity === 1 ? t('itemNotStackable') : `${t('quantityHint')} (${currentItem.maxQuantity})` }}</p>
-                  <button class="button primary inspector-apply" :disabled="busy">
-                    {{ t('apply') }}<Check :size="17" />
+                  <button v-if="currentItem.maxQuantity > 1" class="button primary inspector-apply" :disabled="busy || !inventoryPending">
+                    {{ t('inventoryUpdateQuantity') }}<Check :size="17" />
                   </button>
                 </form>
                 <div class="inspector-more">
@@ -1438,6 +1446,7 @@ onUnmounted(() => {
       class="modal"
       :class="{ 'catalog-modal': catalogOpen }"
       :aria-label="catalogOpen ? t('catalogTitle') : t('howTitle')"
+      @keydown.esc.stop.prevent="catalogOpen = false; helpOpen = false"
       @cancel.prevent="
         catalogOpen = false;
         helpOpen = false;
@@ -1460,7 +1469,11 @@ onUnmounted(() => {
         </button>
       </div>
       <template v-if="catalogOpen">
-        <p class="page-description">{{ t('catalogHint') }}</p>
+        <p v-if="catalogTarget === 'inventory' && selected" class="page-description inventory-catalog-context">
+          <strong>{{ t('slot') }} {{ selected.index + 1 }} · {{ selected.empty ? t('empty') : selected.name }}</strong>
+          <span>{{ t('inventoryCatalogHint') }}</span>
+        </p>
+        <p v-else class="page-description">{{ t('catalogHint') }}</p>
         <label class="search-field"
           ><Search :size="18" /><span class="sr-only">{{ t('searchItems') }}</span
           ><input v-model="catalogQuery" autofocus type="search" :placeholder="t('searchItems')"

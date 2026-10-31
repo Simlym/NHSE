@@ -12,8 +12,16 @@ const props = defineProps<{
   execute: (command: string, payload: Record<string, unknown>) => Promise<boolean>;
 }>();
 const element = ref<HTMLElement | null>(null);
-const emit = defineEmits<{ clear: [] }>();
+const emit = defineEmits<{ clear: []; replace: [item: ItemView] }>();
 function clear() { selection.clear(); emit('clear'); }
+function replace(event: MouseEvent) {
+  if (props.busy || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  // Selection captures the pointer on the grid, so double-clicks may target the grid itself.
+  const slot = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-slot-index]');
+  if (!slot || !element.value?.contains(slot)) return;
+  const item = items.value[Number(slot.dataset.slotIndex)];
+  if (item?.available) emit('replace', item);
+}
 function escape(event: KeyboardEvent) {
   if (event.key !== 'Escape' || document.querySelector('dialog[open], [aria-modal="true"]')) return;
   event.preventDefault();
@@ -65,10 +73,10 @@ onBeforeUnmount(() => {
     tabindex="0" role="group" :aria-label="t(container === 'pocket' ? 'pocket' : container === 'recycle' ? 'recycle' : 'storage')"
     :data-columns="columns" :data-rows="Math.ceil(items.length / columns)"
     @pointerdown="selection.down" @pointermove="selection.move" @pointerup="selection.up"
-    @pointercancel="selection.cancel" @lostpointercapture="selection.cancel" @keydown="($event.key === 'Escape' ? (clear(), $event.preventDefault(), $event.stopPropagation()) : selection.keydown($event))">
+    @pointercancel="selection.cancel" @lostpointercapture="selection.cancel" @dblclick="replace" @keydown="($event.key === 'Escape' ? (clear(), $event.preventDefault(), $event.stopPropagation()) : selection.keydown($event))">
     <button v-for="(item, index) in items" :key="item.index" tabindex="-1" class="item-slot"
       :class="{ selected: selected?.index === item.index, 'multi-selected': selection.keys.value.has(pointKey(point(index))), 'is-empty': item.empty, locked: !item.available }"
-      :disabled="busy || !item.available"
+      :disabled="busy || !item.available" :data-slot-index="index"
       :aria-label="`${t('slot')} ${item.index + 1}: ${!item.available ? t('locked') : item.empty ? t('empty') : item.name}`"
       :aria-pressed="selection.keys.value.has(pointKey(point(index)))"
       @click="selection.click($event, point(index))">

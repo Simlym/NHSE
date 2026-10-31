@@ -9,7 +9,9 @@ async function openProgress(page: import('@playwright/test').Page) {
   await page.goto('/');
   await page.getByRole('button', { name: '打开存档', exact: true }).click();
   await page.locator('.sidebar nav').getByRole('button', { name: '玩家进度', exact: true }).click();
-  await expect(page.locator('.progress-entry')).toHaveCount(60);
+  await expect(page.locator('.progress-entry')).toHaveCount(24);
+  await expect(page.locator('.progress-editor')).toHaveCount(0);
+  await page.locator('.progress-entry').first().click();
 }
 
 test('recipe drafts survive language changes, auto-apply on player switching and undo independently', async ({
@@ -26,6 +28,7 @@ test('recipe drafts survive language changes, auto-apply on player switching and
   await expect(editor.getByRole('checkbox', { name: 'Favorite', exact: true })).toBeChecked();
   await page.locator('.icon-select select').first().selectOption('zhs');
   await page.locator('.player-chip').nth(1).click();
+  await page.locator('.progress-entry').first().click();
   await expect(editor.getByRole('checkbox', { name: '已学习', exact: true })).not.toBeChecked();
   await page.locator('.player-chip').first().click();
   await page.getByRole('searchbox').fill('2047');
@@ -51,6 +54,8 @@ test('reaction wheel and learned slots preserve separate drafts and batch edits 
 }) => {
   await openProgress(page);
   await page.getByRole('button', { name: '反应', exact: true }).click();
+  await expect(page.locator('.progress-editor')).toHaveCount(0);
+  await page.locator('.progress-entry').first().click();
   const editor = page.locator('.progress-editor');
   await editor.getByRole('combobox', { name: '反应编号', exact: true }).selectOption('255');
   await editor.getByRole('checkbox', { name: '新标记', exact: true }).check();
@@ -80,6 +85,8 @@ test('achievement counts, dates and read flags validate, autosave and stay usabl
 }) => {
   await openProgress(page);
   await page.getByRole('button', { name: '成就', exact: true }).click();
+  await expect(page.locator('.progress-editor')).toHaveCount(0);
+  await page.locator('.progress-entry').first().click();
   const editor = page.locator('.progress-editor');
   await expect(editor.locator('.progress-milestone')).toHaveCount(6);
   await editor.getByRole('spinbutton', { name: '计数', exact: true }).fill('4294967296');
@@ -101,7 +108,13 @@ test('achievement counts, dates and read flags validate, autosave and stay usabl
   await expect(editor.getByRole('textbox', { name: '日期', exact: true }).first()).toHaveValue('2024-02-29');
   await page.setViewportSize({ width: 1180, height: 1000 });
   expect((await editor.getByRole('checkbox').first().boundingBox())!.width).toBeLessThan(30);
-  await editor.getByRole('heading').scrollIntoViewIfNeeded();
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await expect(page.locator('.toast')).toHaveCount(0);
+  await editor.scrollIntoViewIfNeeded();
+  expect((await editor.getByRole('spinbutton', { name: '计数', exact: true }).boundingBox())!.width).toBeLessThan(190);
+  expect((await editor.getByRole('textbox', { name: '日期', exact: true }).first().boundingBox())!.width).toBeLessThan(190);
+  expect((await editor.boundingBox())!.height).toBeLessThan(480);
+  await page.locator('.workspace-content').evaluate(el => { el.scrollTop = 0; });
   await page.screenshot({ path: 'test-results/achievement-editor-zhs.png' });
   for (const code of ['en', 'jp', 'de', 'es', 'fr', 'it', 'ko', 'zhs', 'zht']) {
     await page.locator('.icon-select select').first().selectOption(code);
@@ -114,4 +127,63 @@ test('achievement counts, dates and read flags validate, autosave and stay usabl
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     }
   }
+});
+
+
+test('compact progress rows paginate and apply drafts before search and status filters hide them', async ({ page }) => {
+  await openProgress(page);
+  const filters = page.locator('.progress-filters');
+  const editor = page.locator('.progress-editor');
+  await editor.getByRole('checkbox', { name: '已学习', exact: true }).check();
+  await page.getByRole('searchbox').fill('2047');
+  await expect(page.locator('.progress-entry')).toHaveCount(1);
+  await expect(editor).toHaveCount(0);
+  await page.getByRole('searchbox').fill('');
+  await filters.getByRole('button', { name: '已学习', exact: true }).click();
+  await expect(page.locator('.progress-entry')).toHaveCount(1);
+  await expect(editor.getByRole('checkbox', { name: '已学习', exact: true })).toBeChecked();
+  await filters.getByRole('button', { name: '全部物品', exact: true }).click();
+  await editor.getByRole('checkbox', { name: '收藏', exact: true }).check();
+  await page.locator('.progress-pagination-top').getByRole('button', { name: '下一页', exact: true }).click();
+  await expect(page.locator('.progress-entry').first()).toContainText('#24');
+  await filters.getByRole('button', { name: '收藏', exact: true }).click();
+  await expect(page.locator('.progress-entry')).toHaveCount(1);
+  await expect(editor.getByRole('checkbox', { name: '收藏', exact: true })).toBeChecked();
+  await filters.getByRole('button', { name: '全部物品', exact: true }).click();
+  await page.getByRole('spinbutton', { name: '跳至页码', exact: true }).fill('86');
+  await page.getByRole('spinbutton', { name: '跳至页码', exact: true }).press('Tab');
+  await expect(page.locator('.progress-entry')).toHaveCount(8);
+  await expect(page.locator('.progress-entry').last()).toContainText('#2047');
+  await page.locator('.progress-entry').last().click();
+  await expect(page.locator('.progress-record').last().locator('.progress-editor')).toBeVisible();
+  expect(await page.locator('.progress-list').evaluate(el => el.scrollHeight <= el.clientHeight)).toBe(true);
+  await page.locator('.progress-pagination-top').getByRole('button', { name: '第一页', exact: true }).click();
+  await page.locator('.progress-entry').first().click();
+  await page.locator('.progress-entry').first().click();
+  await expect(editor).toHaveCount(0);
+  await page.locator('.progress-entry').first().click();
+  await expect(editor).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await expect(page.locator('.toast')).toHaveCount(0);
+  await page.locator('.workspace-content').evaluate(el => { el.scrollTop = 0; });
+  await page.screenshot({ path: 'test-results/progress-compact-desktop.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.locator('.progress-browser').scrollIntoViewIfNeeded();
+  for (const button of await page.locator('.progress-pagination-top .button').all())
+    expect((await button.boundingBox())!.height).toBeLessThan(60);
+  await page.screenshot({ path: 'test-results/progress-compact-mobile.png' });
+});
+
+test('invalid achievement drafts keep the editor visible when searching or paging', async ({ page }) => {
+  await openProgress(page);
+  await page.getByRole('button', { name: '成就', exact: true }).click();
+  await expect(page.locator('.progress-editor')).toHaveCount(0);
+  await page.locator('.progress-entry').first().click();
+  await page.locator('.progress-editor').getByRole('spinbutton', { name: '计数', exact: true }).fill('4294967296');
+  await page.getByRole('searchbox').fill('511');
+  await expect(page.getByRole('searchbox')).toHaveValue('');
+  await page.locator('.progress-pagination-top').getByRole('button', { name: '下一页', exact: true }).click();
+  await expect(page.locator('.progress-entry').first()).toContainText('#0');
+  await expect(page.locator('.progress-editor').getByRole('spinbutton', { name: '计数', exact: true })).toHaveValue('4294967296');
 });

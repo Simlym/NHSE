@@ -20,7 +20,7 @@ test('catalogue and variant flags reach the final row, apply drafts and undo acr
   await page.getByRole('button', { name: '改造款式图鉴', exact: true }).click();
   expect((await payloads(page, 'setCollection')).at(-1)).toMatchObject({ section: 'collection', index: 15999, known: true });
   await page.getByRole('searchbox').fill('15999'); await page.locator('.progress-entry').click(); await collected.check();
-  await page.locator('.player-chip').nth(1).click(); await expect(collected).not.toBeChecked();
+  await page.locator('.player-chip').nth(1).click(); await page.locator('.progress-entry').first().click(); await expect(collected).not.toBeChecked();
   await page.locator('.player-chip').first().click();
   await page.getByRole('searchbox').fill('15999'); await page.locator('.progress-entry').click(); await expect(collected).toBeChecked();
   await page.getByRole('button', { name: '撤销', exact: true }).click(); await expect(collected).not.toBeChecked();
@@ -42,6 +42,7 @@ test('catalogue batch review freezes scope, cancels safely and sends variants-on
   await page.locator('.progress-entry').click();
   await expect(page.locator('.progress-editor input[type=checkbox]')).not.toBeChecked();
   await page.getByRole('button', { name: '改造款式图鉴', exact: true }).click();
+  await page.locator('.progress-entry').first().click();
   await expect(page.locator('.progress-editor input[type=checkbox]')).toBeChecked();
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(page.locator('.progress-editor input[type=checkbox]')).not.toBeChecked();

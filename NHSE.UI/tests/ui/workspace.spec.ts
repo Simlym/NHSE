@@ -117,16 +117,16 @@ test('ordinary slot selection, quantity changes, undo, saved state and locked sl
   await page.locator('.item-slot').first().click();
   await expect(page.locator('.inspector h3')).toHaveText('木材');
   await page.getByRole('spinbutton', { name: '数量', exact: true }).fill('15');
-  await page.getByRole('button', { name: '应用修改', exact: true }).click();
+  await page.getByRole('button', { name: '更新数量', exact: true }).click();
   await expect(page.locator('.statusbar')).toContainText('有未保存的修改');
   await expect(page.locator('.item-slot').first()).toContainText('15');
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(page.locator('.item-slot').first()).toContainText('10');
-  await page.getByRole('button', { name: '选择物品', exact: true }).click();
+  await page.getByRole('button', { name: '替换物品', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: '木材', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.getByRole('button', { name: '应用修改', exact: true }).click();
+  await expect(page.getByRole('button', { name: '更新数量', exact: true })).toBeDisabled();
   await page.keyboard.press('Control+s');
   await expect(page.locator('.statusbar')).toContainText('修改已保存');
   await expect(page.getByRole('button', { name: '专注模式', exact: true })).toHaveCount(0);
@@ -141,7 +141,7 @@ test('frontend does not invoke the host for an invalid quantity', async ({ page 
   await page.getByRole('button', { name: '背包与仓库', exact: true }).click();
   await page.locator('.item-slot').first().click();
   await page.getByRole('spinbutton', { name: '数量', exact: true }).fill('999');
-  await page.getByRole('button', { name: '应用修改', exact: true }).click();
+  await page.getByRole('button', { name: '更新数量', exact: true }).click();
   expect(
     await page.evaluate(() =>
       (window as unknown as { nhseTestMessages: string[] }).nhseTestMessages.includes('setItem'),
@@ -180,7 +180,15 @@ test('player names and island names remain editable with avatar switching and un
   await expect(page.locator('.player-assets')).toContainText('可用狸端里程');
   await expect(page.locator('.player-capacity')).toContainText('仓库容量');
   await expect(page.locator('.player-apply-help')).toContainText('写入存档文件');
-  await page.setViewportSize({ width: 1600, height: 1100 });
+  await page.setViewportSize({ width: 1600, height: 900 });
+  const cards = await page.locator('.balance-form .player-card').evaluateAll(elements =>
+    elements.map(element => ({ top: element.getBoundingClientRect().top, width: element.getBoundingClientRect().width })),
+  );
+  expect(Math.max(...cards.map(card => card.top)) - Math.min(...cards.map(card => card.top))).toBeLessThan(2);
+  for (const input of await page.locator('.balance-form input').all()) {
+    expect((await input.boundingBox())!.width).toBeLessThan(300);
+  }
+  expect((await page.locator('.misc-profile').boundingBox())!.y + (await page.locator('.misc-profile').boundingBox())!.height).toBeLessThan(850);
   await page.screenshot({ path: 'test-results/player-profile-zhs.png' });
   for (const width of [1180, 800, 390]) {
     await page.setViewportSize({ width, height: 900 });
@@ -202,7 +210,7 @@ test('catalog exposes all pages, category filters, item-ID search and a dense pi
   await page.getByRole('button', { name: '打开存档', exact: true }).click();
   await page.getByRole('button', { name: '背包与仓库', exact: true }).click();
   await page.locator('.item-slot').first().click();
-  await page.getByRole('button', { name: '选择物品', exact: true }).click();
+  await page.getByRole('button', { name: '替换物品', exact: true }).click();
   const catalog = page.getByRole('dialog');
   await expect(catalog.locator('.catalog-item')).toHaveCount(96);
   await expect(catalog.locator('.catalog-summary')).toContainText('240');
@@ -237,7 +245,8 @@ test('catalog exposes all pages, category filters, item-ID search and a dense pi
   await catalog.getByRole('button', { name: '最后一页', exact: true }).click();
   await catalog.getByRole('button', { name: '测试物品240', exact: true }).click();
   await expect(page.locator('.inspector h3')).toHaveText('测试物品240');
-  await page.getByRole('button', { name: '应用修改', exact: true }).click();
+  await expect(catalog).toHaveCount(0);
+  await expect(page.locator('.item-slot').first()).toHaveAttribute('aria-label', '格子 1: 测试物品240');
   await expect(page.locator('.statusbar')).toContainText('有未保存的修改');
 });
 
@@ -346,7 +355,7 @@ test('recycle shortcut uses the workspace grid, stays shared and supports remova
   await expect(page.locator('.item-slot').last()).toBeEnabled();
   await page.locator('.item-slot').first().click();
   await page.getByRole('spinbutton', { name: '数量', exact: true }).fill('20');
-  await page.getByRole('button', { name: '应用修改', exact: true }).click();
+  await page.getByRole('button', { name: '更新数量', exact: true }).click();
   await page.locator('.player-chip').nth(1).click();
   await expect(page.locator('.item-slot').first()).toContainText('20');
   await page.getByRole('button', { name: '撤销', exact: true }).click();

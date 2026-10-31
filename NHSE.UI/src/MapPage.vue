@@ -533,7 +533,7 @@ defineExpose({ applyPending, chooseItem, hasPending, resetDraft });
         </div>
         <section v-if="data.target.mode === 'buildings'" class="building-navigator">
           <h3>{{ t('mapBuildingList') }} <span>{{ data.buildingPins?.length ?? 0 }}</span></h3>
-          <label class="building-search"><Search :size="15" /><input v-model="buildingSearch" type="search" :aria-label="t('mapSearchBuildings')" :placeholder="t('mapSearchBuildings')" /></label>
+          <label class="search-field building-search"><Search :size="15" /><input v-model="buildingSearch" type="search" :aria-label="t('mapSearchBuildings')" :placeholder="t('mapSearchBuildings')" /></label>
           <div class="map-building-list">
             <button v-for="pin in filteredBuildings" :key="pin.id" :disabled="busy" :aria-label="`${pin.id + 1} · ${buildingName(pin)}`" :aria-pressed="data.target.building === pin.id" @click="selectBuilding(pin)"><span class="building-number">{{ pin.id + 1 }}</span>{{ buildingName(pin) }}</button>
             <p v-if="!filteredBuildings.length" class="panel-hint">{{ t('mapNoBuildings') }}</p>
@@ -671,7 +671,7 @@ h3 { font-size: 12px; margin: 0; }
 .building-navigator { padding: 12px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
 .building-navigator h3 { display: flex; justify-content: space-between; }
 .building-navigator h3 span { color: var(--muted); font-weight: 400; }
-.building-search { display: flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 6px; padding: 0 7px; color: var(--muted); }
+.building-search { gap: 5px; border-radius: 6px; padding: 0 7px; }
 .building-search input { min-width: 0; width: 100%; padding: 7px 0; border: 0; background: transparent; font-size: 11px; }
 .map-building-list { display: grid; gap: 4px; }
 .map-building-list button { justify-content: flex-start; text-align: left; padding: 7px; font-size: 11px; border-color: transparent; }

@@ -51,7 +51,7 @@
   "apply": "変更を適用",
   "applied": "変更を適用しました。確認後にセーブを保存してください。",
   "saveSuccess": "保存しました。",
-  "inventoryHint": "マスを選択してアイテムを確認・交換します。適用した変更は元に戻せます。",
+  "inventoryHint": "クリックで詳細を表示、ダブルクリックで追加・置き換え。変更は元に戻せます。",
   "pocket": "ポケット",
   "storage": "家の収納",
   "searchInventory": "このポケット・収納を検索",
@@ -635,5 +635,9 @@
   "mapUseCurrentItem": "現在のアイテムを使用",
   "mapStampHint": "クリックで1個配置します。R でテンプレートを回転、Esc で終了します。",
   "mapMoveHint": "アイテムのあるマスをドラッグして移動します。選択範囲内をドラッグすると選択したすべてのアイテムを移動します。離すと検証して一括適用します。",
-  "mapBuildingDragHint": "選択した建物のラベルをドラッグして移動します。Esc で取消します。"
+  "mapBuildingDragHint": "選択した建物のラベルをドラッグして移動します。Esc で取消します。",
+  "inventoryAddItem": "アイテムを追加",
+  "inventoryReplaceItem": "アイテムを置き換え",
+  "inventoryUpdateQuantity": "数量を更新",
+  "inventoryCatalogHint": "アイテムを選ぶと、このスロットにすぐ反映されます。元に戻せます。数量は元の数を引き継ぎ、新しいアイテムの上限までに調整します。"
 }

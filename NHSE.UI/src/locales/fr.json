@@ -51,7 +51,7 @@
   "apply": "Appliquer",
   "applied": "Modifications appliquées. Enregistrez la sauvegarde lorsque vous êtes prêt.",
   "saveSuccess": "Sauvegarde enregistrée.",
-  "inventoryHint": "Sélectionnez un emplacement pour voir ou remplacer un objet. Les modifications peuvent être annulées.",
+  "inventoryHint": "Cliquez pour voir les détails, double-cliquez pour ajouter ou remplacer. Les modifications peuvent être annulées.",
   "pocket": "Poches",
   "storage": "Rangement de la maison",
   "searchInventory": "Rechercher dans cet inventaire",
@@ -635,5 +635,9 @@
   "mapUseCurrentItem": "Utiliser l’objet actuel",
   "mapStampHint": "Cliquez pour placer un objet. R tourne le modèle et Échap quitte le mode.",
   "mapMoveHint": "Faites glisser une case occupée pour déplacer son objet, ou dans la sélection pour déplacer tous les objets sélectionnés. Relâchez pour vérifier et appliquer en une seule opération.",
-  "mapBuildingDragHint": "Faites glisser l’étiquette du bâtiment sélectionné pour le déplacer. Échap annule."
+  "mapBuildingDragHint": "Faites glisser l’étiquette du bâtiment sélectionné pour le déplacer. Échap annule.",
+  "inventoryAddItem": "Ajouter un objet",
+  "inventoryReplaceItem": "Remplacer l’objet",
+  "inventoryUpdateQuantity": "Mettre à jour la quantité",
+  "inventoryCatalogHint": "La sélection s’applique immédiatement à cet emplacement et peut être annulée. La quantité précédente est conservée dans la limite du nouvel objet."
 }

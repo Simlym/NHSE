@@ -51,7 +51,7 @@
   "apply": "변경 사항 적용",
   "applied": "변경 사항을 적용했습니다. 확인 후 저장하세요.",
   "saveSuccess": "저장했습니다.",
-  "inventoryHint": "칸을 선택해 아이템을 확인하거나 교체하세요. 적용한 변경은 취소할 수 있습니다.",
+  "inventoryHint": "클릭하여 확인하고 두 번 클릭하여 추가하거나 교체하세요. 변경 사항은 실행 취소할 수 있습니다.",
   "pocket": "주머니",
   "storage": "집 창고",
   "searchInventory": "이 주머니 또는 창고에서 검색",
@@ -635,5 +635,9 @@
   "mapUseCurrentItem": "현재 아이템 사용",
   "mapStampHint": "클릭하여 아이템 하나를 배치합니다. R로 템플릿을 회전하고 Esc로 종료합니다.",
   "mapMoveHint": "점유된 칸을 드래그하면 해당 물체가 이동하며, 선택 범위 안에서 드래그하면 선택한 물체 전체가 이동합니다. 놓으면 검증 후 한 번에 적용합니다.",
-  "mapBuildingDragHint": "선택한 건물의 라벨을 드래그하여 이동하세요. Esc로 취소합니다."
+  "mapBuildingDragHint": "선택한 건물의 라벨을 드래그하여 이동하세요. Esc로 취소합니다.",
+  "inventoryAddItem": "아이템 추가",
+  "inventoryReplaceItem": "아이템 교체",
+  "inventoryUpdateQuantity": "수량 변경",
+  "inventoryCatalogHint": "선택한 아이템이 이 슬롯에 즉시 적용되며 실행 취소할 수 있습니다. 기존 수량은 새 아이템의 최대 수량 내에서 유지됩니다."
 }

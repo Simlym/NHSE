@@ -51,7 +51,7 @@
   "apply": "应用修改",
   "applied": "已应用修改，确认后请保存存档。",
   "saveSuccess": "存档保存成功。",
-  "inventoryHint": "点选格子查看或替换物品，已应用的修改支持撤销。",
+  "inventoryHint": "单击格子查看，双击添加或替换物品。修改即时生效，支持撤销。",
   "pocket": "随身背包",
   "storage": "房屋收纳",
   "searchInventory": "查找背包或仓库中的物品",
@@ -635,5 +635,9 @@
   "mapUseCurrentItem": "使用当前物品",
   "mapStampHint": "单击放置一个物品，R 旋转模板，Esc 退出。",
   "mapMoveHint": "拖动占用格移动物品；在选区内拖动可整体移动选中物品。松开后校验并一次提交。",
-  "mapBuildingDragHint": "拖动已选建筑的标签移动建筑，Esc 取消。"
+  "mapBuildingDragHint": "拖动已选建筑的标签移动建筑，Esc 取消。",
+  "inventoryAddItem": "添加物品",
+  "inventoryReplaceItem": "替换物品",
+  "inventoryUpdateQuantity": "更新数量",
+  "inventoryCatalogHint": "选择新物品后立即应用到此格，可撤销。堆叠数量沿用原数量，不超过新物品上限。"
 }

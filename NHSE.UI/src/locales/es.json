@@ -51,7 +51,7 @@
   "apply": "Aplicar cambios",
   "applied": "Cambios aplicados. Guarda la partida cuando termines.",
   "saveSuccess": "Partida guardada.",
-  "inventoryHint": "Selecciona una casilla para ver o reemplazar un objeto. Puedes deshacer los cambios.",
+  "inventoryHint": "Haz clic para ver los detalles y doble clic para añadir o reemplazar. Los cambios se pueden deshacer.",
   "pocket": "Bolsillos",
   "storage": "Trastero de casa",
   "searchInventory": "Buscar en este inventario",
@@ -635,5 +635,9 @@
   "mapUseCurrentItem": "Usar objeto actual",
   "mapStampHint": "Haz clic para colocar un objeto. R gira la plantilla y Esc sale.",
   "mapMoveHint": "Arrastra una celda ocupada para mover su objeto, o arrastra dentro de la selección para mover todos los objetos seleccionados. Al soltar se valida y aplica como una sola operación.",
-  "mapBuildingDragHint": "Arrastra la etiqueta del edificio seleccionado para moverlo. Esc cancela."
+  "mapBuildingDragHint": "Arrastra la etiqueta del edificio seleccionado para moverlo. Esc cancela.",
+  "inventoryAddItem": "Añadir objeto",
+  "inventoryReplaceItem": "Reemplazar objeto",
+  "inventoryUpdateQuantity": "Actualizar cantidad",
+  "inventoryCatalogHint": "La selección se aplica inmediatamente a esta casilla y se puede deshacer. Se conserva la cantidad anterior hasta el límite del nuevo objeto."
 }

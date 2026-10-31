@@ -51,7 +51,7 @@
   "apply": "Apply changes",
   "applied": "Changes applied. Save to file when ready.",
   "saveSuccess": "Save written successfully.",
-  "inventoryHint": "Select a slot to inspect or replace an item. Changes can be undone.",
+  "inventoryHint": "Click a slot to view it; double-click to add or replace an item. Changes can be undone.",
   "pocket": "Pockets",
   "storage": "Home storage",
   "searchInventory": "Find an item in this inventory",
@@ -635,5 +635,9 @@
   "mapUseCurrentItem": "Use current item",
   "mapStampHint": "Click to place one item. R rotates the template; Esc exits.",
   "mapMoveHint": "Drag an occupied cell to move its object, or drag inside the selection to move all selected objects. Release to validate and commit once.",
-  "mapBuildingDragHint": "Drag the selected building label to move it. Esc cancels."
+  "mapBuildingDragHint": "Drag the selected building label to move it. Esc cancels.",
+  "inventoryAddItem": "Add item",
+  "inventoryReplaceItem": "Replace item",
+  "inventoryUpdateQuantity": "Update quantity",
+  "inventoryCatalogHint": "Choose an item to apply it immediately to this slot. You can undo the change. The existing quantity is kept up to the new stack limit."
 }

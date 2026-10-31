@@ -51,7 +51,7 @@
   "apply": "Applica modifiche",
   "applied": "Modifiche applicate. Salva il file quando sei pronto.",
   "saveSuccess": "Salvataggio completato.",
-  "inventoryHint": "Seleziona una casella per vedere o sostituire un oggetto. Puoi annullare le modifiche.",
+  "inventoryHint": "Clic per i dettagli, doppio clic per aggiungere o sostituire. Le modifiche possono essere annullate.",
   "pocket": "Tasche",
   "storage": "Deposito di casa",
   "searchInventory": "Cerca in questo inventario",
@@ -635,5 +635,9 @@
   "mapUseCurrentItem": "Usa oggetto attuale",
   "mapStampHint": "Fai clic per posizionare un oggetto. R ruota il modello ed Esc esce.",
   "mapMoveHint": "Trascina una cella occupata per spostarne l’oggetto, oppure trascina nella selezione per spostare tutti gli oggetti selezionati. Rilascia per verificare e applicare in una sola operazione.",
-  "mapBuildingDragHint": "Trascina l’etichetta dell’edificio selezionato per spostarlo. Esc annulla."
+  "mapBuildingDragHint": "Trascina l’etichetta dell’edificio selezionato per spostarlo. Esc annulla.",
+  "inventoryAddItem": "Aggiungi oggetto",
+  "inventoryReplaceItem": "Sostituisci oggetto",
+  "inventoryUpdateQuantity": "Aggiorna quantità",
+  "inventoryCatalogHint": "La selezione viene applicata subito a questo spazio e può essere annullata. La quantità precedente viene mantenuta entro il limite del nuovo oggetto."
 }

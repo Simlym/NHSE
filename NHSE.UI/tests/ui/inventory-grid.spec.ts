@@ -1,6 +1,32 @@
 import { test, expect } from '@playwright/test';
 import { mockHost } from './mock-host';
 
+test('double-click replaces immediately, clamps quantity, supports undo and cancels without changes', async ({ page }) => {
+  await mockHost(page); await page.goto('/');
+  await page.getByRole('button', { name: '打开存档', exact: true }).click();
+  await page.locator('.sidebar nav').getByRole('button', { name: '背包与仓库', exact: true }).click();
+  const slot = page.locator('.inventory-selection-grid button').first();
+  await slot.dblclick();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.locator('.inventory-catalog-context')).toContainText('格子 1 · 木材');
+  await dialog.getByRole('button', { name: '测试物品002', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(slot).toHaveAttribute('aria-label', '格子 1: 测试物品002');
+  await expect(page.getByRole('spinbutton', { name: '数量', exact: true })).toHaveValue('1');
+  await expect(page.locator('.inspector-apply')).toHaveCount(0);
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(slot).toHaveAttribute('aria-label', '格子 1: 木材');
+  await expect(slot).toContainText('10');
+  await slot.dblclick();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(slot).toContainText('10');
+  await page.locator('.inventory-selection-grid button').nth(1).dblclick();
+  await expect(dialog.locator('.inventory-catalog-context')).toContainText('格子 2');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: '添加物品', exact: true })).toBeVisible();
+});
+
 test('inventory clears details repeatedly with Escape and blank clicks, and returns from item properties', async ({ page }) => {
   await mockHost(page); await page.goto('/');
   await page.getByRole('button', { name: '打开存档', exact: true }).click();
